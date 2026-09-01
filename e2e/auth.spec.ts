@@ -26,10 +26,15 @@ test("AC1: Mike logs in at /ops and lands on the ops placeholder", async ({ page
   await page.goto("/ops");
   await expect(page.getByRole("heading", { name: "Operations portal" })).toBeVisible();
 
-  await login(page, "mike@example.com");
+  await login(page, "mike@idelta.com.au");
 
   await expect(page.getByText(/Logged in as Mike/)).toBeVisible();
   await expect(page.getByText(/Operations admin/)).toBeVisible();
+
+  // Below the shell's md breakpoint, log out lives behind the menu button
+  // (Feature 1006, the ops portal shell) -- open it first where it exists.
+  const menuButton = page.getByRole("button", { name: "Open menu" });
+  if (await menuButton.isVisible()) await menuButton.click();
 
   // Leave the account as we found it.
   await page.getByRole("button", { name: "Log out" }).click();
@@ -40,12 +45,12 @@ test("AC3 + AC11: Bob's contractor session sees the wrong-door card on /ops, and
   page,
 }) => {
   await page.goto("/contractor");
-  await login(page, "bob.reilly@example.com");
+  await login(page, "bob@idelta.com.au");
   await expect(page.getByText(/Logged in as Bob Reilly/)).toBeVisible();
 
   await page.goto("/ops");
   await expect(page.getByRole("heading", { name: "Wrong portal" })).toBeVisible();
-  await expect(page.getByText("bob.reilly@example.com")).toBeVisible();
+  await expect(page.getByText("bob@idelta.com.au")).toBeVisible();
 
   await page.getByRole("link", { name: "Go to your portal" }).click();
   await expect(page).toHaveURL(/\/contractor$/);
@@ -59,7 +64,7 @@ test("AC2: a wrong password shows the generic banner, never a field-specific one
   page,
 }) => {
   await page.goto("/ops");
-  await page.getByLabel("Email").fill("mike@example.com");
+  await page.getByLabel("Email").fill("mike@idelta.com.au");
   await page.getByLabel("Password").fill("not-the-right-password");
   await page.getByRole("button", { name: "Log in" }).click();
 
@@ -71,7 +76,7 @@ test("the forgot-password form reaches the no-enumeration sent state", async ({ 
   await page.getByRole("link", { name: "Forgot your password?" }).click();
   await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible();
 
-  await page.getByLabel("Email").fill("mike@example.com");
+  await page.getByLabel("Email").fill("mike@idelta.com.au");
   await page.getByRole("button", { name: "Email me a reset link" }).click();
 
   await expect(page.getByText(/If that email has an account/)).toBeVisible();
