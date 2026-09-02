@@ -25,6 +25,14 @@
 // Plumbing's rate/multiplier/option edits are restored to the seeded
 // values at the end of the writing test, the same "leave it as we found
 // it" discipline settings.spec.ts uses for the PlatformSettings row.
+//
+// Feature 1012 (reorderable rows) proves its own AC2 (reorder + save +
+// reload) and AC4 (add/remove regression on the shared component) inside
+// this same desktop-only test, right after this file's AC5 section -- this
+// test already owns the one exclusive-write slot on the shared Plumbing
+// row; a second writer in reorderable-rows.spec.ts would race it. 1012's
+// AC1 and AC3 (button presence, tap targets) touch no server state and
+// live in reorderable-rows.spec.ts instead.
 import { test, expect } from "@playwright/test";
 
 const DEV_PASSWORD = "dev-password-123";
@@ -177,6 +185,25 @@ test(
     await page.reload();
     await expect(page.getByLabel("Option 1", { exact: true })).toHaveValue("Blocked drain");
     await expect(page.getByLabel("Option 2", { exact: true })).toHaveValue("Leaking tap");
+    await expect(page.getByLabel("Option 3", { exact: true })).toHaveCount(0);
+
+    // Feature 1012, AC2 -- move option 2 up one place and save; the API
+    // returns the new order and a reload shows it.
+    await page.getByRole("button", { name: "Move option 2 up" }).click();
+    await expect(page.getByLabel("Option 1", { exact: true })).toHaveValue("Leaking tap");
+    await expect(page.getByLabel("Option 2", { exact: true })).toHaveValue("Blocked drain");
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("Saved.")).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel("Option 1", { exact: true })).toHaveValue("Leaking tap");
+    await expect(page.getByLabel("Option 2", { exact: true })).toHaveValue("Blocked drain");
+
+    // Feature 1012, AC4 -- add and remove still behave exactly as before
+    // now that the ordered variant is in play (regression guard).
+    await page.getByRole("button", { name: "+ Add another" }).click();
+    await page.getByLabel("Option 3", { exact: true }).fill("to be removed");
+    await expect(page.getByLabel("Option 3", { exact: true })).toHaveValue("to be removed");
+    await page.getByRole("button", { name: "Remove option 3" }).click();
     await expect(page.getByLabel("Option 3", { exact: true })).toHaveCount(0);
 
     // Leave the row exactly as found.
