@@ -8,6 +8,10 @@
 // repeatable rows (plan AC5). Confirmed against the Ops Portal Shell style
 // reference and the frozen repeatable-rows / computed-preview patterns
 // (plan.md, Quick fixes).
+//
+// Feature 1012: the prefilled options are the first user of the ordered
+// repeatable-rows variant (up/down buttons, no drag) -- reordering is
+// client-side row shuffling; nothing saves until this screen's one Save.
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -258,6 +262,7 @@ export function ServiceTypeForm({
           values={prefilledFields}
           onChange={setPrefilledFields}
           placeholder="e.g. Blocked drain"
+          ordered
         />
       </div>
 
