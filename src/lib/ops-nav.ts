@@ -22,7 +22,7 @@ export const OPS_NAV_ITEMS: readonly OpsNavItem[] = [
   { key: "settlements", label: "Settlements", href: "/ops/settlements", built: false },
   { key: "status", label: "Service status", href: "/ops/status", built: false },
   { key: "settings", label: "Settings", href: "/ops/settings", owner: true, built: true },
-  { key: "pricing", label: "Pricing", href: "/ops/pricing", owner: true, built: false },
+  { key: "pricing", label: "Pricing", href: "/ops/pricing", owner: true, built: true },
   { key: "seo-pages", label: "SEO pages", href: "/ops/seo-pages", owner: true, built: false },
   { key: "reports", label: "Reports", href: "/ops/reports", owner: true, built: false },
 ] as const;
