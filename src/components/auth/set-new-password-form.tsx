@@ -17,7 +17,15 @@ import type { Role } from "@/lib/session";
 
 const MIN_LENGTH = 8;
 
-export function SetNewPasswordForm({ email, token }: { email: string; token: string }) {
+export function SetNewPasswordForm({
+  email,
+  token,
+  displayName = null,
+}: {
+  email: string;
+  token: string;
+  displayName?: string | null;
+}) {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | undefined>();
@@ -60,7 +68,7 @@ export function SetNewPasswordForm({ email, token }: { email: string; token: str
   }
 
   return (
-    <GateShell>
+    <GateShell displayName={displayName}>
       <GateCardTitle title="Choose a new password" subtitle={`For ${email}`} />
       <form onSubmit={(event) => void handleSubmit(event)} noValidate>
         {formError ? <Banner kind="error">{formError}</Banner> : null}

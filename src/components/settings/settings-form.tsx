@@ -19,6 +19,7 @@ import { Banner } from "@/components/auth/banner";
 
 export interface SettingsDto {
   id: string;
+  displayName: string;
   gstRegistered: boolean;
   gstStatusChangedAt: string | null;
   gstStatusChangedByUserId: string | null;
@@ -70,6 +71,7 @@ const EMAIL_PROVIDER_OPTIONS = [{ value: "mailjet", label: "Mailjet" }] as const
 const SMS_PROVIDER_OPTIONS = [{ value: "clicksend", label: "ClickSend" }] as const;
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+const DISPLAY_NAME_MAX_LENGTH = 80;
 
 function centsToDollarsInput(cents: number): string {
   return (cents / 100).toFixed(2);
@@ -92,6 +94,7 @@ function formatAuditDate(iso: string): string {
 export function SettingsForm({ initial }: { initial: SettingsDto }) {
   const [settings, setSettings] = useState(initial);
 
+  const [displayName, setDisplayName] = useState(initial.displayName);
   const [gstRegistered, setGstRegistered] = useState(initial.gstRegistered);
   const [businessAbn, setBusinessAbn] = useState(initial.businessAbn ?? "");
   const [gstRatePercent, setGstRatePercent] = useState(initial.gstRatePercent);
@@ -127,6 +130,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
       return undefined;
     }
     return {
+      displayName,
       gstRegistered,
       businessAbn: businessAbn.trim() === "" ? null : businessAbn.trim(),
       gstRatePercent: Number(gstRatePercent),
@@ -182,6 +186,16 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
     setFieldErrors({});
     setFormError(undefined);
 
+    // Decision 7, mirrored client-side (the server enforces it for real).
+    if (displayName.trim() === "") {
+      setFieldErrors({ displayName: "Enter a business name." });
+      return;
+    }
+    if (displayName.trim().length > DISPLAY_NAME_MAX_LENGTH) {
+      setFieldErrors({ displayName: `Keep it to ${DISPLAY_NAME_MAX_LENGTH} characters or fewer.` });
+      return;
+    }
+
     // The ABN gate, mirrored client-side (the server enforces it for real -- AC4).
     if (gstRegistered && businessAbn.trim() === "") {
       setFieldErrors({ businessAbn: "Enter the ABN first - a GST-registered invoice must carry it." });
@@ -212,6 +226,18 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
 
       <div className="mb-4.5 max-w-[720px] rounded-[10px] border border-hairline bg-surface p-5">
         <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Business</h3>
+        <div className="flex flex-wrap gap-4">
+          <div className="min-w-[200px] flex-1">
+            <Field
+              id="displayName"
+              label="Business name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              error={fieldErrors["displayName"]}
+              helper={fieldErrors["displayName"] ? undefined : "Shown on every screen and signs every message."}
+            />
+          </div>
+        </div>
         <div className="flex flex-wrap gap-4">
           <div className="min-w-[200px] flex-1">
             <Field

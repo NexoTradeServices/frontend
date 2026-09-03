@@ -3,6 +3,7 @@
 // (plan decision 3: create is included -- "a catalog the owner cannot
 // extend without a developer is not a catalog").
 import { getSessionUser } from "@/lib/session";
+import { getDisplayName } from "@/lib/identity";
 import { LoginGate } from "@/components/auth/login-gate";
 import { WrongDoor } from "@/components/auth/wrong-door";
 import { OpsShell } from "@/components/ops-shell/ops-shell";
@@ -20,12 +21,18 @@ const BLANK: ServiceTypeDto = {
 };
 
 export default async function NewServiceTypePage() {
-  const user = await getSessionUser();
-  if (!user) return <LoginGate portalName={PORTAL_NAME} />;
-  if (user.role !== "owner") return <WrongDoor user={user} portalName="Pricing" />;
+  const [user, displayName] = await Promise.all([getSessionUser(), getDisplayName()]);
+  if (!user) return <LoginGate portalName={PORTAL_NAME} displayName={displayName} />;
+  if (user.role !== "owner") return <WrongDoor user={user} portalName="Pricing" displayName={displayName} />;
 
   return (
-    <OpsShell user={user} active="pricing" title="Add a trade" subtitle="Set its customer rates before it goes live.">
+    <OpsShell
+      user={user}
+      active="pricing"
+      title="Add a trade"
+      subtitle="Set its customer rates before it goes live."
+      displayName={displayName}
+    >
       <ServiceTypeForm mode="create" initial={BLANK} />
     </OpsShell>
   );

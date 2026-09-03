@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo, Geist_Mono, Public_Sans } from "next/font/google";
+import { getDisplayName } from "@/lib/identity";
 import "./globals.css";
 
 // Foundations typography (frontend-conventions.md, section B): Archivo for
@@ -21,10 +22,17 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Perth Trades & Services",
-  description: "Managed trades platform for Perth, WA.",
-};
+// Feature 1014, brand strings go to config: the tab title reads the config
+// home. Decision 6 -- if the identity read fails, the title falls back to
+// nothing brand-bearing (an empty string) rather than holding a name of its
+// own; the page still loads either way.
+export async function generateMetadata(): Promise<Metadata> {
+  const displayName = await getDisplayName();
+  return {
+    title: displayName ?? "",
+    description: "Managed trades platform for Perth, WA.",
+  };
+}
 
 export default function RootLayout({
   children,

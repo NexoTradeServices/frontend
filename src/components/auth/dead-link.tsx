@@ -5,9 +5,9 @@
 import { GateShell, GateCardTitle } from "./gate-shell";
 import { PrimaryLink, TextLink } from "./buttons";
 
-export function DeadLink() {
+export function DeadLink({ displayName = null }: { displayName?: string | null }) {
   return (
-    <GateShell>
+    <GateShell displayName={displayName}>
       <GateCardTitle
         title="This link has expired"
         subtitle="Reset links work once and expire after an hour"
