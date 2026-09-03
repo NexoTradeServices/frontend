@@ -17,7 +17,13 @@ import { Banner } from "./banner";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function LoginGate({ portalName }: { portalName: string }) {
+export function LoginGate({
+  portalName,
+  displayName = null,
+}: {
+  portalName: string;
+  displayName?: string | null;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [email, setEmail] = useState("");
@@ -54,7 +60,7 @@ export function LoginGate({ portalName }: { portalName: string }) {
   }
 
   return (
-    <GateShell>
+    <GateShell displayName={displayName}>
       <GateCardTitle title={portalName} subtitle="Log in to continue" />
       <form onSubmit={(event) => void handleSubmit(event)} noValidate>
         {formError ? <Banner kind="error">{formError}</Banner> : null}

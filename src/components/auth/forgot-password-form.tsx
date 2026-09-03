@@ -13,7 +13,13 @@ import { Field } from "./field";
 import { PrimaryButton, TextLink } from "./buttons";
 import { Banner } from "./banner";
 
-export function ForgotPasswordForm({ backTo }: { backTo: string }) {
+export function ForgotPasswordForm({
+  backTo,
+  displayName = null,
+}: {
+  backTo: string;
+  displayName?: string | null;
+}) {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -31,7 +37,7 @@ export function ForgotPasswordForm({ backTo }: { backTo: string }) {
   }
 
   return (
-    <GateShell>
+    <GateShell displayName={displayName}>
       <GateCardTitle title="Reset your password" subtitle="We'll email you a link to set a new one" />
       {sent ? (
         <Banner kind="success">

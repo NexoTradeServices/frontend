@@ -8,6 +8,7 @@
 // the same Verification row, read twice, never consumed by either read.
 import { DeadLink } from "@/components/auth/dead-link";
 import { SetNewPasswordForm } from "@/components/auth/set-new-password-form";
+import { getDisplayName } from "@/lib/identity";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -19,16 +20,17 @@ export default async function ResetPasswordPage({
   const { token, error } = await searchParams;
 
   if (error || !token) {
-    return <DeadLink />;
+    return <DeadLink displayName={await getDisplayName()} />;
   }
 
-  const res = await fetch(`${apiUrl}/api/reset-link?token=${encodeURIComponent(token)}`, {
-    cache: "no-store",
-  });
+  const [res, displayName] = await Promise.all([
+    fetch(`${apiUrl}/api/reset-link?token=${encodeURIComponent(token)}`, { cache: "no-store" }),
+    getDisplayName(),
+  ]);
   if (res.status !== 200) {
-    return <DeadLink />;
+    return <DeadLink displayName={displayName} />;
   }
   const { email } = (await res.json()) as { email: string };
 
-  return <SetNewPasswordForm email={email} token={token} />;
+  return <SetNewPasswordForm email={email} token={token} displayName={displayName} />;
 }

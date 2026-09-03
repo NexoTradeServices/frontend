@@ -9,11 +9,23 @@ import { LogoutLink } from "./logout-link";
 import { PORTAL_ROOTS } from "@/lib/portal-roots";
 import type { SessionUser } from "@/lib/session";
 
-export function WrongDoor({ user, portalName }: { user: SessionUser; portalName: string }) {
+// `displayName` arrives as a prop, fetched by the caller ALONGSIDE
+// getSessionUser (Promise.all) rather than here -- nesting a second await
+// behind the session read would serialize two backend round trips into one
+// render instead of running them in parallel.
+export function WrongDoor({
+  user,
+  portalName,
+  displayName = null,
+}: {
+  user: SessionUser;
+  portalName: string;
+  displayName?: string | null;
+}) {
   const ownRoot = PORTAL_ROOTS[user.role];
 
   return (
-    <GateShell>
+    <GateShell displayName={displayName}>
       <h1 className="mb-0.5 font-heading text-base font-extrabold text-ink">Wrong portal</h1>
       <p className="mb-4 text-xs text-muted-text">You&apos;re logged in as {user.email}</p>
       <p className="mb-4 text-[13px] text-secondary-text">

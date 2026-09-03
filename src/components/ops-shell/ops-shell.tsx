@@ -19,15 +19,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { OPS_NAV_ITEMS, type OpsNavItem } from "@/lib/ops-nav";
 import { LogoutLink } from "@/components/auth/logout-link";
+import { Wordmark } from "@/components/brand/wordmark";
 import type { SessionUser } from "@/lib/session";
-
-function Wordmark() {
-  return (
-    <span className="font-heading text-xs font-black tracking-[0.14em] text-white uppercase">
-      Perth Trades <span className="text-brand-accent">&amp;</span> Services
-    </span>
-  );
-}
 
 function NavLink({ item, active, onNavigate }: { item: OpsNavItem; active: boolean; onNavigate?: () => void }) {
   return (
@@ -89,12 +82,14 @@ export function OpsShell({
   title,
   subtitle,
   children,
+  displayName = null,
 }: {
   user: SessionUser;
   active: string;
   title: string;
   subtitle: string;
   children: ReactNode;
+  displayName?: string | null;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const mainItems = OPS_NAV_ITEMS.filter((item) => item.built && !item.owner);
@@ -106,7 +101,7 @@ export function OpsShell({
       <div className="flex min-h-screen">
         <nav aria-label="Sidebar" className="hidden w-[224px] shrink-0 flex-col bg-ink pt-[18px] pb-6 md:flex">
           <div className="px-[18px] pb-[18px]">
-            <Wordmark />
+            <Wordmark name={displayName} />
           </div>
           <NavGroups mainItems={mainItems} ownerItems={ownerItems} active={active} />
           <div className="mt-auto px-[18px] pt-[18px] text-xs text-[#b9c2cc]">
@@ -120,7 +115,7 @@ export function OpsShell({
         <div className="min-w-0 flex-1">
           {/* Mobile / tablet-below-md top app bar */}
           <div className="flex items-center justify-between bg-ink px-3.5 py-3 md:hidden">
-            <Wordmark />
+            <Wordmark name={displayName} />
             <button
               type="button"
               aria-label="Open menu"
@@ -143,7 +138,7 @@ export function OpsShell({
       {menuOpen ? (
         <div className="fixed inset-0 z-50 flex flex-col bg-ink md:hidden">
           <div className="flex items-center justify-between px-3.5 py-3">
-            <Wordmark />
+            <Wordmark name={displayName} />
             <button
               type="button"
               aria-label="Close menu"
