@@ -14,14 +14,7 @@
 // Both tests below never click Save, so they touch no server state and are
 // safe to run on every project in parallel.
 import { test, expect } from "@playwright/test";
-
-const DEV_PASSWORD = "dev-password-123";
-
-async function login(page: import("@playwright/test").Page, email: string) {
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(DEV_PASSWORD);
-  await page.getByRole("button", { name: "Log in" }).click();
-}
+import { login } from "./helpers/login";
 
 async function openPlumbingEdit(page: import("@playwright/test").Page) {
   await page.goto("/ops/pricing");

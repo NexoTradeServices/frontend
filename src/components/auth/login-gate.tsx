@@ -51,8 +51,17 @@ export function LoginGate({
     setLoading(false);
 
     if (error) {
+      // Feature 2001, decision 9: a deactivated contractor with the RIGHT
+      // password is told why -- backend/src/auth/login-routes.ts intercepts
+      // sign-in and returns this code+message instead of a session; every
+      // other failure (wrong password, unknown email) carries no `code` and
+      // gets the same generic banner as before, so the message can never be
+      // used to probe which emails hold accounts.
+      const accountError = error as { code?: string; message?: string };
       setFormError(
-        "That email and password don't match. Check them and try again, or reset your password below.",
+        accountError.code === "ACCOUNT_NOT_ACTIVE" && accountError.message
+          ? accountError.message
+          : "That email and password don't match. Check them and try again, or reset your password below.",
       );
       return;
     }
