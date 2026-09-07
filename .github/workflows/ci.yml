@@ -30,5 +30,11 @@ jobs:
       - name: Build
         run: npm run build
 
-      # No test step yet - tests arrive with the first feature that needs them,
-      # so a green tick never claims more than it checked.
+      # BKLG-015 (feature 2002): a Playwright step was tried here and pulled
+      # back out. See change.md's Notes on the table, V1. playwright.config.ts's
+      # baseURL is the real dev domain (https://idelta.com.au); this runner
+      # reaches it over the public internet on a home uplink, not the LAN
+      # every local run uses, and every login-dependent spec timed out. The
+      # real fix is a hermetic runner (its own Postgres, backend and
+      # frontend, tests against localhost) -> project/setup/02-repos-and-cicd.md,
+      # section "2a. CI -- the gate the rule above depends on".

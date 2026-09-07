@@ -1,18 +1,14 @@
 // Field anatomy -- frontend-conventions.md, Components / Field anatomy.
 //
 // Label above the control; helper text below, replaced by an error message
-// (blocking, destructive red) when one is set. Two ways to mark the
-// required/optional split, pick whichever is the MINORITY on the screen:
-// an `optional` field carries an explicit, un-shouted "(optional)" tag
-// (the original convention, still the default -- Components / Required vs
-// optional marking); a `required` field carries a small asterisk instead,
-// for a screen where most fields are optional and the few required ones
-// are the exception worth calling out (feature 2001's contractor form --
-// owner's call, 04/09/26: with only 3 of ~15 fields required, tagging
-// every other field "(optional)" read as noise/confusing rather than
-// informative). `prefix`/`suffix` decorate the control itself -- "$"
-// before a money amount, a unit ("days", "km", "%", "min") after a number
-// (Components / Money input).
+// (blocking, destructive red) when one is set. The required/optional split
+// marks only the required exception with a small asterisk -- never an
+// "(optional)" tag on the rest, on any screen (BKLG-012, feature 2002:
+// Settings and Pricing joined 2001's contractor form on this rule; the
+// `optional` prop this file used to carry is gone, not just unused).
+// `prefix`/`suffix` decorate the control itself -- "$" before a money
+// amount, a unit ("days", "km", "%", "min") after a number (Components /
+// Money input).
 import type { InputHTMLAttributes } from "react";
 
 interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -21,8 +17,7 @@ interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   /** true, never an error -- the value stands, only the consequence differs (e.g. an already-expired date). */
   warning?: string;
-  optional?: boolean;
-  /** the alternative to `optional` -- mark the required exception instead of the optional majority. */
+  /** marks the required exception with a small asterisk; unmarked fields are optional. */
   required?: boolean;
   prefix?: string;
   suffix?: string;
@@ -33,7 +28,6 @@ export function Field({
   helper,
   error,
   warning,
-  optional,
   required,
   prefix,
   suffix,
@@ -57,7 +51,6 @@ export function Field({
         }`}
       >
         {label}
-        {optional ? <span className="font-normal tracking-normal normal-case"> (optional)</span> : null}
       </label>
       <div className="relative">
         {prefix ? (

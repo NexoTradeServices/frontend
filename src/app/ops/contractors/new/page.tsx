@@ -6,7 +6,7 @@ import { getSessionUser } from "@/lib/session";
 import { getDisplayName } from "@/lib/identity";
 import { LoginGate } from "@/components/auth/login-gate";
 import { WrongDoor } from "@/components/auth/wrong-door";
-import { OpsShell } from "@/components/ops-shell/ops-shell";
+import { PortalShell } from "@/components/portal-shell/portal-shell";
 import { ContractorForm } from "@/components/contractors/contractor-form";
 
 const PORTAL_NAME = "Operations portal";
@@ -27,7 +27,7 @@ export default async function NewContractorPage() {
   const tradeOptions = res.status === 200 ? ((await res.json()) as { trades: string[] }).trades : [];
 
   return (
-    <OpsShell
+    <PortalShell
       user={user}
       active="contractors"
       title="Contractors"
@@ -35,6 +35,6 @@ export default async function NewContractorPage() {
       displayName={displayName}
     >
       <ContractorForm mode="create" initial={null} tradeOptions={tradeOptions} />
-    </OpsShell>
+    </PortalShell>
   );
 }

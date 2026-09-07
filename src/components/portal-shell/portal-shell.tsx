@@ -1,10 +1,11 @@
-// The ops portal shell -- Feature 1006, admin settings screen.
+// The portal shell -- Feature 1006, admin settings screen; generalized to a
+// shared shell across portals at Feature 2002, plan decision 2 ("the
+// contractor shell is the portal shell with a contractor nav list").
 //
 // Layout shells: "navy sidebar (white-on-navy nav, accent active item, OWNER
-// group separated), warm content area, white cards ... On phones the sidebar
-// becomes a top app bar + menu: the menu opens full-screen over navy and
-// carries the sidebar's exact content and order." Confirmed live on the Ops
-// Portal Shell style reference, 01 Sep 2026.
+// group separated), warm content area, white cards with 1px borders. Same
+// bones for /account, /contractor and /ops - different nav items per role."
+// Confirmed live on the Ops Portal Shell style reference, 01 Sep 2026.
 //
 // [IMPL] The reference draws only desktop and the 390 mobile menu, not the
 // 768 tablet width in between -- the sidebar/top-app-bar swap uses
@@ -17,12 +18,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { OPS_NAV_ITEMS, type OpsNavItem } from "@/lib/ops-nav";
+import { OPS_NAV_ITEMS, type PortalNavItem } from "@/lib/ops-nav";
 import { LogoutLink } from "@/components/auth/logout-link";
 import { Wordmark } from "@/components/brand/wordmark";
 import type { SessionUser } from "@/lib/session";
 
-function NavLink({ item, active, onNavigate }: { item: OpsNavItem; active: boolean; onNavigate?: () => void }) {
+function NavLink({ item, active, onNavigate }: { item: PortalNavItem; active: boolean; onNavigate?: () => void }) {
   return (
     <Link
       href={item.href}
@@ -45,8 +46,8 @@ function NavGroups({
   active,
   onNavigate,
 }: {
-  mainItems: readonly OpsNavItem[];
-  ownerItems: readonly OpsNavItem[];
+  mainItems: readonly PortalNavItem[];
+  ownerItems: readonly PortalNavItem[];
   active: string;
   onNavigate?: () => void;
 }) {
@@ -76,13 +77,14 @@ function NavGroups({
   );
 }
 
-export function OpsShell({
+export function PortalShell({
   user,
   active,
   title,
   subtitle,
   children,
   displayName = null,
+  navItems = OPS_NAV_ITEMS,
 }: {
   user: SessionUser;
   active: string;
@@ -90,10 +92,12 @@ export function OpsShell({
   subtitle: string;
   children: ReactNode;
   displayName?: string | null;
+  /** Per-portal nav list (Portal menus, Architecture & Routing) -- defaults to the ops list. */
+  navItems?: readonly PortalNavItem[];
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const mainItems = OPS_NAV_ITEMS.filter((item) => item.built && !item.owner);
-  const ownerItems = user.role === "owner" ? OPS_NAV_ITEMS.filter((item) => item.built && item.owner) : [];
+  const mainItems = navItems.filter((item) => item.built && !item.owner);
+  const ownerItems = user.role === "owner" ? navItems.filter((item) => item.built && item.owner) : [];
 
   return (
     <div className="min-h-screen bg-ground">

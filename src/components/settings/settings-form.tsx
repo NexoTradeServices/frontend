@@ -231,6 +231,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
             <Field
               id="displayName"
               label="Business name"
+              required
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               error={fieldErrors["displayName"]}
@@ -243,7 +244,6 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
             <Field
               id="businessAbn"
               label="ABN"
-              optional
               value={businessAbn}
               onChange={(e) => setBusinessAbn(e.target.value)}
               error={fieldErrors["businessAbn"]}
@@ -254,6 +254,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
             <Field
               id="operatorPhone"
               label="Operator phone"
+              required
               value={operatorPhone}
               onChange={(e) => setOperatorPhone(e.target.value)}
               error={fieldErrors["operatorPhone"]}
@@ -267,6 +268,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
               id="operatorEmail"
               label="Business inbox"
               type="email"
+              required
               value={operatorEmail}
               onChange={(e) => setOperatorEmail(e.target.value)}
               error={fieldErrors["operatorEmail"]}
@@ -281,6 +283,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
             <SelectField
               id="timezone"
               label="Timezone"
+              required
               options={TIMEZONE_OPTIONS}
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
@@ -325,6 +328,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
               min={0}
               max={100}
               suffix="%"
+              required
               value={gstRatePercent}
               onChange={(e) => setGstRatePercent(e.target.value)}
               error={fieldErrors["gstRatePercent"]}
@@ -348,6 +352,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
               type="number"
               min={0}
               suffix="days"
+              required
               value={paymentTermsDays}
               onChange={(e) => setPaymentTermsDays(e.target.value)}
               error={fieldErrors["paymentTermsDays"]}
@@ -361,6 +366,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
               step="0.01"
               min={0}
               prefix="$"
+              required
               value={calloutFee}
               onChange={(e) => setCalloutFee(e.target.value)}
               error={fieldErrors["calloutFee"]}
@@ -376,6 +382,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
               type="number"
               min={0}
               suffix="min"
+              required
               value={returnVisitMinimumMinutes}
               onChange={(e) => setReturnVisitMinimumMinutes(e.target.value)}
               error={fieldErrors["returnVisitMinimumMinutes"]}
@@ -389,6 +396,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
               step="0.01"
               min={0}
               prefix="$"
+              required
               value={maxContractorPartAmount}
               onChange={(e) => setMaxContractorPartAmount(e.target.value)}
               error={fieldErrors["maxContractorPartAmount"]}
@@ -402,6 +410,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
               step="0.1"
               min={0}
               suffix="km"
+              required
               value={serviceReachKm}
               onChange={(e) => setServiceReachKm(e.target.value)}
               error={fieldErrors["serviceReachKm"]}
@@ -417,6 +426,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
             <SelectField
               id="payoutCycle"
               label="Payout cycle"
+              required
               options={PAYOUT_CYCLE_OPTIONS}
               value={payoutCycle}
               onChange={(e) => setPayoutCycle(e.target.value as "weekly" | "fortnightly")}
@@ -439,6 +449,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
             <SelectField
               id="emailProvider"
               label="Email provider"
+              required
               options={EMAIL_PROVIDER_OPTIONS}
               value={emailProvider}
               onChange={(e) => setEmailProvider(e.target.value)}
@@ -449,6 +460,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
             <SelectField
               id="smsProvider"
               label="SMS provider"
+              required
               options={SMS_PROVIDER_OPTIONS}
               value={smsProvider}
               onChange={(e) => setSmsProvider(e.target.value)}

@@ -88,6 +88,14 @@ export function dispatchStateLabel(state: DispatchState): string {
   return "Dispatchable";
 }
 
+/** the record header's own tags (Active/Deactivated, Ready/Not ready) -- shared by the Details and Service area tabs. */
+export function recordTagClasses(kind: "active" | "suspended" | "ready" | "notready"): string {
+  const base = "inline-block rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] uppercase";
+  if (kind === "active" || kind === "ready") return `${base} bg-success-bg text-brand-success`;
+  if (kind === "notready") return `${base} bg-warning-bg text-brand-warning`;
+  return `${base} bg-ground text-muted-text`;
+}
+
 /** the frozen tag style (Q1 visual) -- success/warning/neutral pill, shared across the contractor screens. */
 export function dispatchStateTagClasses(state: DispatchState): string {
   // font-sans, explicit: every other status pill on this screen sits outside

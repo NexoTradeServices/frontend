@@ -5,7 +5,7 @@ import { getSessionUser } from "@/lib/session";
 import { getDisplayName } from "@/lib/identity";
 import { LoginGate } from "@/components/auth/login-gate";
 import { WrongDoor } from "@/components/auth/wrong-door";
-import { OpsShell } from "@/components/ops-shell/ops-shell";
+import { PortalShell } from "@/components/portal-shell/portal-shell";
 import { SettingsForm, type SettingsDto } from "@/components/settings/settings-form";
 
 const PORTAL_NAME = "Operations portal";
@@ -28,7 +28,7 @@ export default async function OpsSettingsPage() {
   const settings = (await res.json()) as SettingsDto;
 
   return (
-    <OpsShell
+    <PortalShell
       user={user}
       active="settings"
       title="Settings"
@@ -36,6 +36,6 @@ export default async function OpsSettingsPage() {
       displayName={displayName}
     >
       <SettingsForm initial={settings} />
-    </OpsShell>
+    </PortalShell>
   );
 }

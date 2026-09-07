@@ -2,7 +2,9 @@
 //
 // A short, fixed list (Timezone, Payout cycle/day, providers) uses a plain
 // select. Same label/helper/error anatomy as Field (Components / Field
-// anatomy), so the two sit in the same fieldrow without looking mismatched.
+// anatomy), so the two sit in the same fieldrow without looking mismatched --
+// including the same required-star marking, never an "(optional)" tag
+// (BKLG-012, feature 2002).
 import type { SelectHTMLAttributes } from "react";
 
 interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement> {
@@ -10,6 +12,8 @@ interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement> {
   helper?: string;
   error?: string;
   options: readonly { value: string; label: string }[];
+  /** marks the required exception with a small asterisk; unmarked fields are optional. */
+  required?: boolean;
 }
 
 export function SelectField({
@@ -17,6 +21,7 @@ export function SelectField({
   helper,
   error,
   options,
+  required,
   id,
   className,
   ...selectProps
@@ -25,7 +30,9 @@ export function SelectField({
     <div className="mb-3.5">
       <label
         htmlFor={id}
-        className="mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase"
+        className={`mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase ${
+          required ? "after:ml-0.5 after:text-brand-destructive after:content-['*']" : ""
+        }`}
       >
         {label}
       </label>
@@ -35,6 +42,7 @@ export function SelectField({
           error ? "border-brand-destructive" : "border-hairline"
         } ${className ?? ""}`}
         aria-invalid={error ? true : undefined}
+        aria-required={required ? true : undefined}
         {...selectProps}
       >
         {options.map((option) => (

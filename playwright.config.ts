@@ -15,6 +15,13 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
+  // BKLG-013 (feature 2002): the flake "correlates with heavy PARALLEL login
+  // load (all three viewport projects at once)" -- server-side slowness
+  // under concurrent sign-ins, not a wrong wait condition (frontend/e2e/
+  // helpers/login.ts already gives the post-login landmark more room). This
+  // caps how many logins ever run at once, independent of the CPU count
+  // Playwright would otherwise default to.
+  workers: 2,
   reporter: "list",
   use: {
     baseURL: "https://idelta.com.au",

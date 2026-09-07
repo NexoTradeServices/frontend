@@ -11,6 +11,14 @@
 //     still saves.
 //   - typed text with no pick, on blur -> a field error asking to pick from
 //     the list or clear it.
+//
+// Two variants (Components / Google Places field): "address" (default, the
+// full street pick above) and "suburb" -- the core-location pin (Feature
+// 2002, plan decision 11): predictions are biased to locality-level places
+// only (`includedPrimaryTypes: ["locality"]`), a street address is never
+// offered, and the caller stores every field but `street` (which comes back
+// empty for a locality pick, same shape `fullAddress()` already collapses
+// around -- "Fremantle WA 6160", no leading comma).
 // Uses AutocompleteSuggestion/Place (the current Places API), not the
 // classic AutocompleteService/PlacesService pair: this project's Google
 // Cloud project only has Places API (New) enabled (project/setup/
@@ -60,6 +68,7 @@ interface GoogleAutocompleteSuggestionNamespace {
   fetchAutocompleteSuggestions(request: {
     input: string;
     includedRegionCodes?: string[];
+    includedPrimaryTypes?: string[];
   }): Promise<{ suggestions: GoogleAutocompleteSuggestion[] }>;
 }
 
@@ -151,6 +160,8 @@ export function PlacesField({
   id,
   label,
   optional,
+  variant = "address",
+  helper,
   value,
   onChange,
   error,
@@ -160,6 +171,10 @@ export function PlacesField({
   id: string;
   label: string;
   optional?: boolean;
+  /** "address" (default, full street pick) or "suburb" (the core-location pin, plan decision 11). */
+  variant?: "address" | "suburb";
+  /** shown below the field when there is neither an error nor the unavailable warning. */
+  helper?: string;
   value: PickedAddress | null;
   onChange: (value: PickedAddress | null) => void;
   error?: string;
@@ -239,7 +254,11 @@ export function PlacesField({
     }
     const requestId = ++requestIdRef.current;
     namespaceRef.current
-      .fetchAutocompleteSuggestions({ input: next, includedRegionCodes: ["au"] })
+      .fetchAutocompleteSuggestions({
+        input: next,
+        includedRegionCodes: ["au"],
+        ...(variant === "suburb" ? { includedPrimaryTypes: ["locality"] } : {}),
+      })
       .then((result) => {
         if (requestId !== requestIdRef.current) return; // superseded by a later keystroke
         const withPredictions = result.suggestions
@@ -317,7 +336,7 @@ export function PlacesField({
         className={`min-h-[44px] w-full rounded-md border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 disabled:bg-ground disabled:text-muted-text ${
           error ? "border-brand-destructive" : "border-hairline"
         }`}
-        placeholder="Start typing, then pick the match"
+        placeholder={variant === "suburb" ? "Start typing a suburb, then pick it" : "Start typing, then pick the match"}
         autoComplete="off"
         disabled={notReady}
         value={inputValue}
@@ -350,8 +369,12 @@ export function PlacesField({
         <p className="mt-[5px] text-xs text-brand-destructive">{error}</p>
       ) : unavailable ? (
         <p className="mt-[5px] text-xs text-brand-warning">
-          Address lookup is unavailable right now -- try again shortly. Everything else still saves.
+          {variant === "suburb"
+            ? "Suburb lookup is unavailable right now -- try again shortly."
+            : "Address lookup is unavailable right now -- try again shortly. Everything else still saves."}
         </p>
+      ) : helper ? (
+        <p className="mt-[5px] text-xs text-muted-text">{helper}</p>
       ) : null}
     </div>
   );

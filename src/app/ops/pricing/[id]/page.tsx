@@ -5,7 +5,7 @@ import { getSessionUser } from "@/lib/session";
 import { getDisplayName } from "@/lib/identity";
 import { LoginGate } from "@/components/auth/login-gate";
 import { WrongDoor } from "@/components/auth/wrong-door";
-import { OpsShell } from "@/components/ops-shell/ops-shell";
+import { PortalShell } from "@/components/portal-shell/portal-shell";
 import { ServiceTypeForm, type ServiceTypeDto } from "@/components/pricing/service-type-form";
 
 const PORTAL_NAME = "Operations portal";
@@ -26,7 +26,7 @@ export default async function EditServiceTypePage({ params }: { params: Promise<
   const serviceType = (await res.json()) as ServiceTypeDto;
 
   return (
-    <OpsShell
+    <PortalShell
       user={user}
       active="pricing"
       title={serviceType.trade}
@@ -34,6 +34,6 @@ export default async function EditServiceTypePage({ params }: { params: Promise<
       displayName={displayName}
     >
       <ServiceTypeForm mode="edit" initial={serviceType} />
-    </OpsShell>
+    </PortalShell>
   );
 }
