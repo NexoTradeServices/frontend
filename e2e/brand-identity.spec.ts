@@ -13,15 +13,9 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { test, expect } from "@playwright/test";
+import { login } from "./helpers/login";
 
-const DEV_PASSWORD = "dev-password-123";
 const INTERIM_WORDING = "Perth Trades & Services";
-
-async function login(page: import("@playwright/test").Page, email: string) {
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(DEV_PASSWORD);
-  await page.getByRole("button", { name: "Log in" }).click();
-}
 
 async function logout(page: import("@playwright/test").Page) {
   const menuButton = page.getByRole("button", { name: "Open menu" });

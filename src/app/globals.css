@@ -25,6 +25,11 @@
   --brand-destructive: #b3362b;
   --error-bg: #fbeceb;
   --error-border: #eac6c2;
+  /* Feature 2001 -- the warning state (an already-expired date, the
+     persistent info/alert banner): true, not an error, so it gets its own
+     color rather than reusing destructive. */
+  --brand-warning: #b4531a;
+  --warning-bg: #fdeadd;
   /* Accent's own loading-state shade -- the button ladder's dimmed fill
      while a submit is in flight (Patterns / Page loading vs button loading). */
   --brand-accent-loading: #ef9d68;
@@ -53,6 +58,8 @@
   --color-error-bg: var(--error-bg);
   --color-error-border: var(--error-border);
   --color-success-border: var(--success-border);
+  --color-brand-warning: var(--brand-warning);
+  --color-warning-bg: var(--warning-bg);
   --color-brand-accent-loading: var(--brand-accent-loading);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);

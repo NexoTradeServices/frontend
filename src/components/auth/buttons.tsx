@@ -7,17 +7,29 @@
 import type { ButtonHTMLAttributes } from "react";
 import Link from "next/link";
 
-const primaryBase =
-  "mt-1.5 block min-h-[52px] w-full rounded-md px-4 py-3.5 text-center text-sm font-bold text-on-accent";
+// Two sizes of the same primary (frontend-conventions.md, Components /
+// Buttons): full-width for a stacked single-column form (the login gate,
+// the wrong-door card) -- the default, so every existing caller is
+// untouched -- and compact, sized to its label, for an inline action beside
+// a list or heading ("Add a contractor"). Confirmed live on the
+// Contractors list, 04/09/26.
+export type PrimarySize = "full" | "compact";
+
+const sizeClasses: Record<PrimarySize, string> = {
+  full: "mt-1.5 block min-h-[52px] w-full rounded-md px-4 py-3.5 text-center text-sm font-bold text-on-accent",
+  compact: "inline-block min-h-11 rounded-md px-[18px] py-2.5 text-center text-sm font-bold text-on-accent",
+};
 
 interface PrimaryButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
   loadingLabel?: string;
+  size?: PrimarySize;
 }
 
 export function PrimaryButton({
   loading = false,
   loadingLabel,
+  size = "full",
   children,
   disabled,
   className,
@@ -27,7 +39,7 @@ export function PrimaryButton({
     <button
       type="submit"
       disabled={disabled || loading}
-      className={`${primaryBase} ${loading ? "bg-brand-accent-loading" : "bg-brand-accent"} ${className ?? ""}`}
+      className={`${sizeClasses[size]} ${loading ? "bg-brand-accent-loading" : "bg-brand-accent"} ${className ?? ""}`}
       {...buttonProps}
     >
       {loading ? (
@@ -46,9 +58,17 @@ export function PrimaryButton({
 }
 
 /** Same primary role as `PrimaryButton`, for a navigation ("Go to your portal") rather than a form submit. */
-export function PrimaryLink({ href, children }: { href: string; children: React.ReactNode }) {
+export function PrimaryLink({
+  href,
+  size = "full",
+  children,
+}: {
+  href: string;
+  size?: PrimarySize;
+  children: React.ReactNode;
+}) {
   return (
-    <Link href={href} className={`${primaryBase} bg-brand-accent`}>
+    <Link href={href} className={`${sizeClasses[size]} bg-brand-accent`}>
       {children}
     </Link>
   );

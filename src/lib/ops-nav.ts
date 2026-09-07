@@ -16,7 +16,7 @@ export interface OpsNavItem {
 
 export const OPS_NAV_ITEMS: readonly OpsNavItem[] = [
   { key: "jobs", label: "Jobs", href: "/ops/jobs", built: false },
-  { key: "contractors", label: "Contractors", href: "/ops/contractors", built: false },
+  { key: "contractors", label: "Contractors", href: "/ops/contractors", built: true },
   { key: "receivables", label: "Receivables", href: "/ops/receivables", built: false },
   { key: "refunds", label: "Refunds", href: "/ops/refunds", built: false },
   { key: "settlements", label: "Settlements", href: "/ops/settlements", built: false },

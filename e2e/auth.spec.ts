@@ -12,15 +12,7 @@
 // parallel test run could have changed; it only exercises login, wrong-door,
 // and log out, all reversible.
 import { test, expect } from "@playwright/test";
-
-// The dev-only password every seeded login shares (backend/src/db/seed/auth.ts).
-const DEV_PASSWORD = "dev-password-123";
-
-async function login(page: import("@playwright/test").Page, email: string) {
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(DEV_PASSWORD);
-  await page.getByRole("button", { name: "Log in" }).click();
-}
+import { login } from "./helpers/login";
 
 test("AC1: Mike logs in at /ops and lands on the ops placeholder", async ({ page }) => {
   await page.goto("/ops");
