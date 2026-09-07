@@ -22,7 +22,7 @@
 //      BOTH branches: a real pick stores the structured address, and a
 //      simulated script failure (route-blocked) degrades to the
 //      unavailable state with the form still saving
-// AC13 this file, and every other spec touched by B-009, log in through the
+// AC13 this file, and every other spec touched by BKLG-013, log in through the
 //      shared helper (frontend/e2e/helpers/login.ts) -- proven by three
 //      consecutive clean `npm run test:e2e` runs, not by an assertion here
 // AC14 the 390px responsive floor on the list, the form and the deactivate
@@ -53,7 +53,7 @@ async function deactivateOpenContractor(page: import("@playwright/test").Page) {
   await expect(page.getByText(/Their session is gone/)).toBeVisible();
 }
 
-test("AC1: Mike sees Bob, Dave, Priya -- Active + Not ready to dispatch, Priya's insurance expired, all missing a service area", async ({
+test("AC1: Mike sees Bob Ready to dispatch, Dave and Priya Not ready (Priya's insurance expired, both missing a service area)", async ({
   page,
 }) => {
   await page.goto("/ops/contractors");
@@ -61,8 +61,17 @@ test("AC1: Mike sees Bob, Dave, Priya -- Active + Not ready to dispatch, Priya's
   await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
 
   for (const name of ["Bob Reilly", "Dave Hurst", "Priya Nair"]) {
+    await expect(page.getByRole("link").filter({ hasText: name }).getByText("Active", { exact: true })).toBeVisible();
+  }
+  // Feature 2002, decision 13: Bob's fixture (this dev DB's Bob also carries
+  // the legacy address shape AC12 documents, so "address" was never his
+  // remaining gap) now carries a saved service area -- his last missing
+  // item is gone and he reads Ready. Dave and Priya still have none.
+  await expect(
+    page.getByRole("link").filter({ hasText: "Bob Reilly" }).getByText("Ready to dispatch"),
+  ).toBeVisible();
+  for (const name of ["Dave Hurst", "Priya Nair"]) {
     const row = page.getByRole("link").filter({ hasText: name });
-    await expect(row.getByText("Active", { exact: true })).toBeVisible();
     await expect(row.getByText("Not ready to dispatch")).toBeVisible();
     await expect(row.getByText(/service area \(not set up yet\)/)).toBeVisible();
   }
@@ -219,15 +228,14 @@ test.describe.serial("Bob (CON-014) -- the shared writer tests", () => {
     await expect(plumbingRowAfterSave.getByLabel("Standard rate")).toHaveValue("150.00");
     // This dev DB's Bob predates the migration (Feature 1001's original
     // seed), so his old free-text address survived it as
-    // { street: "Fremantle WA 6160" } (AC12) -- present, so "address" is not
-    // missing here. [IMPL] (plan.md) applies to a FRESH database (the
+    // { street: "Fremantle WA 6160" } (AC12) -- present, so "address" was
+    // never his gap here. [IMPL] (plan.md) applies to a FRESH database (the
     // backend suite's throwaway one), where the current fixture seed never
-    // sets Bob's own address at all and "address" stays missing too.
-    await expect(page.getByText("Not ready to dispatch", { exact: true })).toBeVisible();
-    // The banner's "Missing:" text and its <li> items are separate nodes,
-    // unlike the list row's flat "Missing: a, b, c" string -- check both.
-    await expect(page.getByText("Not ready to dispatch.")).toBeVisible();
-    await expect(page.getByRole("listitem")).toHaveText(["service area (not set up yet)"]);
+    // sets Bob's own address at all and "address" stays missing there.
+    // Feature 2002: his fixture now carries a saved service area too, so
+    // this dev DB's Bob has nothing left missing and reads Ready.
+    await expect(page.getByText("Ready to dispatch", { exact: true })).toBeVisible();
+    await expect(page.getByText("Not ready to dispatch.")).not.toBeVisible();
   });
 
   test("AC6: a blank licence expiry refuses the save; a past expiry saves and shows the warning", async ({ page }) => {

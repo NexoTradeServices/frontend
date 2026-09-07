@@ -7,7 +7,7 @@ import { getSessionUser } from "@/lib/session";
 import { getDisplayName } from "@/lib/identity";
 import { LoginGate } from "@/components/auth/login-gate";
 import { WrongDoor } from "@/components/auth/wrong-door";
-import { OpsShell } from "@/components/ops-shell/ops-shell";
+import { PortalShell } from "@/components/portal-shell/portal-shell";
 
 const PORTAL_NAME = "Operations portal";
 
@@ -21,7 +21,7 @@ export default async function OpsPage() {
     return <WrongDoor user={user} portalName={PORTAL_NAME} displayName={displayName} />;
   }
   return (
-    <OpsShell
+    <PortalShell
       user={user}
       active=""
       title={PORTAL_NAME}
@@ -31,6 +31,6 @@ export default async function OpsPage() {
       <p className="text-sm text-secondary-text">
         No pages are open here yet -- each nav item lights up as its own feature ships.
       </p>
-    </OpsShell>
+    </PortalShell>
   );
 }

@@ -160,6 +160,7 @@ export function ServiceTypeForm({
           <Field
             id="trade"
             label="Trade name"
+            required
             value={trade}
             onChange={(e) => setTrade(e.target.value)}
             error={fieldErrors["trade"]}
@@ -179,6 +180,7 @@ export function ServiceTypeForm({
               step="0.01"
               min={0}
               prefix="$"
+              required
               value={customerCalloutRate}
               onChange={(e) => setCustomerCalloutRate(e.target.value)}
               error={fieldErrors["customerCalloutRate"]}
@@ -196,6 +198,7 @@ export function ServiceTypeForm({
               min={0}
               prefix="$"
               suffix="/h"
+              required
               value={customerStandardRate}
               onChange={(e) => setCustomerStandardRate(e.target.value)}
               error={fieldErrors["customerStandardRate"]}
@@ -223,6 +226,7 @@ export function ServiceTypeForm({
               step="0.01"
               min={1}
               suffix="x"
+              required
               value={emergency}
               onChange={(e) => setEmergency(e.target.value)}
               error={fieldErrors["emergency"]}
@@ -241,6 +245,7 @@ export function ServiceTypeForm({
               step="0.01"
               min={1}
               suffix="x"
+              required
               value={weekend}
               onChange={(e) => setWeekend(e.target.value)}
               error={fieldErrors["weekend"]}

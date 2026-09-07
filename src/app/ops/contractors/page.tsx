@@ -7,7 +7,7 @@ import { getSessionUser } from "@/lib/session";
 import { getDisplayName } from "@/lib/identity";
 import { LoginGate } from "@/components/auth/login-gate";
 import { WrongDoor } from "@/components/auth/wrong-door";
-import { OpsShell } from "@/components/ops-shell/ops-shell";
+import { PortalShell } from "@/components/portal-shell/portal-shell";
 import { ContractorList } from "@/components/contractors/contractor-list";
 import type { ContractorDto } from "@/components/contractors/types";
 
@@ -30,7 +30,7 @@ export default async function ContractorsPage() {
   const contractors = (await res.json()) as ContractorDto[];
 
   return (
-    <OpsShell
+    <PortalShell
       user={user}
       active="contractors"
       title="Contractors"
@@ -40,6 +40,6 @@ export default async function ContractorsPage() {
       <Suspense>
         <ContractorList contractors={contractors} />
       </Suspense>
-    </OpsShell>
+    </PortalShell>
   );
 }

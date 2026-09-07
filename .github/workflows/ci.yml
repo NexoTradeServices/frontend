@@ -30,5 +30,17 @@ jobs:
       - name: Build
         run: npm run build
 
-      # No test step yet - tests arrive with the first feature that needs them,
-      # so a green tick never claims more than it checked.
+      # BKLG-015 (feature 2002): closed features 1003, 1006, 1007, 1012, 1014
+      # and 2001 had already shipped Playwright specs with no CI step running
+      # them (setup/02-repos-and-cicd.md, 2a). playwright.config.ts's baseURL
+      # is the real dev domain (https://idelta.com.au), not a server this job
+      # starts -- the specs are pure browser interactions against the already-
+      # running dev stack (no spec reads an env var or calls the API
+      # directly), so this runner needs nothing beyond the browsers
+      # themselves and outbound internet access to that domain, same as a
+      # developer's own `npm run test:e2e`.
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Test (e2e)
+        run: npm run test:e2e

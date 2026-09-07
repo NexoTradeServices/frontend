@@ -5,7 +5,7 @@ import { getSessionUser } from "@/lib/session";
 import { getDisplayName } from "@/lib/identity";
 import { LoginGate } from "@/components/auth/login-gate";
 import { WrongDoor } from "@/components/auth/wrong-door";
-import { OpsShell } from "@/components/ops-shell/ops-shell";
+import { PortalShell } from "@/components/portal-shell/portal-shell";
 import { ServiceTypeCatalog } from "@/components/pricing/service-type-catalog";
 import type { ServiceTypeDto } from "@/components/pricing/service-type-form";
 
@@ -28,7 +28,7 @@ export default async function PricingPage() {
   const serviceTypes = (await res.json()) as ServiceTypeDto[];
 
   return (
-    <OpsShell
+    <PortalShell
       user={user}
       active="pricing"
       title="Pricing"
@@ -36,6 +36,6 @@ export default async function PricingPage() {
       displayName={displayName}
     >
       <ServiceTypeCatalog serviceTypes={serviceTypes} />
-    </OpsShell>
+    </PortalShell>
   );
 }

@@ -6,7 +6,7 @@ import { getSessionUser } from "@/lib/session";
 import { getDisplayName } from "@/lib/identity";
 import { LoginGate } from "@/components/auth/login-gate";
 import { WrongDoor } from "@/components/auth/wrong-door";
-import { OpsShell } from "@/components/ops-shell/ops-shell";
+import { PortalShell } from "@/components/portal-shell/portal-shell";
 import { ServiceTypeForm, type ServiceTypeDto } from "@/components/pricing/service-type-form";
 
 const PORTAL_NAME = "Operations portal";
@@ -26,7 +26,7 @@ export default async function NewServiceTypePage() {
   if (user.role !== "owner") return <WrongDoor user={user} portalName="Pricing" displayName={displayName} />;
 
   return (
-    <OpsShell
+    <PortalShell
       user={user}
       active="pricing"
       title="Add a trade"
@@ -34,6 +34,6 @@ export default async function NewServiceTypePage() {
       displayName={displayName}
     >
       <ServiceTypeForm mode="create" initial={BLANK} />
-    </OpsShell>
+    </PortalShell>
   );
 }

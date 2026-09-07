@@ -23,6 +23,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Banner } from "@/components/auth/banner";
 import { Toast, useToast } from "@/components/ui/toast";
 import { TradeRows, emptyTradeRow, type TradeRowDraft, type TradeRowErrors } from "./trade-rows";
+import { ContractorRecordHeader } from "./record-header";
 import { dispatchState, fmtDate, isFutureDate, type ApiFieldError, type ContractorDto } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -126,13 +127,6 @@ function readyBannerText(contractor: ContractorDto): string {
     .map((x) => `${x.s.trade}: ${x.state === "expired" ? "licence expired" : "suspended"}.`)
     .join(" ");
   return `Ready to dispatch for ${dispatchable.join(", ")}. ${exceptionText}`;
-}
-
-function tagClasses(kind: "active" | "suspended" | "ready" | "notready"): string {
-  const base = "inline-block rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] uppercase";
-  if (kind === "active" || kind === "ready") return `${base} bg-success-bg text-brand-success`;
-  if (kind === "notready") return `${base} bg-warning-bg text-brand-warning`;
-  return `${base} bg-ground text-muted-text`;
 }
 
 export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create" | "edit"; initial: ContractorDto | null; tradeOptions: string[] }) {
@@ -342,61 +336,9 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
     }
   }
 
-  const headTags: { kind: "active" | "suspended"; label: string }[] = contractor
-    ? [{ kind: contractor.status === "active" ? "active" : "suspended", label: contractor.status === "active" ? "Active" : "Deactivated" }]
-    : [];
-  const readyTag = contractor
-    ? { kind: (contractor.ready ? "ready" : "notready") as "ready" | "notready", label: contractor.ready ? "Ready to dispatch" : "Not ready to dispatch" }
-    : null;
-
   return (
     <div>
-      <div className="mb-1.5 max-w-[760px] text-xs text-muted-text">
-        <Link href="/ops/contractors" className="text-muted-text">
-          Contractors
-        </Link>{" "}
-        / <span>{contractor ? contractor.code : "New contractor"}</span>
-      </div>
-      <div className="mb-4.5 flex max-w-[760px] flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="mb-0.5 font-heading text-xl font-black text-ink md:text-[22px]">
-            {contractor ? `${contractor.code} ${contractor.name}` : "New contractor"}
-          </h1>
-          <p className="text-[13px] text-muted-text">
-            {contractor ? `Added ${fmtDate(contractor.createdAt)}. Change anything and press Save.` : "Only name, email and phone are needed to save. The rest can arrive later."}
-          </p>
-        </div>
-        {contractor ? (
-          <div className="flex gap-1.5">
-            {headTags.map((t) => (
-              <span key={t.label} className={tagClasses(t.kind)}>
-                {t.label}
-              </span>
-            ))}
-            {readyTag ? (
-              <span className={tagClasses(readyTag.kind)}>{readyTag.label}</span>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
-      {contractor ? (
-        // Record tabs (frontend-conventions.md): a tab strip under the page
-        // title, accent underline on the active tab, each tab its own page
-        // and URL. Service area (2002) is a second tab that does not exist
-        // yet -- "a tab whose surface cannot exist yet does not show" -- so
-        // this carries only Details (plan.md Scope) until 2002 ships it.
-        <div className="mb-4.5 flex max-w-[760px] gap-5 border-b border-hairline" role="tablist">
-          <Link
-            href={`/ops/contractors/${contractor.code}`}
-            role="tab"
-            aria-selected="true"
-            className="border-b-2 border-brand-accent pb-2 text-sm font-bold text-ink"
-          >
-            Details
-          </Link>
-        </div>
-      ) : null}
+      <ContractorRecordHeader contractor={contractor} activeTab="details" />
 
       <form
         onSubmit={(e) => {
@@ -416,9 +358,17 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
               <>
                 <b>Not ready to dispatch.</b> Missing:
                 <ul className="mt-0.5 mb-0 list-disc pl-4.5">
-                  {contractor.missing.map((m) => (
-                    <li key={m}>{m}</li>
-                  ))}
+                  {contractor.missing.map((m) =>
+                    m === "service area (not set up yet)" ? (
+                      <li key={m}>
+                        <Link href={`/ops/contractors/${contractor.code}/service-area`} className="underline underline-offset-2">
+                          {m}
+                        </Link>
+                      </li>
+                    ) : (
+                      <li key={m}>{m}</li>
+                    ),
+                  )}
                 </ul>
               </>
             )}

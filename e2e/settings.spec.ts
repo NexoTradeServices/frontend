@@ -9,7 +9,7 @@
 //      the field error
 // AC5  with an ABN, the flip passes the confirm dialog and the audit
 //      caption appears
-// AC6  the Business inbox field edits operatorEmail (B-004)
+// AC6  the Business inbox field edits operatorEmail
 // AC7  the 390px responsive floor: the app-bar menu opens with the full
 //      nav, every field and Save reachable, no horizontal scrolling
 //
@@ -47,6 +47,24 @@ test("AC2: Mike's ops-portal nav shows no OWNER group -- Settings is owner-only"
 
   await expect(page.getByRole("link", { name: "Settings" })).toHaveCount(0);
   await expect(page.getByText("Owner", { exact: true })).toHaveCount(0);
+
+  await logout(page);
+});
+
+test("AC12 (BKLG-012, feature 2002): required fields carry the star, no field says \"(optional)\"", async ({
+  page,
+}) => {
+  await page.goto("/ops/settings");
+  await login(page, "owner@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible({ timeout: 10_000 });
+
+  await expect(page.getByText("(optional)")).toHaveCount(0);
+  await expect(page.getByLabel("Business name")).toHaveAttribute("aria-required", "true");
+  await expect(page.getByLabel("Operator phone")).toHaveAttribute("aria-required", "true");
+  await expect(page.getByLabel("Business inbox")).toHaveAttribute("aria-required", "true");
+  await expect(page.getByLabel("Timezone")).toHaveAttribute("aria-required", "true");
+  // ABN is conditionally required (only once GST is switched on) -- never starred.
+  await expect(page.getByLabel("ABN")).not.toHaveAttribute("aria-required", "true");
 
   await logout(page);
 });

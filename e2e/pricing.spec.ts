@@ -80,6 +80,35 @@ test("AC1: the owner sees the seeded catalog, Plumbing $250 / $180 among it", as
   await logout(page);
 });
 
+test("AC11 (BKLG-011, feature 2002): 'Add a trade' is the shared primary's compact size, not full-width", async ({
+  page,
+}) => {
+  await page.goto("/ops/pricing");
+  await login(page, "owner@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "Pricing" })).toBeVisible({ timeout: 10_000 });
+
+  const addButton = page.getByRole("link", { name: "Add a trade" });
+  await expect(addButton).toHaveClass(/inline-block/);
+  await expect(addButton).not.toHaveClass(/w-full/);
+
+  await logout(page);
+});
+
+test("AC12 (BKLG-012, feature 2002): required fields carry the star, no field says \"(optional)\"", async ({
+  page,
+}) => {
+  await page.goto("/ops/pricing/new");
+  await login(page, "owner@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "Add a trade" })).toBeVisible({ timeout: 10_000 });
+
+  await expect(page.getByText("(optional)")).toHaveCount(0);
+  await expect(page.getByLabel("Trade name")).toHaveAttribute("aria-required", "true");
+  await expect(page.getByLabel("Call-out (first hour)")).toHaveAttribute("aria-required", "true");
+  await expect(page.getByLabel("Standard rate")).toHaveAttribute("aria-required", "true");
+
+  await logout(page);
+});
+
 test("AC6: creating 'Plumbing' again is refused with the field error on the name", async ({ page }) => {
   await page.goto("/ops/pricing/new");
   await login(page, "owner@idelta.com.au");

@@ -4,7 +4,10 @@
 // row per trade -- name, then the rates summary. "Add a trade" is the one
 // loud button the screen exists for (Components / Buttons); each row's own
 // action is a text-style link (button ladder: alternatives/trivial actions
-// are never a second filled button).
+// are never a second filled button). Compact size, sized to its label beside
+// the heading -- the shared primary's other size (BKLG-011, feature 2002):
+// this screen's "Add a trade" had shipped full-width, the only survivor of
+// that pattern once the Contractors list moved to compact.
 import Link from "next/link";
 import { PrimaryLink } from "@/components/auth/buttons";
 import type { ServiceTypeDto } from "./service-type-form";
@@ -17,7 +20,9 @@ export function ServiceTypeCatalog({ serviceTypes }: { serviceTypes: ServiceType
   return (
     <div className="max-w-[720px]">
       <div className="mb-4.5 flex justify-end">
-        <PrimaryLink href="/ops/pricing/new">Add a trade</PrimaryLink>
+        <PrimaryLink href="/ops/pricing/new" size="compact">
+          Add a trade
+        </PrimaryLink>
       </div>
 
       {serviceTypes.length === 0 ? (
