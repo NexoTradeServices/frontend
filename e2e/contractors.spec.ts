@@ -1,16 +1,18 @@
 // Feature 2001, contractor onboarding (Mike's path) -- frontend e2e (ADR
 // 0001, Playwright).
 //
-// AC1  Mike/the owner see Bob, Dave, Priya -- Active tags, all Not ready to
-//      dispatch, Priya names "insurance renewal (expired)", all three name
+// AC1  Mike/the owner see Bob, Dave, Priya -- Active tags; Bob reads Ready
+//      to dispatch (his fixture-seeded service area, and address no longer
+//      counts -- design, "Managing the contractor record"), Dave and Priya
+//      read Not ready, Priya names "insurance renewal (expired)", both name
 //      "service area (not set up yet)"; Bob (contractor) gets the
 //      wrong-door card
 // AC2  Add a contractor with just name/phone/email: lands on the list with
 //      the toast, the new row shows Not ready to dispatch with the full
 //      missing list
-// AC5  Bob's Plumbing row, insurance and payout round-trip; [IMPL] (plan.md)
-//      -- the missing list is "address" + "service area (not set up yet)",
-//      not just the one item; see the plan note for why
+// AC5  Bob's Plumbing row, insurance and payout round-trip; this PUT plus
+//      his fixture-seeded service area leaves him with nothing missing at
+//      all (address stopped counting, see AC1 above)
 // AC6  a blank licence expiry refuses the whole save with a field error; a
 //      past expiry saves and shows the warning
 // AC8  a deactivated contractor with the RIGHT password sees the
@@ -21,7 +23,11 @@
 //      01-dev-environment.md, section 6, ticked 03/09/26), so this proves
 //      BOTH branches: a real pick stores the structured address, and a
 //      simulated script failure (route-blocked) degrades to the
-//      unavailable state with the form still saving
+//      unavailable state with the form still saving. In CI the "real pick"
+//      half calls a stand-in instead of Google (helpers/mock-google-places.ts,
+//      project/setup/frontend-test-harness.md Part 3) -- the referrer-
+//      restricted key never leaves this machine, and CI never depends on
+//      Google being up.
 // AC13 this file, and every other spec touched by BKLG-013, log in through the
 //      shared helper (frontend/e2e/helpers/login.ts) -- proven by three
 //      consecutive clean `npm run test:e2e` runs, not by an assertion here
@@ -35,6 +41,8 @@
 // Active, the same "leave it as we found it" discipline.
 import { test, expect } from "@playwright/test";
 import { login } from "./helpers/login";
+import { MOBILE_VIEWPORT } from "../playwright.config";
+import { MOCKS_GOOGLE_PLACES, installMockGooglePlaces } from "./helpers/mock-google-places";
 
 // A unique suffix per test, on BOTH the name and the email -- a test that
 // fails before its own cleanup step leaves a stray active row behind, and
@@ -63,12 +71,19 @@ test("AC1: Mike sees Bob Ready to dispatch, Dave and Priya Not ready (Priya's in
   for (const name of ["Bob Reilly", "Dave Hurst", "Priya Nair"]) {
     await expect(page.getByRole("link").filter({ hasText: name }).getByText("Active", { exact: true })).toBeVisible();
   }
-  // Feature 2002, decision 13: Bob's fixture (this dev DB's Bob also carries
-  // the legacy address shape AC12 documents, so "address" was never his
-  // remaining gap) now carries a saved service area -- his last missing
-  // item is gone and he reads Ready. Dave and Priya still have none.
+  // Feature 2002, decision 13: Bob's fixture carries a saved service area,
+  // and address no longer counts toward Ready to dispatch (design,
+  // "Managing the contractor record" -- backend/src/contractors/ready.ts,
+  // project/setup/frontend-test-harness.md) -- his fixture leaves him with
+  // nothing missing, so he reads Ready. Dave and Priya still have none.
+  //
+  // `exact: true` here matters: without it, this locator's plain-string
+  // match is a case-insensitive SUBSTRING match, and "Ready to dispatch" is
+  // a substring of "Not ready to dispatch" -- this assertion could not
+  // fail, green on either tag, from feature 2001 until this fix (found by
+  // the first CI run against a truly fresh database, 08/09/26).
   await expect(
-    page.getByRole("link").filter({ hasText: "Bob Reilly" }).getByText("Ready to dispatch"),
+    page.getByRole("link").filter({ hasText: "Bob Reilly" }).getByText("Ready to dispatch", { exact: true }),
   ).toBeVisible();
   for (const name of ["Dave Hurst", "Priya Nair"]) {
     const row = page.getByRole("link").filter({ hasText: name });
@@ -127,9 +142,8 @@ test("AC2: add a contractor with just the three required fields", async ({ page 
   await deactivateOpenContractor(page);
 });
 
-test("AC11: a real Google pick stores the structured address and round-trips", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "one network-dependent pick is enough; avoid tripling the Google API calls");
-
+test("AC11: a real Google pick stores the structured address and round-trips", async ({ page }) => {
+  if (MOCKS_GOOGLE_PLACES) await installMockGooglePlaces(page);
   await page.goto("/ops/contractors/new");
   await login(page, "mike@idelta.com.au");
   await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
@@ -166,9 +180,7 @@ test("AC11: a real Google pick stores the structured address and round-trips", a
 
 test("AC11: with the Places script blocked, the address field is disabled with the warning line and the form still saves", async ({
   page,
-}, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "the unavailable branch needs no repeating per viewport");
-
+}) => {
   await page.route("https://maps.googleapis.com/**", (route) => route.abort());
   await page.goto("/ops/contractors/new");
   await login(page, "mike@idelta.com.au");
@@ -199,11 +211,7 @@ test("AC11: with the Places script blocked, the address field is disabled with t
 // workers (unlike settings.spec.ts's/pricing.spec.ts's single shared
 // writer, this file has two, so a project-only skip is not enough).
 test.describe.serial("Bob (CON-014) -- the shared writer tests", () => {
-  test("AC5: Bob's Plumbing row, insurance and payout round-trip as whole cents", async ({ page }, testInfo) => {
-    test.skip(
-      testInfo.project.name !== "desktop",
-      "writes the shared seeded Bob row; runs on one project only to avoid racing the others (pricing.spec.ts's precedent)",
-    );
+  test("AC5: Bob's Plumbing row, insurance and payout round-trip as whole cents", async ({ page }) => {
     await page.goto("/ops/contractors/CON-014");
     await login(page, "mike@idelta.com.au");
     await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
@@ -275,11 +283,7 @@ test.describe.serial("Bob (CON-014) -- the shared writer tests", () => {
 
   test("AC8 + AC9: a deactivated contractor with the right password is told to call the office; reactivating restores his login", async ({
     page,
-  }, testInfo) => {
-    test.skip(
-      testInfo.project.name !== "desktop",
-      "writes the shared seeded Bob row; runs on one project only to avoid racing the others (pricing.spec.ts's precedent)",
-    );
+  }) => {
     await page.goto("/ops/contractors/CON-014");
     await login(page, "mike@idelta.com.au");
     await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
@@ -327,36 +331,38 @@ test.describe.serial("Bob (CON-014) -- the shared writer tests", () => {
   });
 });
 
-test("AC14: at 390px the list, the form and the deactivate dialog hold the responsive floor", async ({
-  page,
-}, testInfo) => {
-  test.skip(testInfo.project.name !== "mobile", "this AC is specifically about the phone viewport");
+test.describe(() => {
+  test.use(MOBILE_VIEWPORT);
 
-  await page.goto("/ops/contractors");
-  await login(page, "mike@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
-  let scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-  let clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+  test("AC14: at 390px the list, the form and the deactivate dialog hold the responsive floor", async ({
+    page,
+  }) => {
+    await page.goto("/ops/contractors");
+    await login(page, "mike@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+    let scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    let clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
 
-  await page.getByRole("link", { name: "Add a contractor" }).click();
-  await expect(page.getByLabel("Name", { exact: true })).toBeVisible();
-  scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-  clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    await page.getByRole("link", { name: "Add a contractor" }).click();
+    await expect(page.getByLabel("Name", { exact: true })).toBeVisible();
+    scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
 
-  await expect(page.getByRole("button", { name: "Remove this trade" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Remove this trade" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
 
-  await page.goto("/ops/contractors/CON-014");
-  await expect(page.getByRole("switch", { name: "Contractor status" })).toBeVisible();
-  await page.getByRole("switch", { name: "Contractor status" }).click();
-  await expect(page.getByRole("heading", { name: "Deactivate Bob Reilly?" })).toBeVisible();
-  scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-  clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
-  await expect(page.getByRole("button", { name: "Keep active" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Deactivate" })).toBeVisible();
-  await page.getByRole("button", { name: "Keep active" }).click();
+    await page.goto("/ops/contractors/CON-014");
+    await expect(page.getByRole("switch", { name: "Contractor status" })).toBeVisible();
+    await page.getByRole("switch", { name: "Contractor status" }).click();
+    await expect(page.getByRole("heading", { name: "Deactivate Bob Reilly?" })).toBeVisible();
+    scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    await expect(page.getByRole("button", { name: "Keep active" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Deactivate" })).toBeVisible();
+    await page.getByRole("button", { name: "Keep active" }).click();
+  });
 });
