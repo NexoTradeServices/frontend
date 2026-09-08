@@ -17,15 +17,28 @@
 // AC8  with Places unavailable: a saved pin (Bob) still works and Save
 //      succeeds; an empty area (Priya) shows the pick-first banner and Save
 //      is refused
-// AC10 the 390px responsive floor
+// AC10 the 390px responsive floor -- also drags and releases the radius
+//      slider by touch (project/setup/frontend-test-harness.md Part 2),
+//      since on a phone that release is a touchend, not the mouseup/keyup
+//      the desktop lifecycle test below already covers
 //
 // Runs against the seeded dev database (real Suburb reference data, ADR
 // 0003) -- same constraint as contractors.spec.ts. AC3-AC6 use a FRESH
 // throwaway contractor (deactivated at the end, same litter convention as
 // contractors.spec.ts's AC2/AC6/AC11) rather than Dave, so Priya alone
 // stays the permanent "never saved a service area" fixture AC1/AC7/AC8 read.
+//
+// AC3-AC6's own Fremantle/Joondalup picks call a stand-in for Google in CI
+// (helpers/mock-google-places.ts, project/setup/frontend-test-harness.md
+// Part 3), not the real Places API -- the owner's key stays
+// referrer-restricted to idelta.com.au, and CI never depends on Google
+// being up. The mock hands back real, approximate coordinates for both
+// suburbs, so the backend's own /api/suburbs/in-range query (never mocked)
+// still proves AC4/AC5 for real.
 import { test, expect, type Page } from "@playwright/test";
 import { login } from "./helpers/login";
+import { MOBILE_VIEWPORT } from "../playwright.config";
+import { MOCKS_GOOGLE_PLACES, installMockGooglePlaces } from "./helpers/mock-google-places";
 
 function uniqueTag(tag: string): string {
   return `${tag}-${Date.now().toString()}`;
@@ -52,6 +65,24 @@ async function addThrowawayContractor(page: Page, tag: string): Promise<{ name: 
  * once it has resolved. */
 function waitForInRange(page: Page) {
   return page.waitForResponse((res) => res.url().includes("/api/suburbs/in-range"));
+}
+
+/** Commits a radius change through the slider's TOUCH path, not its mouse or
+ * keyboard one -- project/setup/frontend-test-harness.md Part 2. On a phone
+ * that release is a touchend, not a mouseup (service-area.tsx's `onTouchEnd`
+ * handler), a different input path than the ArrowRight/keyup one the
+ * desktop-only lifecycle test above already covers. Playwright's
+ * touchscreen API can tap but not drag a native `<input type=range>`, so
+ * this sets the value the way a touchmove would have and dispatches the
+ * same touchend the real handler commits on. */
+async function dragSliderByTouch(page: Page, toKm: number) {
+  const slider = page.getByRole("slider", { name: "Radius in kilometres" });
+  await slider.evaluate((el: HTMLInputElement, value: string) => {
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
+    setter.call(el, value);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new TouchEvent("touchend", { bubbles: true, cancelable: true }));
+  }, String(toKm));
 }
 
 async function openServiceAreaTab(page: Page, name: string, opts: { hasPin?: boolean } = {}) {
@@ -106,12 +137,11 @@ test("AC1: an empty area shows the empty pin, 30km default and pick-first banner
   await expect(page.getByRole("button", { name: /^\d{4} -/ })).toHaveCount(0);
 });
 
-test.describe.serial("AC3-AC6 (desktop only, real Places): the pin/radius/postcode lifecycle on a throwaway contractor", () => {
+test.describe.serial("AC3-AC6 (real Places): the pin/radius/postcode lifecycle on a throwaway contractor", () => {
   test("AC3 + AC4 + AC5 + AC6: pick, cross off, save, reopen, widen, move the pin resets, refuse", async ({
     page,
-  }, testInfo) => {
-    test.skip(testInfo.project.name !== "desktop", "one real-network suite is enough; avoid tripling Google API calls");
-
+  }) => {
+    if (MOCKS_GOOGLE_PLACES) await installMockGooglePlaces(page);
     const { name } = await addThrowawayContractor(page, "ac3");
     await openServiceAreaTab(page, name, { hasPin: false });
 
@@ -220,9 +250,7 @@ test("AC7: Bob sees and saves his own area; Priya sees her own (empty) area, nev
 
 test("AC8: Places unavailable -- Bob's saved pin still works and Save succeeds; Priya's empty area refuses Save", async ({
   page,
-}, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "the unavailable branch needs no repeating per viewport");
-
+}) => {
   await page.route("https://maps.googleapis.com/**", (route) => route.abort());
 
   await page.goto("/contractor/service-area");
@@ -248,24 +276,38 @@ test("AC8: Places unavailable -- Bob's saved pin still works and Save succeeds; 
   await expect(page.getByText(/service area needs a core location/)).toBeVisible();
 });
 
-test("AC10: at 390px Bob's page holds the floor -- pin, slider, chips, both text actions, Save and Cancel reachable, no horizontal scroll", async ({
-  page,
-}, testInfo) => {
-  test.skip(testInfo.project.name !== "mobile", "this AC is specifically about the phone viewport");
+test.describe(() => {
+  test.use(MOBILE_VIEWPORT);
 
-  await page.goto("/contractor/service-area");
-  await login(page, "bob@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Your service area" })).toBeVisible({ timeout: 10_000 });
+  test("AC10: at 390px Bob's page holds the floor -- pin, slider, chips, both text actions, Save and Cancel reachable, no horizontal scroll", async ({
+    page,
+  }) => {
+    await page.goto("/contractor/service-area");
+    await login(page, "bob@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Your service area" })).toBeVisible({ timeout: 10_000 });
+    await waitForInRange(page);
 
-  const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-  const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
 
-  await expect(page.getByLabel("Suburb")).toBeVisible();
-  await expect(page.getByRole("slider", { name: "Radius in kilometres" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /^6163 -/ })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByRole("button", { name: "Tick all", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Untick all" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Undo changes" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save service area" })).toBeVisible();
+    await expect(page.getByLabel("Suburb")).toBeVisible();
+    const slider = page.getByRole("slider", { name: "Radius in kilometres" });
+    await expect(slider).toBeVisible();
+    await expect(slider).toHaveValue("30");
+    await expect(page.getByRole("button", { name: /^6163 -/ })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("button", { name: "Tick all", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Untick all" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Undo changes" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save service area" })).toBeVisible();
+
+    // Part 2's own addition (project/setup/frontend-test-harness.md): the
+    // radius fetches "on slider release, never mid-drag" (service-area.tsx),
+    // and on a phone that release is a touch event -- a path the desktop
+    // lifecycle test's keyboard-driven widen never exercises.
+    const widenWait = waitForInRange(page);
+    await dragSliderByTouch(page, 40);
+    await expect(page.getByText("40 km")).toBeVisible();
+    await widenWait;
+  });
 });

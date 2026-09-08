@@ -10,6 +10,23 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+
+    # Postgres 18 + PostGIS 3.6, matching setup/01-dev-environment.md and
+    # backend's own ci.yml -- exposed on the runner's own localhost:5432, not
+    # a container job, so steps below reach it as an ordinary local Postgres.
+    services:
+      postgres:
+        image: postgis/postgis:18-3.6
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -27,14 +44,152 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Build
+      - name: Unit tests
+        run: npm run test:unit
+
+      # NEXT_PUBLIC_* vars are inlined at BUILD time -- PlacesField reads
+      # this one to decide whether to even try loading Google (a blank key
+      # means "unavailable" from first paint). It is NOT the real key: the
+      # real one is referrer-restricted to idelta.com.au on purpose (it is
+      # printed on the live page, like every browser key is, and that
+      # restriction is the only thing stopping someone else from using it),
+      # so it never goes in GitHub and that restriction never widens. This
+      # is a non-secret placeholder -- it is never sent anywhere, it only
+      # has to be non-empty. e2e/helpers/mock-google-places.ts stands in for
+      # Google itself in the two specs that need a real pick (contractors.spec.ts
+      # AC11, service-area.spec.ts AC3-AC6) -- project/setup/
+      # frontend-test-harness.md Part 3.
+      - name: Build (the app the e2e suite serves -- never `next dev`, see below)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8080
+          NEXT_PUBLIC_GOOGLE_PLACES_KEY: ci-placeholder-not-a-real-key
+
+      # ---------------------------------------------------------------------
+      # The backend half of the stack, checked out alongside (same org, per
+      # project/setup/02-repos-and-cicd.md) -- this runner stands up its OWN
+      # Postgres, backend and frontend and tests over localhost. The first
+      # attempt (removed, see backend's own ci.yml) pointed the runner at
+      # the dev domain instead; idelta.com.au resolves to a LAN address on
+      # the dev machine's own /etc/hosts but to a PUBLIC address in real
+      # DNS, so a cloud runner reached the developer's house over a home
+      # uplink and every login-dependent spec timed out.
+      # project/setup/frontend-test-harness.md Part 3.
+      # ---------------------------------------------------------------------
+      - name: Check out backend
+        uses: actions/checkout@v4
+        with:
+          repository: NexoTradeServices/backend
+          path: backend
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: backend/.nvmrc
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      # src/generated is gitignored in the backend repo too -- see its own
+      # ci.yml's comment on this same step.
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npm run db:generate
+
+      # tradeservice_dev, not _test: this stands up the same DEV-shaped,
+      # seeded database every spec already runs against locally (setup/
+      # 01-dev-environment.md), not backend's own throwaway test database.
+      - name: Create dev-style role, database and PostGIS extension
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -c "CREATE ROLE tradeservice LOGIN PASSWORD 'tradeservice';"
+          createdb -h localhost -U postgres -O tradeservice tradeservice_dev
+          psql -h localhost -U postgres -d tradeservice_dev -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+
+      - name: Run database migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://tradeservice:tradeservice@localhost:5432/tradeservice_dev
+        run: npx prisma migrate deploy
+
+      # In order: base (PlatformSettings + ServiceTypes), fixtures (the cast
+      # -- every spec logs in as one of them), suburbs (the licensed CSV,
+      # committed -- the service-area specs have no postcode chips without it).
+      - name: Seed the dev-style data every spec logs in against
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://tradeservice:tradeservice@localhost:5432/tradeservice_dev
+        run: |
+          npm run db:seed
+          npm run db:seed:fixtures
+          npm run db:seed:suburbs
+
+      - name: Build backend
+        working-directory: backend
         run: npm run build
 
-      # BKLG-015 (feature 2002): a Playwright step was tried here and pulled
-      # back out. See change.md's Notes on the table, V1. playwright.config.ts's
-      # baseURL is the real dev domain (https://idelta.com.au); this runner
-      # reaches it over the public internet on a home uplink, not the LAN
-      # every local run uses, and every login-dependent spec timed out. The
-      # real fix is a hermetic runner (its own Postgres, backend and
-      # frontend, tests against localhost) -> project/setup/02-repos-and-cicd.md,
-      # section "2a. CI -- the gate the rule above depends on".
+      # COOKIE_DOMAIN=localhost, not an IP: Chrome (and every other modern
+      # browser) treats http://localhost specifically as a secure context,
+      # so a `Secure`-flagged session cookie (auth/config.ts's
+      # useSecureCookies: true, unconditional) still sets and sends over
+      # plain http here -- the same env values project/setup/
+      # frontend-test-harness.md Part 3 calls for, not a coincidence.
+      - name: Start backend on :8080
+        working-directory: backend
+        env:
+          PORT: 8080
+          WEB_ORIGIN: http://localhost:3000
+          COOKIE_DOMAIN: localhost
+          API_BASE_URL: http://localhost:8080
+          BETTER_AUTH_SECRET: ci-only-secret-change-me-32-chars-min
+          DATABASE_URL: postgresql://tradeservice:tradeservice@localhost:5432/tradeservice_dev
+        run: |
+          nohup node dist/index.js > /tmp/backend.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/health > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "backend never became healthy" >&2
+          cat /tmp/backend.log >&2
+          exit 1
+
+      # The BUILT app, not `next dev`: dev mode holds the compiler in memory
+      # and compiles routes on the fly while tests are running, which is
+      # exactly the kind of server-side unsteadiness this harness exists to
+      # remove (project/setup/frontend-test-harness.md, "Why this exists").
+      - name: Start frontend on :3000
+        run: |
+          nohup npm start > /tmp/frontend.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000 > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "frontend never became healthy" >&2
+          cat /tmp/frontend.log >&2
+          exit 1
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E tests
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+        run: npm run test:e2e
+
+      - name: Upload server logs and Playwright traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-logs-and-traces
+          path: |
+            /tmp/backend.log
+            /tmp/frontend.log
+            test-results/
+          retention-days: 7

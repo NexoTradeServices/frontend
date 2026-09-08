@@ -35,6 +35,7 @@
 // live in reorderable-rows.spec.ts instead.
 import { test, expect } from "@playwright/test";
 import { login } from "./helpers/login";
+import { MOBILE_VIEWPORT } from "../playwright.config";
 
 async function logout(page: import("@playwright/test").Page) {
   const menuButton = page.getByRole("button", { name: "Open menu" });
@@ -128,45 +129,42 @@ test("AC6: creating 'Plumbing' again is refused with the field error on the name
   await logout(page);
 });
 
-test("AC7: at 390px the pricing list and edit screens hold the responsive floor", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "mobile", "this AC is specifically about the phone viewport");
+test.describe(() => {
+  test.use(MOBILE_VIEWPORT);
 
-  await page.goto("/ops/pricing");
-  await login(page, "owner@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Pricing" })).toBeVisible({ timeout: 10_000 });
+  test("AC7: at 390px the pricing list and edit screens hold the responsive floor", async ({ page }) => {
+    await page.goto("/ops/pricing");
+    await login(page, "owner@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Pricing" })).toBeVisible({ timeout: 10_000 });
 
-  let scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-  let clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    let scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    let clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
 
-  await page.getByRole("button", { name: "Open menu" }).click();
-  const menu = page.getByRole("navigation", { name: "Menu" });
-  await expect(menu.getByRole("link", { name: "Pricing" })).toBeVisible();
-  await page.getByRole("button", { name: "Close menu" }).click();
+    await page.getByRole("button", { name: "Open menu" }).click();
+    const menu = page.getByRole("navigation", { name: "Menu" });
+    await expect(menu.getByRole("link", { name: "Pricing" })).toBeVisible();
+    await page.getByRole("button", { name: "Close menu" }).click();
 
-  await expect(page.getByRole("link", { name: "Add a trade" })).toBeVisible();
-  await editTrade(page, "Plumbing");
+    await expect(page.getByRole("link", { name: "Add a trade" })).toBeVisible();
+    await editTrade(page, "Plumbing");
 
-  await expect(page.getByRole("heading", { name: "Plumbing" })).toBeVisible({ timeout: 10_000 });
-  scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-  clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    await expect(page.getByRole("heading", { name: "Plumbing" })).toBeVisible({ timeout: 10_000 });
+    scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
 
-  await expect(page.getByLabel("Call-out (first hour)")).toBeVisible();
-  await expect(page.getByLabel("Weekend")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
+    await expect(page.getByLabel("Call-out (first hour)")).toBeVisible();
+    await expect(page.getByLabel("Weekend")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
 
-  await logout(page);
+    await logout(page);
+  });
 });
 
 test(
-  "AC2 + AC3 + AC4 + AC5 (desktop only): edit Plumbing's rate, see the live multiplier preview, the locked normal row, reorder its options -- then everything reverts",
-  async ({ page }, testInfo) => {
-    test.skip(
-      testInfo.project.name !== "desktop",
-      "writes the shared Plumbing ServiceType row; runs on one project only to avoid racing the others",
-    );
-
+  "AC2 + AC3 + AC4 + AC5: edit Plumbing's rate, see the live multiplier preview, the locked normal row, reorder its options -- then everything reverts",
+  async ({ page }) => {
     await page.goto("/ops/pricing");
     await login(page, "owner@idelta.com.au");
     await expect(page.getByRole("heading", { name: "Pricing" })).toBeVisible({ timeout: 10_000 });

@@ -21,7 +21,11 @@
 //      01-dev-environment.md, section 6, ticked 03/09/26), so this proves
 //      BOTH branches: a real pick stores the structured address, and a
 //      simulated script failure (route-blocked) degrades to the
-//      unavailable state with the form still saving
+//      unavailable state with the form still saving. In CI the "real pick"
+//      half calls a stand-in instead of Google (helpers/mock-google-places.ts,
+//      project/setup/frontend-test-harness.md Part 3) -- the referrer-
+//      restricted key never leaves this machine, and CI never depends on
+//      Google being up.
 // AC13 this file, and every other spec touched by BKLG-013, log in through the
 //      shared helper (frontend/e2e/helpers/login.ts) -- proven by three
 //      consecutive clean `npm run test:e2e` runs, not by an assertion here
@@ -35,6 +39,8 @@
 // Active, the same "leave it as we found it" discipline.
 import { test, expect } from "@playwright/test";
 import { login } from "./helpers/login";
+import { MOBILE_VIEWPORT } from "../playwright.config";
+import { MOCKS_GOOGLE_PLACES, installMockGooglePlaces } from "./helpers/mock-google-places";
 
 // A unique suffix per test, on BOTH the name and the email -- a test that
 // fails before its own cleanup step leaves a stray active row behind, and
@@ -127,9 +133,8 @@ test("AC2: add a contractor with just the three required fields", async ({ page 
   await deactivateOpenContractor(page);
 });
 
-test("AC11: a real Google pick stores the structured address and round-trips", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "one network-dependent pick is enough; avoid tripling the Google API calls");
-
+test("AC11: a real Google pick stores the structured address and round-trips", async ({ page }) => {
+  if (MOCKS_GOOGLE_PLACES) await installMockGooglePlaces(page);
   await page.goto("/ops/contractors/new");
   await login(page, "mike@idelta.com.au");
   await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
@@ -166,9 +171,7 @@ test("AC11: a real Google pick stores the structured address and round-trips", a
 
 test("AC11: with the Places script blocked, the address field is disabled with the warning line and the form still saves", async ({
   page,
-}, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "the unavailable branch needs no repeating per viewport");
-
+}) => {
   await page.route("https://maps.googleapis.com/**", (route) => route.abort());
   await page.goto("/ops/contractors/new");
   await login(page, "mike@idelta.com.au");
@@ -199,11 +202,7 @@ test("AC11: with the Places script blocked, the address field is disabled with t
 // workers (unlike settings.spec.ts's/pricing.spec.ts's single shared
 // writer, this file has two, so a project-only skip is not enough).
 test.describe.serial("Bob (CON-014) -- the shared writer tests", () => {
-  test("AC5: Bob's Plumbing row, insurance and payout round-trip as whole cents", async ({ page }, testInfo) => {
-    test.skip(
-      testInfo.project.name !== "desktop",
-      "writes the shared seeded Bob row; runs on one project only to avoid racing the others (pricing.spec.ts's precedent)",
-    );
+  test("AC5: Bob's Plumbing row, insurance and payout round-trip as whole cents", async ({ page }) => {
     await page.goto("/ops/contractors/CON-014");
     await login(page, "mike@idelta.com.au");
     await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
@@ -275,11 +274,7 @@ test.describe.serial("Bob (CON-014) -- the shared writer tests", () => {
 
   test("AC8 + AC9: a deactivated contractor with the right password is told to call the office; reactivating restores his login", async ({
     page,
-  }, testInfo) => {
-    test.skip(
-      testInfo.project.name !== "desktop",
-      "writes the shared seeded Bob row; runs on one project only to avoid racing the others (pricing.spec.ts's precedent)",
-    );
+  }) => {
     await page.goto("/ops/contractors/CON-014");
     await login(page, "mike@idelta.com.au");
     await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
@@ -327,36 +322,38 @@ test.describe.serial("Bob (CON-014) -- the shared writer tests", () => {
   });
 });
 
-test("AC14: at 390px the list, the form and the deactivate dialog hold the responsive floor", async ({
-  page,
-}, testInfo) => {
-  test.skip(testInfo.project.name !== "mobile", "this AC is specifically about the phone viewport");
+test.describe(() => {
+  test.use(MOBILE_VIEWPORT);
 
-  await page.goto("/ops/contractors");
-  await login(page, "mike@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
-  let scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-  let clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+  test("AC14: at 390px the list, the form and the deactivate dialog hold the responsive floor", async ({
+    page,
+  }) => {
+    await page.goto("/ops/contractors");
+    await login(page, "mike@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+    let scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    let clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
 
-  await page.getByRole("link", { name: "Add a contractor" }).click();
-  await expect(page.getByLabel("Name", { exact: true })).toBeVisible();
-  scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-  clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    await page.getByRole("link", { name: "Add a contractor" }).click();
+    await expect(page.getByLabel("Name", { exact: true })).toBeVisible();
+    scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
 
-  await expect(page.getByRole("button", { name: "Remove this trade" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Remove this trade" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
 
-  await page.goto("/ops/contractors/CON-014");
-  await expect(page.getByRole("switch", { name: "Contractor status" })).toBeVisible();
-  await page.getByRole("switch", { name: "Contractor status" }).click();
-  await expect(page.getByRole("heading", { name: "Deactivate Bob Reilly?" })).toBeVisible();
-  scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-  clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
-  await expect(page.getByRole("button", { name: "Keep active" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Deactivate" })).toBeVisible();
-  await page.getByRole("button", { name: "Keep active" }).click();
+    await page.goto("/ops/contractors/CON-014");
+    await expect(page.getByRole("switch", { name: "Contractor status" })).toBeVisible();
+    await page.getByRole("switch", { name: "Contractor status" }).click();
+    await expect(page.getByRole("heading", { name: "Deactivate Bob Reilly?" })).toBeVisible();
+    scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    await expect(page.getByRole("button", { name: "Keep active" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Deactivate" })).toBeVisible();
+    await page.getByRole("button", { name: "Keep active" }).click();
+  });
 });

@@ -3,8 +3,10 @@
 // AC1  Mike logs in at /ops and lands on the ops placeholder
 // AC3  Bob, logged in as a contractor, opening /ops sees the wrong-door card
 // AC11 "Go to your portal" lands each role on its own root
-// AC12 the gate and reset pages hold the responsive floor at 390px (this
-//      suite's own `mobile` project runs every test below at that viewport)
+// AC12 the gate holds the responsive floor at 390px -- its own describe
+//      block below opts into MOBILE_VIEWPORT (project/setup/
+//      frontend-test-harness.md Part 1); every other test in this file is
+//      plain login behaviour and runs once, at the default desktop viewport.
 //
 // Runs against the seeded dev database (`npm run db:seed:fixtures`), not a
 // throwaway one -- so this file never completes a password reset (that would
@@ -13,6 +15,7 @@
 // and log out, all reversible.
 import { test, expect } from "@playwright/test";
 import { login } from "./helpers/login";
+import { MOBILE_VIEWPORT } from "../playwright.config";
 
 test("AC1: Mike logs in at /ops and lands on the ops placeholder", async ({ page }) => {
   await page.goto("/ops");
@@ -82,16 +85,20 @@ test("a dead reset link shows the dead-link page with its fix as the primary act
   await expect(page.getByRole("link", { name: "Email me a fresh link" })).toBeVisible();
 });
 
-test("AC12: no horizontal scrolling on the gate, and every action stays reachable", async ({
-  page,
-}) => {
-  await page.goto("/ops");
-  const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-  const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+test.describe(() => {
+  test.use(MOBILE_VIEWPORT);
 
-  await expect(page.getByLabel("Email")).toBeVisible();
-  await expect(page.getByLabel("Password")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Forgot your password?" })).toBeVisible();
+  test("AC12: no horizontal scrolling on the gate, and every action stays reachable", async ({
+    page,
+  }) => {
+    await page.goto("/ops");
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+
+    await expect(page.getByLabel("Email")).toBeVisible();
+    await expect(page.getByLabel("Password")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Forgot your password?" })).toBeVisible();
+  });
 });
