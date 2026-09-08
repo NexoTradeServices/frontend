@@ -1,16 +1,18 @@
 // Feature 2001, contractor onboarding (Mike's path) -- frontend e2e (ADR
 // 0001, Playwright).
 //
-// AC1  Mike/the owner see Bob, Dave, Priya -- Active tags, all Not ready to
-//      dispatch, Priya names "insurance renewal (expired)", all three name
+// AC1  Mike/the owner see Bob, Dave, Priya -- Active tags; Bob reads Ready
+//      to dispatch (his fixture-seeded service area, and address no longer
+//      counts -- design, "Managing the contractor record"), Dave and Priya
+//      read Not ready, Priya names "insurance renewal (expired)", both name
 //      "service area (not set up yet)"; Bob (contractor) gets the
 //      wrong-door card
 // AC2  Add a contractor with just name/phone/email: lands on the list with
 //      the toast, the new row shows Not ready to dispatch with the full
 //      missing list
-// AC5  Bob's Plumbing row, insurance and payout round-trip; [IMPL] (plan.md)
-//      -- the missing list is "address" + "service area (not set up yet)",
-//      not just the one item; see the plan note for why
+// AC5  Bob's Plumbing row, insurance and payout round-trip; this PUT plus
+//      his fixture-seeded service area leaves him with nothing missing at
+//      all (address stopped counting, see AC1 above)
 // AC6  a blank licence expiry refuses the whole save with a field error; a
 //      past expiry saves and shows the warning
 // AC8  a deactivated contractor with the RIGHT password sees the
@@ -69,12 +71,19 @@ test("AC1: Mike sees Bob Ready to dispatch, Dave and Priya Not ready (Priya's in
   for (const name of ["Bob Reilly", "Dave Hurst", "Priya Nair"]) {
     await expect(page.getByRole("link").filter({ hasText: name }).getByText("Active", { exact: true })).toBeVisible();
   }
-  // Feature 2002, decision 13: Bob's fixture (this dev DB's Bob also carries
-  // the legacy address shape AC12 documents, so "address" was never his
-  // remaining gap) now carries a saved service area -- his last missing
-  // item is gone and he reads Ready. Dave and Priya still have none.
+  // Feature 2002, decision 13: Bob's fixture carries a saved service area,
+  // and address no longer counts toward Ready to dispatch (design,
+  // "Managing the contractor record" -- backend/src/contractors/ready.ts,
+  // project/setup/frontend-test-harness.md) -- his fixture leaves him with
+  // nothing missing, so he reads Ready. Dave and Priya still have none.
+  //
+  // `exact: true` here matters: without it, this locator's plain-string
+  // match is a case-insensitive SUBSTRING match, and "Ready to dispatch" is
+  // a substring of "Not ready to dispatch" -- this assertion could not
+  // fail, green on either tag, from feature 2001 until this fix (found by
+  // the first CI run against a truly fresh database, 08/09/26).
   await expect(
-    page.getByRole("link").filter({ hasText: "Bob Reilly" }).getByText("Ready to dispatch"),
+    page.getByRole("link").filter({ hasText: "Bob Reilly" }).getByText("Ready to dispatch", { exact: true }),
   ).toBeVisible();
   for (const name of ["Dave Hurst", "Priya Nair"]) {
     const row = page.getByRole("link").filter({ hasText: name });
