@@ -217,11 +217,39 @@ test("AC11: with the Places script blocked, the address field is disabled with t
   await deactivateOpenContractor(page);
 });
 
+/** Idempotent: reads the switch's own aria-checked rather than assuming a
+ * starting state, and does nothing if Bob is already Active. */
+async function ensureBobActive(page: import("@playwright/test").Page): Promise<void> {
+  await withContractorStatusLock(async () => {
+    await page.goto("/ops/contractors/CON-014");
+    await login(page, "mike@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+    const statusSwitch = page.getByRole("switch", { name: "Contractor status" });
+    if ((await statusSwitch.getAttribute("aria-checked")) === "false") {
+      await statusSwitch.click();
+      await expect(page.getByText("Bob Reilly reactivated.")).toBeVisible();
+    }
+  });
+}
+
 // AC5 and AC8+AC9 both write to the SHARED seeded Bob (CON-014) row --
 // serialized so they never race each other's PUT under fullyParallel
 // workers (unlike settings.spec.ts's/pricing.spec.ts's single shared
 // writer, this file has two, so a project-only skip is not enough).
 test.describe.serial("Bob (CON-014) -- the shared writer tests", () => {
+  // Bob must end every run Active, whatever happened above. AC8+AC9
+  // deactivates him partway through and reactivates him at the end of the
+  // SAME test -- if it fails or times out before reaching that (found by
+  // CI: a ~15-action compound test can outrun the 30s default test timeout
+  // on a resource-constrained runner even with nothing actually broken),
+  // that reactivation never runs, and every OTHER test that logs in as Bob
+  // or reads his status stays broken for the rest of the suite. This
+  // check-and-fix is idempotent, so it costs almost nothing on the
+  // ordinary path where AC8+AC9 already put him back itself.
+  test.afterEach(async ({ page }) => {
+    await ensureBobActive(page);
+  });
+
   test("AC5: Bob's Plumbing row, insurance and payout round-trip as whole cents", async ({ page }) => {
     await page.goto("/ops/contractors/CON-014");
     await login(page, "mike@idelta.com.au");
