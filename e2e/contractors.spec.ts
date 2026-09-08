@@ -40,7 +40,7 @@
 // deactivates its own throwaway row as cleanup; AC8/AC9 restores Bob to
 // Active, the same "leave it as we found it" discipline.
 import { test, expect } from "@playwright/test";
-import { login } from "./helpers/login";
+import { login, ensureLoggedInAs } from "./helpers/login";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 import { MOCKS_GOOGLE_PLACES, installMockGooglePlaces } from "./helpers/mock-google-places";
 import { withContractorStatusLock } from "./helpers/singleton-lock";
@@ -221,8 +221,7 @@ test("AC11: with the Places script blocked, the address field is disabled with t
  * starting state, and does nothing if Bob is already Active. */
 async function ensureBobActive(page: import("@playwright/test").Page): Promise<void> {
   await withContractorStatusLock(async () => {
-    await page.goto("/ops/contractors/CON-014");
-    await login(page, "mike@idelta.com.au");
+    await ensureLoggedInAs(page, "/ops/contractors/CON-014", "mike@idelta.com.au");
     await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
     const statusSwitch = page.getByRole("switch", { name: "Contractor status" });
     if ((await statusSwitch.getAttribute("aria-checked")) === "false") {

@@ -25,7 +25,7 @@
 // lives in afterEach, which Playwright runs whether the test passed or
 // failed.
 import { test, expect, type Page } from "@playwright/test";
-import { login } from "./helpers/login";
+import { login, ensureLoggedInAs } from "./helpers/login";
 import { withPlatformSettingsLock } from "./helpers/singleton-lock";
 
 const INTERIM_WORDING = "Perth Trades & Services";
@@ -43,8 +43,7 @@ async function logout(page: Page) {
 }
 
 async function setBusinessName(page: Page, name: string): Promise<void> {
-  await page.goto("/ops/settings");
-  await login(page, "owner@idelta.com.au");
+  await ensureLoggedInAs(page, "/ops/settings", "owner@idelta.com.au");
   await expect(page.getByLabel("Business name")).toBeVisible({ timeout: 10_000 });
   await page.getByLabel("Business name").fill(name);
   await page.getByRole("button", { name: "Save settings" }).click();

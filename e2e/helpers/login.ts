@@ -46,3 +46,52 @@ export async function login(page: Page, email: string, password: string = DEV_PA
     await fillAndSubmit();
   }
 }
+
+/** Gets to `url` logged in as `email`, whatever session (if any) is
+ * already active on `page` -- for cleanup code (an afterEach restoring a
+ * shared fixture) that runs after a test which could have failed at ANY
+ * point, including before it ever logged out. Calling login() straight
+ * after a bare goto() assumes the gate is what's actually showing there;
+ * a still-authenticated page (the ordinary case right after a test fails
+ * mid-body) never has one, so that assumption hangs forever waiting for
+ * a field that will never appear, instead of failing -- found chasing
+ * project/setup/frontend-test-harness.md's CI cascade. Logs out first
+ * whenever something else is already signed in, rather than trying to
+ * tell "already the right session" apart from "the wrong one" -- both
+ * are safe to just re-authenticate from.
+ *
+ * Checks for the "Log in" BUTTON specifically, not a bare Email field --
+ * an authenticated record page can carry its own "Email" label (a
+ * contact-details field, e.g. the contractor record's own email input at
+ * /ops/contractors/[code]), which the first version of this check
+ * mistook for the gate and filled with a login email, then hung waiting
+ * for a Password field that page has no reason to have. */
+export async function ensureLoggedInAs(
+  page: Page,
+  url: string,
+  email: string,
+  password: string = DEV_PASSWORD,
+): Promise<void> {
+  await page.goto(url);
+  // .count() reads the DOM the instant this line runs; goto() resolving
+  // does not guarantee this route's own content (gate or authenticated)
+  // has actually settled by then. waitFor() gives the gate a real window
+  // to appear before concluding it never will.
+  const loginButton = page.getByRole("button", { name: "Log in", exact: true });
+  const atGate = await loginButton
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!atGate) {
+    const menuButton = page.getByRole("button", { name: "Open menu" });
+    if (await menuButton.isVisible().catch(() => false)) await menuButton.click();
+    await page.getByRole("button", { name: "Log out" }).click();
+    // The SAME unambiguous locator as the gate check above -- not
+    // getByLabel("Email"), which a still-mounted authenticated page (mid
+    // client-side swap, or logout silently doing nothing) can satisfy via
+    // its own unrelated "Email provider" field, falsely confirming the
+    // gate before it has actually arrived.
+    await expect(loginButton).toBeVisible({ timeout: 10_000 });
+  }
+  await login(page, email, password);
+}

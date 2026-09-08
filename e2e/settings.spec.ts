@@ -20,19 +20,26 @@
 //
 // Runs against the seeded dev database, not a throwaway one (same
 // constraint as auth.spec.ts). PlatformSettings is a SINGLETON row -- the
-// one test below that saves restores the row to what it found, the same
-// "leave it as we found it" discipline auth.spec.ts uses for sessions, and
-// runs inside withPlatformSettingsLock (helpers/singleton-lock.ts) because
-// brand-identity.spec.ts's AC6 writes the very same row.
-import { test, expect } from "@playwright/test";
-import { login } from "./helpers/login";
+// writer test below restores it via its own afterEach (not its own last
+// step -- project/setup/frontend-test-harness.md: a test that dies partway
+// through a multi-field edit otherwise leaves the row corrupted for every
+// later test, in this file and in brand-identity.spec.ts, which is exactly
+// the bug that shape caused there), inside withPlatformSettingsLock
+// (helpers/singleton-lock.ts) because brand-identity.spec.ts's AC6 writes
+// the very same row.
+import { test, expect, type Page } from "@playwright/test";
+import { login, ensureLoggedInAs } from "./helpers/login";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 import { withPlatformSettingsLock } from "./helpers/singleton-lock";
 
-async function logout(page: import("@playwright/test").Page) {
+async function logout(page: Page) {
   const menuButton = page.getByRole("button", { name: "Open menu" });
   if (await menuButton.isVisible()) await menuButton.click();
   await page.getByRole("button", { name: "Log out" }).click();
+  // Log out's own client-side refresh swaps the portal for the login gate
+  // in place (no URL change) -- wait for that landmark before navigating
+  // again, or the next goto races it (contractors.spec.ts's own precedent).
+  await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10_000 });
 }
 
 test("AC2: Mike (ops) gets the wrong-door card at /ops/settings", async ({ page }) => {
@@ -133,71 +140,96 @@ test.describe(() => {
   });
 });
 
-test(
-  "AC1 + AC3 + AC5 + AC6: seeded values render; the owner edits, saves, flips GST through the confirm dialog and sees the audit caption -- then everything reverts",
-  async ({ page }) => {
-    await withPlatformSettingsLock(async () => {
-      await page.goto("/ops/settings");
-      await login(page, "owner@idelta.com.au");
+/** Idempotent: reads the current row before touching anything, and only
+ * fixes what actually differs from the seed. GST goes off first, on its
+ * own, since flipping it needs its own confirm dialog and going off
+ * doesn't depend on the other fields. */
+async function restoreSeededSettings(page: Page): Promise<void> {
+  await ensureLoggedInAs(page, "/ops/settings", "owner@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible({ timeout: 10_000 });
 
-      // AC1 -- the OWNER nav group shows, and the seeded values render, one field per card.
-      // (/ops/settings renders from two sequential server-side fetches -- session,
-      // then settings -- a longer, honest wait for genuinely slower real work.)
-      await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible({ timeout: 10_000 });
-      await expect(page.getByRole("link", { name: "Settings" })).toBeVisible();
-      await expect(page.getByText("Owner", { exact: true })).toBeVisible();
-      await expect(page.getByLabel("ABN")).toHaveValue("");
-      await expect(page.getByLabel("Operator phone")).toHaveValue("08 0000 0000");
-      await expect(page.getByLabel("Business inbox")).toHaveValue("ops@idelta.com.au");
-      await expect(page.getByLabel("Timezone")).toHaveValue("Australia/Perth");
-      await expect(page.getByLabel("GST rate")).toHaveValue("10");
-      await expect(page.getByLabel("Payment terms")).toHaveValue("7");
-      await expect(page.getByLabel("No-show call-out fee")).toHaveValue("150.00");
-      await expect(page.getByLabel("Return visit minimum")).toHaveValue("30");
-      await expect(page.getByLabel("Contractor part cap")).toHaveValue("150.00");
-      await expect(page.getByLabel("Service reach")).toHaveValue("25");
-      await expect(page.getByLabel("Payout cycle")).toHaveValue("weekly");
-      await expect(page.getByLabel("Payout day")).toHaveValue("fri");
-      await expect(page.getByLabel("Email provider")).toHaveValue("mailjet");
-      await expect(page.getByLabel("SMS provider")).toHaveValue("clicksend");
+  if ((await page.getByRole("switch", { name: "GST registered" }).getAttribute("aria-checked")) === "true") {
+    await page.getByRole("switch", { name: "GST registered" }).click();
+    await page.getByRole("button", { name: "Save settings" }).click();
+    await expect(page.getByRole("heading", { name: "Switch GST off?" })).toBeVisible();
+    await page.getByRole("button", { name: "Switch off" }).click();
+    await expect(page.getByText("Saved.")).toBeVisible();
+  }
 
-      // AC3 -- edit a plain field and save; a reload shows the change.
-      await page.getByLabel("Payment terms").fill("14");
-      await page.getByRole("button", { name: "Save settings" }).click();
-      await expect(page.getByText("Saved.")).toBeVisible();
-      await page.reload();
-      await expect(page.getByLabel("Payment terms")).toHaveValue("14");
+  const abn = await page.getByLabel("ABN").inputValue();
+  const paymentTerms = await page.getByLabel("Payment terms").inputValue();
+  const businessInbox = await page.getByLabel("Business inbox").inputValue();
+  if (abn !== "" || paymentTerms !== "7" || businessInbox !== "ops@idelta.com.au") {
+    await page.getByLabel("ABN").fill("");
+    await page.getByLabel("Payment terms").fill("7");
+    await page.getByLabel("Business inbox").fill("ops@idelta.com.au");
+    await page.getByRole("button", { name: "Save settings" }).click();
+    await expect(page.getByText("Saved.")).toBeVisible();
+  }
 
-      // AC4 -- flipping GST on with no ABN is blocked client-side, no network round trip.
-      await page.getByRole("switch", { name: "GST registered" }).click();
-      await page.getByRole("button", { name: "Save settings" }).click();
-      await expect(page.getByText(/Enter the ABN first/)).toBeVisible();
+  await logout(page);
+}
 
-      // AC5 -- with an ABN, the flip passes the confirm dialog and stamps the audit pair.
-      await page.getByLabel("ABN").fill("51 824 753 556");
-      await page.getByRole("button", { name: "Save settings" }).click();
-      await expect(page.getByRole("heading", { name: "Switch GST on?" })).toBeVisible();
-      await page.getByRole("button", { name: "Switch on" }).click();
-      await expect(page.getByText(/Changed \d{2}\/\d{2}\/\d{2} by The owner/)).toBeVisible();
+test.describe(() => {
+  // Runs whether the test below passes or fails -- see the file header.
+  test.afterEach(async ({ page }) => {
+    await withPlatformSettingsLock(() => restoreSeededSettings(page));
+  });
 
-      // AC6 -- the Business inbox field edits operatorEmail.
-      await page.getByLabel("Business inbox").fill("admin@idelta.com.au");
-      await page.getByRole("button", { name: "Save settings" }).click();
-      await expect(page.getByText("Saved.")).toBeVisible();
-      await page.reload();
-      await expect(page.getByLabel("Business inbox")).toHaveValue("admin@idelta.com.au");
+  test(
+    "AC1 + AC3 + AC5 + AC6: seeded values render; the owner edits, saves, flips GST through the confirm dialog and sees the audit caption",
+    async ({ page }) => {
+      await withPlatformSettingsLock(async () => {
+        await page.goto("/ops/settings");
+        await login(page, "owner@idelta.com.au");
 
-      // Leave the row exactly as found.
-      await page.getByLabel("Business inbox").fill("ops@idelta.com.au");
-      await page.getByLabel("Payment terms").fill("7");
-      await page.getByLabel("ABN").fill("");
-      await page.getByRole("switch", { name: "GST registered" }).click();
-      await page.getByRole("button", { name: "Save settings" }).click();
-      await expect(page.getByRole("heading", { name: "Switch GST off?" })).toBeVisible();
-      await page.getByRole("button", { name: "Switch off" }).click();
-      await expect(page.getByText("Saved.")).toBeVisible();
+        // AC1 -- the OWNER nav group shows, and the seeded values render, one field per card.
+        // (/ops/settings renders from two sequential server-side fetches -- session,
+        // then settings -- a longer, honest wait for genuinely slower real work.)
+        await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible({ timeout: 10_000 });
+        await expect(page.getByRole("link", { name: "Settings" })).toBeVisible();
+        await expect(page.getByText("Owner", { exact: true })).toBeVisible();
+        await expect(page.getByLabel("ABN")).toHaveValue("");
+        await expect(page.getByLabel("Operator phone")).toHaveValue("08 0000 0000");
+        await expect(page.getByLabel("Business inbox")).toHaveValue("ops@idelta.com.au");
+        await expect(page.getByLabel("Timezone")).toHaveValue("Australia/Perth");
+        await expect(page.getByLabel("GST rate")).toHaveValue("10");
+        await expect(page.getByLabel("Payment terms")).toHaveValue("7");
+        await expect(page.getByLabel("No-show call-out fee")).toHaveValue("150.00");
+        await expect(page.getByLabel("Return visit minimum")).toHaveValue("30");
+        await expect(page.getByLabel("Contractor part cap")).toHaveValue("150.00");
+        await expect(page.getByLabel("Service reach")).toHaveValue("25");
+        await expect(page.getByLabel("Payout cycle")).toHaveValue("weekly");
+        await expect(page.getByLabel("Payout day")).toHaveValue("fri");
+        await expect(page.getByLabel("Email provider")).toHaveValue("mailjet");
+        await expect(page.getByLabel("SMS provider")).toHaveValue("clicksend");
 
-      await logout(page);
-    });
-  },
-);
+        // AC3 -- edit a plain field and save; a reload shows the change.
+        await page.getByLabel("Payment terms").fill("14");
+        await page.getByRole("button", { name: "Save settings" }).click();
+        await expect(page.getByText("Saved.")).toBeVisible();
+        await page.reload();
+        await expect(page.getByLabel("Payment terms")).toHaveValue("14");
+
+        // AC4 -- flipping GST on with no ABN is blocked client-side, no network round trip.
+        await page.getByRole("switch", { name: "GST registered" }).click();
+        await page.getByRole("button", { name: "Save settings" }).click();
+        await expect(page.getByText(/Enter the ABN first/)).toBeVisible();
+
+        // AC5 -- with an ABN, the flip passes the confirm dialog and stamps the audit pair.
+        await page.getByLabel("ABN").fill("51 824 753 556");
+        await page.getByRole("button", { name: "Save settings" }).click();
+        await expect(page.getByRole("heading", { name: "Switch GST on?" })).toBeVisible();
+        await page.getByRole("button", { name: "Switch on" }).click();
+        await expect(page.getByText(/Changed \d{2}\/\d{2}\/\d{2} by The owner/)).toBeVisible();
+
+        // AC6 -- the Business inbox field edits operatorEmail.
+        await page.getByLabel("Business inbox").fill("admin@idelta.com.au");
+        await page.getByRole("button", { name: "Save settings" }).click();
+        await expect(page.getByText("Saved.")).toBeVisible();
+        await page.reload();
+        await expect(page.getByLabel("Business inbox")).toHaveValue("admin@idelta.com.au");
+      });
+    },
+  );
+});
