@@ -11,9 +11,14 @@ import { Wordmark } from "@/components/brand/wordmark";
 export function GateShell({ children, displayName }: { children: ReactNode; displayName?: string | null }) {
   return (
     <div className="flex min-h-screen flex-col bg-ground">
-      <div className="bg-ink px-4 py-3">
+      {/* A bare <header>, not a styling-only <div>: the portal shell's own
+          top app bar (Feature 1006) carries the SAME bg-ink wordmark bar and
+          both can exist in the DOM at once for a moment after logout -- the
+          "banner" landmark this gets for free is what lets a test scope to
+          THIS one (frontend-test-harness.md, "found by the first CI run"). */}
+      <header className="bg-ink px-4 py-3">
         <Wordmark name={displayName ?? null} />
-      </div>
+      </header>
       <div className="flex flex-1 items-center justify-center px-5 py-9">
         <div className="w-full max-w-[360px] rounded-[10px] border border-hairline bg-surface p-6">
           {children}

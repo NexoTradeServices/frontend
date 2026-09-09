@@ -40,9 +40,10 @@
 // deactivates its own throwaway row as cleanup; AC8/AC9 restores Bob to
 // Active, the same "leave it as we found it" discipline.
 import { test, expect } from "@playwright/test";
-import { login } from "./helpers/login";
+import { login, ensureLoggedInAs } from "./helpers/login";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 import { MOCKS_GOOGLE_PLACES, installMockGooglePlaces } from "./helpers/mock-google-places";
+import { withContractorStatusLock } from "./helpers/singleton-lock";
 
 // A unique suffix per test, on BOTH the name and the email -- a test that
 // fails before its own cleanup step leaves a stray active row behind, and
@@ -66,33 +67,43 @@ test("AC1: Mike sees Bob Ready to dispatch, Dave and Priya Not ready (Priya's in
 }) => {
   await page.goto("/ops/contractors");
   await login(page, "mike@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
 
-  for (const name of ["Bob Reilly", "Dave Hurst", "Priya Nair"]) {
-    await expect(page.getByRole("link").filter({ hasText: name }).getByText("Active", { exact: true })).toBeVisible();
-  }
-  // Feature 2002, decision 13: Bob's fixture carries a saved service area,
-  // and address no longer counts toward Ready to dispatch (design,
-  // "Managing the contractor record" -- backend/src/contractors/ready.ts,
-  // project/setup/frontend-test-harness.md) -- his fixture leaves him with
-  // nothing missing, so he reads Ready. Dave and Priya still have none.
-  //
-  // `exact: true` here matters: without it, this locator's plain-string
-  // match is a case-insensitive SUBSTRING match, and "Ready to dispatch" is
-  // a substring of "Not ready to dispatch" -- this assertion could not
-  // fail, green on either tag, from feature 2001 until this fix (found by
-  // the first CI run against a truly fresh database, 08/09/26).
-  await expect(
-    page.getByRole("link").filter({ hasText: "Bob Reilly" }).getByText("Ready to dispatch", { exact: true }),
-  ).toBeVisible();
-  for (const name of ["Dave Hurst", "Priya Nair"]) {
-    const row = page.getByRole("link").filter({ hasText: name });
-    await expect(row.getByText("Not ready to dispatch")).toBeVisible();
-    await expect(row.getByText(/service area \(not set up yet\)/)).toBeVisible();
-  }
-  await expect(
-    page.getByRole("link").filter({ hasText: "Priya Nair" }).getByText(/insurance renewal \(expired\)/),
-  ).toBeVisible();
+  // Held around the read, not the whole test (login() already held it, and
+  // released it, for the login itself) -- project/setup/
+  // frontend-test-harness.md. Bob's tags here are only meaningful if he is
+  // genuinely Active for the whole read; contractors.spec.ts's own AC8+AC9
+  // switches him off and on again elsewhere and holds the same lock for its
+  // whole body, so this either reads his real, steady state or waits for
+  // that test to finish restoring it.
+  await withContractorStatusLock(async () => {
+    await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+
+    for (const name of ["Bob Reilly", "Dave Hurst", "Priya Nair"]) {
+      await expect(page.getByRole("link").filter({ hasText: name }).getByText("Active", { exact: true })).toBeVisible();
+    }
+    // Feature 2002, decision 13: Bob's fixture carries a saved service area,
+    // and address no longer counts toward Ready to dispatch (design,
+    // "Managing the contractor record" -- backend/src/contractors/ready.ts,
+    // project/setup/frontend-test-harness.md) -- his fixture leaves him with
+    // nothing missing, so he reads Ready. Dave and Priya still have none.
+    //
+    // `exact: true` here matters: without it, this locator's plain-string
+    // match is a case-insensitive SUBSTRING match, and "Ready to dispatch" is
+    // a substring of "Not ready to dispatch" -- this assertion could not
+    // fail, green on either tag, from feature 2001 until this fix (found by
+    // the first CI run against a truly fresh database, 08/09/26).
+    await expect(
+      page.getByRole("link").filter({ hasText: "Bob Reilly" }).getByText("Ready to dispatch", { exact: true }),
+    ).toBeVisible();
+    for (const name of ["Dave Hurst", "Priya Nair"]) {
+      const row = page.getByRole("link").filter({ hasText: name });
+      await expect(row.getByText("Not ready to dispatch")).toBeVisible();
+      await expect(row.getByText(/service area \(not set up yet\)/)).toBeVisible();
+    }
+    await expect(
+      page.getByRole("link").filter({ hasText: "Priya Nair" }).getByText(/insurance renewal \(expired\)/),
+    ).toBeVisible();
+  });
 });
 
 test("AC1: the owner sees the same list; Bob (contractor) gets the wrong-door card", async ({ page }) => {
@@ -206,11 +217,38 @@ test("AC11: with the Places script blocked, the address field is disabled with t
   await deactivateOpenContractor(page);
 });
 
+/** Idempotent: reads the switch's own aria-checked rather than assuming a
+ * starting state, and does nothing if Bob is already Active. */
+async function ensureBobActive(page: import("@playwright/test").Page): Promise<void> {
+  await withContractorStatusLock(async () => {
+    await ensureLoggedInAs(page, "/ops/contractors/CON-014", "mike@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+    const statusSwitch = page.getByRole("switch", { name: "Contractor status" });
+    if ((await statusSwitch.getAttribute("aria-checked")) === "false") {
+      await statusSwitch.click();
+      await expect(page.getByText("Bob Reilly reactivated.")).toBeVisible();
+    }
+  });
+}
+
 // AC5 and AC8+AC9 both write to the SHARED seeded Bob (CON-014) row --
 // serialized so they never race each other's PUT under fullyParallel
 // workers (unlike settings.spec.ts's/pricing.spec.ts's single shared
 // writer, this file has two, so a project-only skip is not enough).
 test.describe.serial("Bob (CON-014) -- the shared writer tests", () => {
+  // Bob must end every run Active, whatever happened above. AC8+AC9
+  // deactivates him partway through and reactivates him at the end of the
+  // SAME test -- if it fails or times out before reaching that (found by
+  // CI: a ~15-action compound test can outrun the 30s default test timeout
+  // on a resource-constrained runner even with nothing actually broken),
+  // that reactivation never runs, and every OTHER test that logs in as Bob
+  // or reads his status stays broken for the rest of the suite. This
+  // check-and-fix is idempotent, so it costs almost nothing on the
+  // ordinary path where AC8+AC9 already put him back itself.
+  test.afterEach(async ({ page }) => {
+    await ensureBobActive(page);
+  });
+
   test("AC5: Bob's Plumbing row, insurance and payout round-trip as whole cents", async ({ page }) => {
     await page.goto("/ops/contractors/CON-014");
     await login(page, "mike@idelta.com.au");
@@ -284,50 +322,57 @@ test.describe.serial("Bob (CON-014) -- the shared writer tests", () => {
   test("AC8 + AC9: a deactivated contractor with the right password is told to call the office; reactivating restores his login", async ({
     page,
   }) => {
-    await page.goto("/ops/contractors/CON-014");
-    await login(page, "mike@idelta.com.au");
-    await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
-    await deactivateOpenContractor(page);
-    await expect(page.getByText("Deactivated -- no dispatch, no login")).toBeVisible();
+    // Held for the WHOLE body -- project/setup/frontend-test-harness.md.
+    // Bob is genuinely, if briefly, deactivated partway through this test;
+    // every reader of his status (his own login elsewhere, and
+    // contractors.spec.ts's own AC1 list read) waits out this whole window
+    // via the same lock rather than risk landing on it.
+    await withContractorStatusLock(async () => {
+      await page.goto("/ops/contractors/CON-014");
+      await login(page, "mike@idelta.com.au");
+      await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+      await deactivateOpenContractor(page);
+      await expect(page.getByText("Deactivated -- no dispatch, no login")).toBeVisible();
 
-    const menuButton = page.getByRole("button", { name: "Open menu" });
-    if (await menuButton.isVisible()) await menuButton.click();
-    await page.getByRole("button", { name: "Log out" }).click();
-    await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10_000 });
+      const menuButton = page.getByRole("button", { name: "Open menu" });
+      if (await menuButton.isVisible()) await menuButton.click();
+      await page.getByRole("button", { name: "Log out" }).click();
+      await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10_000 });
 
-    // AC8: the right password, told why -- never a field-specific message.
-    await page.goto("/contractor");
-    await page.getByLabel("Email").fill("bob@idelta.com.au");
-    await page.getByLabel("Password").fill("dev-password-123");
-    await page.getByRole("button", { name: "Log in" }).click();
-    await expect(page.getByText(/Your account is not active\. Call us on 08 0000 0000\./)).toBeVisible();
+      // AC8: the right password, told why -- never a field-specific message.
+      await page.goto("/contractor");
+      await page.getByLabel("Email").fill("bob@idelta.com.au");
+      await page.getByLabel("Password").fill("dev-password-123");
+      await page.getByRole("button", { name: "Log in" }).click();
+      await expect(page.getByText(/Your account is not active\. Call us on 08 0000 0000\./)).toBeVisible();
 
-    // A wrong password still gets the generic banner, not the operatorPhone one.
-    await page.getByLabel("Password").fill("not-the-right-password");
-    await page.getByRole("button", { name: "Log in" }).click();
-    await expect(page.getByText(/don't match/)).toBeVisible();
+      // A wrong password still gets the generic banner, not the operatorPhone one.
+      await page.getByLabel("Password").fill("not-the-right-password");
+      await page.getByRole("button", { name: "Log in" }).click();
+      await expect(page.getByText(/don't match/)).toBeVisible();
 
-    // AC9: reactivate Bob (no confirm) and restore the seeded row.
-    await page.goto("/ops/contractors/CON-014");
-    await login(page, "mike@idelta.com.au");
-    await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
-    await page.getByRole("switch", { name: "Contractor status" }).click();
-    await expect(page.getByText("Bob Reilly reactivated.")).toBeVisible();
-    await expect(page.getByText("Active -- dispatched when ready")).toBeVisible();
+      // AC9: reactivate Bob (no confirm) and restore the seeded row.
+      await page.goto("/ops/contractors/CON-014");
+      await login(page, "mike@idelta.com.au");
+      await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+      await page.getByRole("switch", { name: "Contractor status" }).click();
+      await expect(page.getByText("Bob Reilly reactivated.")).toBeVisible();
+      await expect(page.getByText("Active -- dispatched when ready")).toBeVisible();
 
-    const mikeMenu = page.getByRole("button", { name: "Open menu" });
-    if (await mikeMenu.isVisible()) await mikeMenu.click();
-    await page.getByRole("button", { name: "Log out" }).click();
-    await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10_000 });
+      const mikeMenu = page.getByRole("button", { name: "Open menu" });
+      if (await mikeMenu.isVisible()) await mikeMenu.click();
+      await page.getByRole("button", { name: "Log out" }).click();
+      await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10_000 });
 
-    await page.goto("/contractor");
-    await page.getByLabel("Email").fill("bob@idelta.com.au");
-    await page.getByLabel("Password").fill("dev-password-123");
-    await page.getByRole("button", { name: "Log in" }).click();
-    await expect(page.getByText(/Logged in as Bob Reilly/)).toBeVisible();
-    const bobMenu = page.getByRole("button", { name: "Open menu" });
-    if (await bobMenu.isVisible()) await bobMenu.click();
-    await page.getByRole("button", { name: "Log out" }).click();
+      await page.goto("/contractor");
+      await page.getByLabel("Email").fill("bob@idelta.com.au");
+      await page.getByLabel("Password").fill("dev-password-123");
+      await page.getByRole("button", { name: "Log in" }).click();
+      await expect(page.getByText(/Logged in as Bob Reilly/)).toBeVisible();
+      const bobMenu = page.getByRole("button", { name: "Open menu" });
+      if (await bobMenu.isVisible()) await bobMenu.click();
+      await page.getByRole("button", { name: "Log out" }).click();
+    });
   });
 });
 

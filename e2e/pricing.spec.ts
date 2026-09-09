@@ -23,8 +23,12 @@
 // AC7  the 390px responsive floor on both the list and the edit screen
 //
 // Plumbing's rate/multiplier/option edits are restored to the seeded
-// values at the end of the writing test, the same "leave it as we found
-// it" discipline settings.spec.ts uses for the PlatformSettings row.
+// values via the writing test's own afterEach, not its own last step --
+// project/setup/frontend-test-harness.md: a test that dies partway through
+// a multi-field edit otherwise leaves Plumbing corrupted for every later
+// test (this file's own AC1, and reorderable-rows.spec.ts) for the rest of
+// the run, the same bug shape that hit brand-identity.spec.ts and
+// settings.spec.ts.
 //
 // Feature 1012 (reorderable rows) proves its own AC2 (reorder + save +
 // reload) and AC4 (add/remove regression on the shared component) inside
@@ -33,14 +37,18 @@
 // row; a second writer in reorderable-rows.spec.ts would race it. 1012's
 // AC1 and AC3 (button presence, tap targets) touch no server state and
 // live in reorderable-rows.spec.ts instead.
-import { test, expect } from "@playwright/test";
-import { login } from "./helpers/login";
+import { test, expect, type Page } from "@playwright/test";
+import { login, ensureLoggedInAs } from "./helpers/login";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 
-async function logout(page: import("@playwright/test").Page) {
+async function logout(page: Page) {
   const menuButton = page.getByRole("button", { name: "Open menu" });
   if (await menuButton.isVisible()) await menuButton.click();
   await page.getByRole("button", { name: "Log out" }).click();
+  // Log out's own client-side refresh swaps the portal for the login gate
+  // in place (no URL change) -- wait for that landmark before navigating
+  // again, or the next goto races it (contractors.spec.ts's own precedent).
+  await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10_000 });
 }
 
 /** The catalog lists every trade alphabetically -- each row's Edit link is named for its own trade. */
@@ -162,78 +170,104 @@ test.describe(() => {
   });
 });
 
-test(
-  "AC2 + AC3 + AC4 + AC5: edit Plumbing's rate, see the live multiplier preview, the locked normal row, reorder its options -- then everything reverts",
-  async ({ page }) => {
-    await page.goto("/ops/pricing");
-    await login(page, "owner@idelta.com.au");
-    await expect(page.getByRole("heading", { name: "Pricing" })).toBeVisible({ timeout: 10_000 });
-    await editTrade(page, "Plumbing");
-    await expect(page.getByRole("heading", { name: "Plumbing" })).toBeVisible({ timeout: 10_000 });
+/** Idempotent: reads the current row before touching anything, and only
+ * saves if something actually differs from the seed. Options are removed
+ * highest-index-first -- removing shifts nothing below it, so the loop
+ * never has to recompute names mid-flight. */
+async function restoreSeededPlumbing(page: Page): Promise<void> {
+  await ensureLoggedInAs(page, "/ops/pricing", "owner@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "Pricing" })).toBeVisible({ timeout: 10_000 });
+  await editTrade(page, "Plumbing");
+  await expect(page.getByRole("heading", { name: "Plumbing" })).toBeVisible({ timeout: 10_000 });
 
-    // AC1/seeded values render on the edit screen too.
-    await expect(page.getByLabel("Call-out (first hour)")).toHaveValue("250.00");
-    await expect(page.getByLabel("Standard rate")).toHaveValue("180.00");
-    await expect(page.getByLabel("Emergency")).toHaveValue("1.5");
-    await expect(page.getByLabel("Weekend")).toHaveValue("1.5");
+  const standardRate = await page.getByLabel("Standard rate").inputValue();
+  const weekend = await page.getByLabel("Weekend").inputValue();
+  const optionCount = await page.getByRole("button", { name: /^Remove option \d+$/ }).count();
 
-    // AC4 -- the normal row is locked/frozen: shown, but no input to edit it.
-    await expect(page.getByText("1.0x")).toBeVisible();
-    await expect(page.getByLabel("Normal")).toHaveCount(0);
-
-    // AC2 -- standard rate 180 -> 190, saved.
-    await page.getByLabel("Standard rate").fill("190.00");
-    await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Saved.")).toBeVisible();
-    await page.reload();
-    await expect(page.getByLabel("Standard rate")).toHaveValue("190.00");
-
-    // AC3 -- the weekend multiplier's live preview, computed off the just-saved rate.
-    await page.getByLabel("Weekend").fill("1.25");
-    await expect(page.getByText("Preview: call-out $312.50 / hourly $237.50")).toBeVisible();
-
-    // AC5 -- add, remove and reorder the prefilled options; save; reload shows the saved order.
-    await page.getByRole("button", { name: "+ Add another" }).click();
-    await page.getByLabel("Option 1", { exact: true }).fill("Blocked drain");
-    await page.getByRole("button", { name: "+ Add another" }).click();
-    await page.getByLabel("Option 2", { exact: true }).fill("Leaking tap");
-    await page.getByRole("button", { name: "+ Add another" }).click();
-    await page.getByLabel("Option 3", { exact: true }).fill("to be removed");
-    await page.getByRole("button", { name: "Remove option 3" }).click();
-    await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Saved.")).toBeVisible();
-    await page.reload();
-    await expect(page.getByLabel("Option 1", { exact: true })).toHaveValue("Blocked drain");
-    await expect(page.getByLabel("Option 2", { exact: true })).toHaveValue("Leaking tap");
-    await expect(page.getByLabel("Option 3", { exact: true })).toHaveCount(0);
-
-    // Feature 1012, AC2 -- move option 2 up one place and save; the API
-    // returns the new order and a reload shows it.
-    await page.getByRole("button", { name: "Move option 2 up" }).click();
-    await expect(page.getByLabel("Option 1", { exact: true })).toHaveValue("Leaking tap");
-    await expect(page.getByLabel("Option 2", { exact: true })).toHaveValue("Blocked drain");
-    await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Saved.")).toBeVisible();
-    await page.reload();
-    await expect(page.getByLabel("Option 1", { exact: true })).toHaveValue("Leaking tap");
-    await expect(page.getByLabel("Option 2", { exact: true })).toHaveValue("Blocked drain");
-
-    // Feature 1012, AC4 -- add and remove still behave exactly as before
-    // now that the ordered variant is in play (regression guard).
-    await page.getByRole("button", { name: "+ Add another" }).click();
-    await page.getByLabel("Option 3", { exact: true }).fill("to be removed");
-    await expect(page.getByLabel("Option 3", { exact: true })).toHaveValue("to be removed");
-    await page.getByRole("button", { name: "Remove option 3" }).click();
-    await expect(page.getByLabel("Option 3", { exact: true })).toHaveCount(0);
-
-    // Leave the row exactly as found.
-    await page.getByLabel("Standard rate").fill("180.00");
-    await page.getByLabel("Weekend").fill("1.5");
-    await page.getByRole("button", { name: "Remove option 2" }).click();
-    await page.getByRole("button", { name: "Remove option 1" }).click();
-    await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Saved.")).toBeVisible();
-
+  if (standardRate === "180.00" && weekend === "1.5" && optionCount === 0) {
     await logout(page);
-  },
-);
+    return;
+  }
+
+  if (standardRate !== "180.00") await page.getByLabel("Standard rate").fill("180.00");
+  if (weekend !== "1.5") await page.getByLabel("Weekend").fill("1.5");
+  for (let i = optionCount; i >= 1; i--) {
+    await page.getByRole("button", { name: `Remove option ${String(i)}` }).click();
+  }
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Saved.")).toBeVisible();
+  await logout(page);
+}
+
+test.describe(() => {
+  // Runs whether the test below passes or fails -- see the file header.
+  test.afterEach(async ({ page }) => {
+    await restoreSeededPlumbing(page);
+  });
+
+  test(
+    "AC2 + AC3 + AC4 + AC5: edit Plumbing's rate, see the live multiplier preview, the locked normal row, reorder its options",
+    async ({ page }) => {
+      await page.goto("/ops/pricing");
+      await login(page, "owner@idelta.com.au");
+      await expect(page.getByRole("heading", { name: "Pricing" })).toBeVisible({ timeout: 10_000 });
+      await editTrade(page, "Plumbing");
+      await expect(page.getByRole("heading", { name: "Plumbing" })).toBeVisible({ timeout: 10_000 });
+
+      // AC1/seeded values render on the edit screen too.
+      await expect(page.getByLabel("Call-out (first hour)")).toHaveValue("250.00");
+      await expect(page.getByLabel("Standard rate")).toHaveValue("180.00");
+      await expect(page.getByLabel("Emergency")).toHaveValue("1.5");
+      await expect(page.getByLabel("Weekend")).toHaveValue("1.5");
+
+      // AC4 -- the normal row is locked/frozen: shown, but no input to edit it.
+      await expect(page.getByText("1.0x")).toBeVisible();
+      await expect(page.getByLabel("Normal")).toHaveCount(0);
+
+      // AC2 -- standard rate 180 -> 190, saved.
+      await page.getByLabel("Standard rate").fill("190.00");
+      await page.getByRole("button", { name: "Save" }).click();
+      await expect(page.getByText("Saved.")).toBeVisible();
+      await page.reload();
+      await expect(page.getByLabel("Standard rate")).toHaveValue("190.00");
+
+      // AC3 -- the weekend multiplier's live preview, computed off the just-saved rate.
+      await page.getByLabel("Weekend").fill("1.25");
+      await expect(page.getByText("Preview: call-out $312.50 / hourly $237.50")).toBeVisible();
+
+      // AC5 -- add, remove and reorder the prefilled options; save; reload shows the saved order.
+      await page.getByRole("button", { name: "+ Add another" }).click();
+      await page.getByLabel("Option 1", { exact: true }).fill("Blocked drain");
+      await page.getByRole("button", { name: "+ Add another" }).click();
+      await page.getByLabel("Option 2", { exact: true }).fill("Leaking tap");
+      await page.getByRole("button", { name: "+ Add another" }).click();
+      await page.getByLabel("Option 3", { exact: true }).fill("to be removed");
+      await page.getByRole("button", { name: "Remove option 3" }).click();
+      await page.getByRole("button", { name: "Save" }).click();
+      await expect(page.getByText("Saved.")).toBeVisible();
+      await page.reload();
+      await expect(page.getByLabel("Option 1", { exact: true })).toHaveValue("Blocked drain");
+      await expect(page.getByLabel("Option 2", { exact: true })).toHaveValue("Leaking tap");
+      await expect(page.getByLabel("Option 3", { exact: true })).toHaveCount(0);
+
+      // Feature 1012, AC2 -- move option 2 up one place and save; the API
+      // returns the new order and a reload shows it.
+      await page.getByRole("button", { name: "Move option 2 up" }).click();
+      await expect(page.getByLabel("Option 1", { exact: true })).toHaveValue("Leaking tap");
+      await expect(page.getByLabel("Option 2", { exact: true })).toHaveValue("Blocked drain");
+      await page.getByRole("button", { name: "Save" }).click();
+      await expect(page.getByText("Saved.")).toBeVisible();
+      await page.reload();
+      await expect(page.getByLabel("Option 1", { exact: true })).toHaveValue("Leaking tap");
+      await expect(page.getByLabel("Option 2", { exact: true })).toHaveValue("Blocked drain");
+
+      // Feature 1012, AC4 -- add and remove still behave exactly as before
+      // now that the ordered variant is in play (regression guard).
+      await page.getByRole("button", { name: "+ Add another" }).click();
+      await page.getByLabel("Option 3", { exact: true }).fill("to be removed");
+      await expect(page.getByLabel("Option 3", { exact: true })).toHaveValue("to be removed");
+      await page.getByRole("button", { name: "Remove option 3" }).click();
+      await expect(page.getByLabel("Option 3", { exact: true })).toHaveCount(0);
+    },
+  );
+});
