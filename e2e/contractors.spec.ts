@@ -368,7 +368,7 @@ test.describe.serial("Bob (CON-014) -- the shared writer tests", () => {
       await page.getByLabel("Email").fill("bob@idelta.com.au");
       await page.getByLabel("Password").fill("dev-password-123");
       await page.getByRole("button", { name: "Log in" }).click();
-      await expect(page.getByText(/Logged in as Bob Reilly/)).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
       const bobMenu = page.getByRole("button", { name: "Open menu" });
       if (await bobMenu.isVisible()) await bobMenu.click();
       await page.getByRole("button", { name: "Log out" }).click();
@@ -379,7 +379,7 @@ test.describe.serial("Bob (CON-014) -- the shared writer tests", () => {
 test.describe(() => {
   test.use(MOBILE_VIEWPORT);
 
-  test("AC14: at 390px the list, the form and the deactivate dialog hold the responsive floor", async ({
+  test("AC14: at 390px the list, the form and the deactivate confirm dialog hold the responsive floor", async ({
     page,
   }) => {
     await page.goto("/ops/contractors");
