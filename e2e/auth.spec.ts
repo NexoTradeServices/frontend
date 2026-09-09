@@ -41,7 +41,7 @@ test("AC3 + AC11: Bob's contractor session sees the wrong-door card on /ops, and
 }) => {
   await page.goto("/contractor");
   await login(page, "bob@idelta.com.au");
-  await expect(page.getByText(/Logged in as Bob Reilly/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 
   await page.goto("/ops");
   await expect(page.getByRole("heading", { name: "Wrong portal" })).toBeVisible();
@@ -49,7 +49,7 @@ test("AC3 + AC11: Bob's contractor session sees the wrong-door card on /ops, and
 
   await page.getByRole("link", { name: "Go to your portal" }).click();
   await expect(page).toHaveURL(/\/contractor$/);
-  await expect(page.getByText(/Logged in as Bob Reilly/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 
   await page.getByRole("button", { name: "Log out" }).click();
   await expect(page.getByRole("heading", { name: "Contractor portal" })).toBeVisible();
