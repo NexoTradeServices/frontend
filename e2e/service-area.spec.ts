@@ -36,7 +36,7 @@
 // suburbs, so the backend's own /api/suburbs/in-range query (never mocked)
 // still proves AC4/AC5 for real.
 import { test, expect, type Page } from "@playwright/test";
-import { login } from "./helpers/login";
+import { login, ensureLoggedInAs } from "./helpers/login";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 import { MOCKS_GOOGLE_PLACES, installMockGooglePlaces } from "./helpers/mock-google-places";
 
@@ -216,36 +216,60 @@ test.describe.serial("AC3-AC6 (real Places): the pin/radius/postcode lifecycle o
   });
 });
 
-test("AC7: Bob sees and saves his own area; Priya sees her own (empty) area, never Bob's; Bob gets the wrong door at the ops URL", async ({
-  page,
-}) => {
-  await page.goto("/contractor/service-area");
-  await login(page, "bob@idelta.com.au");
+/** Idempotent: reads 6163's own aria-pressed rather than assuming AC7's
+ * toggle-off happened, and does nothing if it's already kept. */
+async function ensureBobKeeps6163(page: Page): Promise<void> {
+  await ensureLoggedInAs(page, "/contractor/service-area", "bob@idelta.com.au");
   await expect(page.getByRole("heading", { name: "Your service area" })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByLabel("Suburb")).toHaveValue(/Fremantle/);
   const keptChip = page.getByRole("button", { name: /^6163 -/ });
-  await expect(keptChip).toHaveAttribute("aria-pressed", "true", { timeout: 10_000 });
-  await keptChip.click();
-  await page.getByRole("button", { name: "Save service area" }).click();
-  await expect(page.getByText(/Service area saved -- \d+ postcodes from Fremantle/)).toBeVisible({ timeout: 10_000 });
-  // Leave as found: put 6163 back and save again.
-  await keptChip.click();
-  await page.getByRole("button", { name: "Save service area" }).click();
-  await expect(page.getByText(/Service area saved/)).toBeVisible({ timeout: 10_000 });
+  if ((await keptChip.getAttribute("aria-pressed")) === "false") {
+    await keptChip.click();
+    await page.getByRole("button", { name: "Save service area" }).click();
+    await expect(page.getByText(/Service area saved/)).toBeVisible({ timeout: 10_000 });
+  }
+}
 
-  await page.goto("/ops/contractors/CON-014/service-area");
-  await expect(page.getByRole("heading", { name: "Wrong portal" })).toBeVisible({ timeout: 10_000 });
+test.describe(() => {
+  // Runs whether the test below passes or fails -- project/setup/
+  // frontend-test-harness.md: crossing 6163 off and back on again were two
+  // separate saves, both the test's own last steps; a failure in between
+  // left Bob's real, permanent fixture (not a throwaway) missing a
+  // postcode for the rest of the run.
+  test.afterEach(async ({ page }) => {
+    await ensureBobKeeps6163(page);
+  });
 
-  const menuButton = page.getByRole("button", { name: "Open menu" });
-  if (await menuButton.isVisible()) await menuButton.click();
-  await page.getByRole("button", { name: "Log out" }).click();
-  await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10_000 });
+  test("AC7: Bob sees and saves his own area; Priya sees her own (empty) area, never Bob's; Bob gets the wrong door at the ops URL", async ({
+    page,
+  }) => {
+    await page.goto("/contractor/service-area");
+    await login(page, "bob@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Your service area" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByLabel("Suburb")).toHaveValue(/Fremantle/);
+    const keptChip = page.getByRole("button", { name: /^6163 -/ });
+    await expect(keptChip).toHaveAttribute("aria-pressed", "true", { timeout: 10_000 });
+    await keptChip.click();
+    await page.getByRole("button", { name: "Save service area" }).click();
+    await expect(page.getByText(/Service area saved -- \d+ postcodes from Fremantle/)).toBeVisible({ timeout: 10_000 });
+    // Leave as found: put 6163 back and save again.
+    await keptChip.click();
+    await page.getByRole("button", { name: "Save service area" }).click();
+    await expect(page.getByText(/Service area saved/)).toBeVisible({ timeout: 10_000 });
 
-  await page.goto("/contractor/service-area");
-  await login(page, "priya@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Your service area" })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByLabel("Suburb")).toHaveValue("");
-  await expect(page.getByText("Pick the suburb first.")).toBeVisible();
+    await page.goto("/ops/contractors/CON-014/service-area");
+    await expect(page.getByRole("heading", { name: "Wrong portal" })).toBeVisible({ timeout: 10_000 });
+
+    const menuButton = page.getByRole("button", { name: "Open menu" });
+    if (await menuButton.isVisible()) await menuButton.click();
+    await page.getByRole("button", { name: "Log out" }).click();
+    await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10_000 });
+
+    await page.goto("/contractor/service-area");
+    await login(page, "priya@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Your service area" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByLabel("Suburb")).toHaveValue("");
+    await expect(page.getByText("Pick the suburb first.")).toBeVisible();
+  });
 });
 
 test("AC8: Places unavailable -- Bob's saved pin still works and Save succeeds; Priya's empty area refuses Save", async ({

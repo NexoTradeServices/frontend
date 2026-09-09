@@ -47,6 +47,20 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
+  // Flat, not CI-only: CI's own hermetic stack (frontend + backend +
+  // Postgres, all on one small GitHub-hosted runner) answers every action
+  // measurably slower than a normal dev machine, but the dev machine itself
+  // is shared and occasionally just as loaded. The default 30s is tight for
+  // a compound test like contractors.spec.ts's AC8+AC9 (a deactivate, two
+  // login attempts and a reactivate -- upwards of fifteen real page actions
+  // in one test) plus its own afterEach (found by CI: it timed out
+  // mid-test, before its own reactivation step ran, which left Bob
+  // deactivated for the rest of the suite and cascaded into four more
+  // failures that had nothing wrong with them; reproduced locally too, as
+  // the new afterEach itself timing out under a loaded machine). A higher
+  // ceiling costs nothing on the common path -- a test still finishes the
+  // moment its own actions do.
+  timeout: 60_000,
   // BKLG-013 (feature 2002): the flake "correlates with heavy PARALLEL login
   // load" -- server-side slowness under concurrent sign-ins, not a wrong
   // wait condition (frontend/e2e/helpers/login.ts already gives the
