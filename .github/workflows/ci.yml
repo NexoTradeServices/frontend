@@ -178,9 +178,20 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      # NEXT_PUBLIC_API_URL here is for THIS STEP'S OWN Node process, not the
+      # browser -- the browser already has it inlined from the Build step
+      # above. request-a-job.spec.ts's beforeAll calls the backend directly
+      # (Playwright's `request` fixture, not the page) to read the live
+      # ServiceType catalog, and its own fallback default is the real dev
+      # domain -- exactly right locally, wrong here, where that domain is
+      # someone else's catalog entirely (a live dev machine, still running).
+      # Without this, that call silently succeeded against the wrong server,
+      # and every assertion built from its response (rates, prefilledFields)
+      # failed against what the CI-local page actually rendered.
       - name: E2E tests
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
+          NEXT_PUBLIC_API_URL: http://localhost:8080
         run: npm run test:e2e
 
       - name: Upload server logs and Playwright traces on failure
