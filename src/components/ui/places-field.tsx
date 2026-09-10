@@ -159,7 +159,7 @@ export function fullAddress(a: PickedAddress): string {
 export function PlacesField({
   id,
   label,
-  optional,
+  required,
   variant = "address",
   helper,
   value,
@@ -170,7 +170,8 @@ export function PlacesField({
 }: {
   id: string;
   label: string;
-  optional?: boolean;
+  /** marks the required exception with a small asterisk, matching Field/SelectField; unmarked fields are optional. */
+  required?: boolean;
   /** "address" (default, full street pick) or "suburb" (the core-location pin, plan decision 11). */
   variant?: "address" | "suburb";
   /** shown below the field when there is neither an error nor the unavailable warning. */
@@ -327,9 +328,13 @@ export function PlacesField({
 
   return (
     <div className="relative mb-3.5">
-      <label htmlFor={id} className="mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase">
+      <label
+        htmlFor={id}
+        className={`mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase ${
+          required ? "after:ml-0.5 after:text-brand-destructive after:content-['*']" : ""
+        }`}
+      >
         {label}
-        {optional ? <span className="font-normal tracking-normal normal-case"> (optional)</span> : null}
       </label>
       <input
         id={id}
