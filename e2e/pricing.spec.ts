@@ -71,7 +71,8 @@ test("AC1: Bob (contractor) gets the wrong-door card at /ops/pricing too", async
 test("AC1: Mike's ops-portal nav shows no Pricing entry -- owner-only", async ({ page }) => {
   await page.goto("/ops");
   await login(page, "mike@idelta.com.au");
-  await expect(page.getByText(/Logged in as Mike/)).toBeVisible();
+  // Since feature 4001 the ops root lands on the job queue.
+  await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible({ timeout: 15_000 });
 
   await expect(page.getByRole("link", { name: "Pricing" })).toHaveCount(0);
 
@@ -237,29 +238,29 @@ test.describe(() => {
 
       // AC5 -- add, remove and reorder the prefilled options; save; reload shows the saved order.
       await page.getByRole("button", { name: "+ Add another" }).click();
-      await page.getByLabel("Option 1", { exact: true }).fill("Blocked drain");
+      await page.getByLabel("Option 1", { exact: true }).fill("Where in the property is it?");
       await page.getByRole("button", { name: "+ Add another" }).click();
-      await page.getByLabel("Option 2", { exact: true }).fill("Leaking tap");
+      await page.getByLabel("Option 2", { exact: true }).fill("What brand is it?");
       await page.getByRole("button", { name: "+ Add another" }).click();
       await page.getByLabel("Option 3", { exact: true }).fill("to be removed");
       await page.getByRole("button", { name: "Remove option 3" }).click();
       await page.getByRole("button", { name: "Save" }).click();
       await expect(page.getByText("Saved.")).toBeVisible();
       await page.reload();
-      await expect(page.getByLabel("Option 1", { exact: true })).toHaveValue("Blocked drain");
-      await expect(page.getByLabel("Option 2", { exact: true })).toHaveValue("Leaking tap");
+      await expect(page.getByLabel("Option 1", { exact: true })).toHaveValue("Where in the property is it?");
+      await expect(page.getByLabel("Option 2", { exact: true })).toHaveValue("What brand is it?");
       await expect(page.getByLabel("Option 3", { exact: true })).toHaveCount(0);
 
       // Feature 1012, AC2 -- move option 2 up one place and save; the API
       // returns the new order and a reload shows it.
       await page.getByRole("button", { name: "Move option 2 up" }).click();
-      await expect(page.getByLabel("Option 1", { exact: true })).toHaveValue("Leaking tap");
-      await expect(page.getByLabel("Option 2", { exact: true })).toHaveValue("Blocked drain");
+      await expect(page.getByLabel("Option 1", { exact: true })).toHaveValue("What brand is it?");
+      await expect(page.getByLabel("Option 2", { exact: true })).toHaveValue("Where in the property is it?");
       await page.getByRole("button", { name: "Save" }).click();
       await expect(page.getByText("Saved.")).toBeVisible();
       await page.reload();
-      await expect(page.getByLabel("Option 1", { exact: true })).toHaveValue("Leaking tap");
-      await expect(page.getByLabel("Option 2", { exact: true })).toHaveValue("Blocked drain");
+      await expect(page.getByLabel("Option 1", { exact: true })).toHaveValue("What brand is it?");
+      await expect(page.getByLabel("Option 2", { exact: true })).toHaveValue("Where in the property is it?");
 
       // Feature 1012, AC4 -- add and remove still behave exactly as before
       // now that the ordered variant is in play (regression guard).

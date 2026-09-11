@@ -18,7 +18,7 @@ export interface PortalNavItem {
 }
 
 export const OPS_NAV_ITEMS: readonly PortalNavItem[] = [
-  { key: "jobs", label: "Jobs", href: "/ops/jobs", built: false },
+  { key: "jobs", label: "Jobs", href: "/ops/jobs", built: true },
   { key: "contractors", label: "Contractors", href: "/ops/contractors", built: true },
   { key: "receivables", label: "Receivables", href: "/ops/receivables", built: false },
   { key: "refunds", label: "Refunds", href: "/ops/refunds", built: false },

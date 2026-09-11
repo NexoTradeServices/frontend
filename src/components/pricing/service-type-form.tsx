@@ -266,7 +266,7 @@ export function ServiceTypeForm({
           helper="Shown to the customer on the enquiry form for this trade, in this order."
           values={prefilledFields}
           onChange={setPrefilledFields}
-          placeholder="e.g. Blocked drain"
+          placeholder="e.g. What brand is it?"
           ordered
         />
       </div>

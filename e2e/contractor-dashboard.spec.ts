@@ -58,7 +58,12 @@ test.describe(() => {
     await expect(sarahCard.getByText("Sarah Chen")).toBeVisible();
     await expect(sarahCard.getByText("Plumbing")).toBeVisible();
     await expect(sarahCard.getByText("Hilton")).toBeVisible();
-    await expect(sarahCard.getByText(/^[A-Z][a-z]{2} \d{2}\/\d{2}, \d{1,2}:\d{2}(am|pm) AWST$/)).toBeVisible();
+    // Either form formatSlotLabel gives: "Thu 10/09, 8:00am AWST", or
+    // "Today, 8:00am AWST" on the day the seeded slot falls (4001-V2 -- the
+    // dev seed stamps the slot once, on the day it runs).
+    await expect(
+      sarahCard.getByText(/^([A-Z][a-z]{2} \d{2}\/\d{2}|Today), \d{1,2}:\d{2}(am|pm) AWST$/),
+    ).toBeVisible();
 
     await expect(tomCard.getByText("Scheduled", { exact: true })).toBeVisible();
     await expect(tomCard.getByText("Tom")).toBeVisible();
