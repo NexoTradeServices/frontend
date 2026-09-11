@@ -1,6 +1,8 @@
 // Feature 1003, auth + roles -- frontend e2e (ADR 0001, Playwright).
 //
-// AC1  Mike logs in at /ops and lands on the ops placeholder
+// AC1  Mike logs in at /ops and lands in the ops portal (the placeholder
+//      it first landed on is gone: since feature 4001, /ops sends an ops
+//      session to the job queue)
 // AC3  Bob, logged in as a contractor, opening /ops sees the wrong-door card
 // AC11 "Go to your portal" lands each role on its own root
 // AC12 the gate holds the responsive floor at 390px -- its own describe
@@ -17,17 +19,19 @@ import { test, expect } from "@playwright/test";
 import { login } from "./helpers/login";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 
-test("AC1: Mike logs in at /ops and lands on the ops placeholder", async ({ page }) => {
+test("AC1: Mike logs in at /ops and lands in the ops portal", async ({ page }) => {
   await page.goto("/ops");
   await expect(page.getByRole("heading", { name: "Operations portal" })).toBeVisible();
 
   await login(page, "mike@idelta.com.au");
 
-  await expect(page.getByText(/Logged in as Mike/)).toBeVisible();
-  await expect(page.getByText(/Operations admin/)).toBeVisible();
+  // Feature 4001, plan decision 11: the queue is ops' dashboard.
+  await expect(page).toHaveURL(/\/ops\/jobs$/, { timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible();
+  await expect(page.getByText("mike@idelta.com.au").first()).toBeVisible();
 
-  // Below the shell's md breakpoint, log out lives behind the menu button
-  // (Feature 1006, the ops portal shell) -- open it first where it exists.
+  // Below the shell's lg breakpoint (1024px since feature 4001, BKLG-024),
+  // log out lives behind the menu button -- open it first where it exists.
   const menuButton = page.getByRole("button", { name: "Open menu" });
   if (await menuButton.isVisible()) await menuButton.click();
 

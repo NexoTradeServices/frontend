@@ -57,7 +57,8 @@ test("AC2: Bob (contractor) gets the wrong-door card at /ops/settings too", asyn
 test("AC2: Mike's ops-portal nav shows no OWNER group -- Settings is owner-only", async ({ page }) => {
   await page.goto("/ops");
   await login(page, "mike@idelta.com.au");
-  await expect(page.getByText(/Logged in as Mike/)).toBeVisible();
+  // Since feature 4001 the ops root lands on the job queue.
+  await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible({ timeout: 15_000 });
 
   await expect(page.getByRole("link", { name: "Settings" })).toHaveCount(0);
   await expect(page.getByText("Owner", { exact: true })).toHaveCount(0);
@@ -124,7 +125,8 @@ test.describe(() => {
   }) => {
     await page.goto("/ops");
     await login(page, "mike@idelta.com.au");
-    await expect(page.getByText(/Logged in as Mike/)).toBeVisible();
+    // Since feature 4001 the ops root lands on the job queue.
+    await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible({ timeout: 15_000 });
 
     await page.getByRole("button", { name: "Open menu" }).click();
     const menu = page.getByRole("navigation", { name: "Menu" });
@@ -132,9 +134,9 @@ test.describe(() => {
     await expect(menu.getByRole("link", { name: "Settings" })).toHaveCount(0);
     await expect(menu.getByRole("link", { name: "Pricing" })).toHaveCount(0);
     // Same order as the sidebar's own list (frontend/src/lib/ops-nav.ts) --
-    // Contractors is Mike's only built, non-owner entry, so it is the only
-    // link the menu carries.
-    await expect(menu.getByRole("link")).toHaveText(["Contractors"]);
+    // Jobs (feature 4001) and Contractors are Mike's built, non-owner
+    // entries, so they are the only links the menu carries.
+    await expect(menu.getByRole("link")).toHaveText(["Jobs", "Contractors"]);
 
     await page.getByRole("button", { name: "Close menu" }).click();
   });

@@ -34,13 +34,25 @@
      while a submit is in flight (Patterns / Page loading vs button loading). */
   --brand-accent-loading: #ef9d68;
   /* Status palette (Colors, "identical everywhere - queue, calendar, track
-     page"): scheduled/in progress already reuse brand-success/brand-warning
-     above (the same pair, by design); "new" and "on hold" get their own
-     tokens here -- Feature 2003 is the first screen to render either. */
+     page"): one pair per lifecycle status, read only by the shared status
+     tag (components/ui/status-tag.tsx) -- Feature 4001, BKLG-022. Scheduled
+     and in progress carry the same values as brand-success/brand-warning by
+     design, but as their own pair, so the palette can move without the
+     buttons moving with it. */
   --status-new: #2456a6;
   --status-new-bg: #e8eefb;
+  --status-assigned: #6b4fa3;
+  --status-assigned-bg: #efeafa;
+  --status-scheduled: #1f7a67;
+  --status-scheduled-bg: #e2f2ee;
+  --status-in-progress: #b4531a;
+  --status-in-progress-bg: #fdeadd;
   --status-on-hold: #8a6d1a;
   --status-on-hold-bg: #faf0d4;
+  --status-completed: #4a7c59;
+  --status-completed-bg: #e8f1ea;
+  --status-cancelled: #7a828c;
+  --status-cancelled-bg: #efedea;
   --font-heading-family: var(--font-archivo), system-ui, sans-serif;
   --font-body-family: var(--font-public-sans), system-ui, sans-serif;
 }
@@ -71,8 +83,18 @@
   --color-brand-accent-loading: var(--brand-accent-loading);
   --color-status-new: var(--status-new);
   --color-status-new-bg: var(--status-new-bg);
+  --color-status-assigned: var(--status-assigned);
+  --color-status-assigned-bg: var(--status-assigned-bg);
+  --color-status-scheduled: var(--status-scheduled);
+  --color-status-scheduled-bg: var(--status-scheduled-bg);
+  --color-status-in-progress: var(--status-in-progress);
+  --color-status-in-progress-bg: var(--status-in-progress-bg);
   --color-status-on-hold: var(--status-on-hold);
   --color-status-on-hold-bg: var(--status-on-hold-bg);
+  --color-status-completed: var(--status-completed);
+  --color-status-completed-bg: var(--status-completed-bg);
+  --color-status-cancelled: var(--status-cancelled);
+  --color-status-cancelled-bg: var(--status-cancelled-bg);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
