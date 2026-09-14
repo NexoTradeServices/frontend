@@ -10,11 +10,11 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PlacesField, fullAddress, type PickedAddress } from "@/components/ui/places-field";
 import { LockedField } from "@/components/ui/locked-field";
 import { SelectField } from "@/components/ui/select-field";
-import { PrimaryButton } from "@/components/auth/buttons";
+import { PrimaryButton, PrimaryLink } from "@/components/auth/buttons";
 import { Toast, useToast } from "@/components/ui/toast";
 import type { ApiError, JobDetail, NoteView } from "./types";
 
@@ -22,14 +22,26 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 const labelClass = "block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
 
-function Card({ title, aside, children }: { title: string; aside?: string; children: ReactNode }) {
+function Card({
+  title,
+  aside,
+  subtitle,
+  children,
+}: {
+  title: string;
+  aside?: string;
+  /** Shown on its own line under the title, instead of inline beside it. */
+  subtitle?: string;
+  children: ReactNode;
+}) {
   return (
     <section className="rounded-[10px] border border-hairline bg-surface p-5">
-      <h2 className="mb-3 font-heading text-base font-extrabold text-ink">
+      <h2 className="font-heading text-base font-extrabold text-ink">
         {title}
         {aside ? <small className="ml-1.5 font-body text-xs font-normal text-muted-text">{aside}</small> : null}
       </h2>
-      {children}
+      {subtitle ? <p className="mt-0.5 text-xs text-muted-text">{subtitle}</p> : null}
+      <div className="mt-3">{children}</div>
     </section>
   );
 }
@@ -45,19 +57,18 @@ function Fact({ label, wide, children }: { label: string; wide?: boolean; childr
 
 function RequestCard({ job }: { job: JobDetail }) {
   return (
-    <Card title="The request" aside="as the customer sent it">
+    <Card title="The request">
       <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-x-4.5 gap-y-3">
         <Fact label="Trade">{job.trade}</Fact>
         <Fact label="Suburb">
           {job.suburb} {job.postcode}
         </Fact>
-        <Fact label="Wanted">
-          <span className="tabular-nums">
-            {job.wantedDate}, {job.windowLabel}
-          </span>
+        <Fact label="Preferred">
+          <div className="tabular-nums">{job.wantedDate}</div>
+          <div className="text-xs font-normal text-muted-text tabular-nums">{job.windowLabel}</div>
         </Fact>
         <Fact label="Arrived by">{job.source === "web" ? "Web form" : "Phone"}</Fact>
-        <Fact label="What is happening" wide>
+        <Fact label="Issue Description" wide>
           <p className="max-w-[62ch] font-normal whitespace-pre-wrap">{job.description ?? "-"}</p>
         </Fact>
         <Fact label="Additional questions" wide>
@@ -76,6 +87,12 @@ function RequestCard({ job }: { job: JobDetail }) {
   );
 }
 
+const LEVEL_LABELS: Record<"normal" | "weekend" | "emergency", string> = {
+  normal: "Normal",
+  weekend: "Weekend",
+  emergency: "Emergency",
+};
+
 function ContractorCard({ job }: { job: JobDetail }) {
   return (
     <Card title="Contractor">
@@ -84,9 +101,36 @@ function ContractorCard({ job }: { job: JobDetail }) {
           <Fact label="Assigned to">
             {job.contractor.name} <span className="text-xs font-normal text-muted-text">{job.contractor.code}</span>
           </Fact>
-          <Fact label="Where it stands">
+          <Fact label="Status">
             <span className="tabular-nums">{job.contractor.standing}</span>
           </Fact>
+          {job.priceLine && job.serviceLevel ? (
+            <Fact label="Service level">
+              {LEVEL_LABELS[job.serviceLevel]} <span className="font-normal text-muted-text">- {job.priceLine}</span>
+            </Fact>
+          ) : null}
+        </div>
+      ) : job.canDispatch ? (
+        <>
+          <p className="mb-2 text-[13px] text-muted-text">Not dispatched yet.</p>
+          <PrimaryLink
+            href={`/ops/jobs/${encodeURIComponent(job.reference)}/dispatch`}
+            className="md:mt-0 md:inline-block md:min-h-11 md:w-auto md:px-[18px] md:py-2.5"
+          >
+            Dispatch
+          </PrimaryLink>
+        </>
+      ) : job.dispatchBlockedReason ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-[13px] text-muted-text">Not dispatched yet.</p>
+          <p className="text-xs text-brand-warning">{job.dispatchBlockedReason}</p>
+          <button
+            type="button"
+            disabled
+            className="min-h-[52px] w-full rounded-md border border-hairline bg-ground px-4 text-sm font-bold text-muted-text md:min-h-11 md:w-auto md:px-[18px]"
+          >
+            Dispatch
+          </button>
         </div>
       ) : (
         <p className="text-[13px] text-muted-text">Not dispatched yet.</p>
@@ -203,14 +247,14 @@ function AddressesCard({
   }
 
   return (
-    <Card title="Addresses" aside="taken on the confirming call">
+    <Card title="Addresses">
       <PlacesField
         id="billing-address"
         label="Billing address"
         helper={
           job.customer.billingAddress
             ? `${name}'s own address, on every invoice. Changing it here changes it for all of ${name}'s future invoices.`
-            : "Their own address - ask for it on the first call. It goes on every invoice."
+            : undefined
         }
         value={billing}
         onChange={(value) => {
@@ -260,9 +304,7 @@ function AddressesCard({
           {/* Ticked, the site IS the billing address -- shown as that address,
               greyed and locked (owner at the feel-pass, change.md V4). */}
           {sameAsBilling ? (
-            billing === null ? (
-              <p className="mb-3.5 text-xs text-muted-text">Fills in from the billing address once that is picked.</p>
-            ) : (
+            billing === null ? null : (
               <LockedField
                 label="Job site address"
                 value={fullAddress(billing)}
@@ -273,7 +315,7 @@ function AddressesCard({
             <PlacesField
               id="site-address"
               label="Job site address"
-              helper="A rental, a parent's house, a shop - pick its street address."
+              helper="Address where the actual job is required."
               value={site}
               onChange={setSite}
               error={siteError}
@@ -441,7 +483,7 @@ function NotesCard({
   }
 
   return (
-    <Card title="Operator notes" aside="a log - fixable for 10 minutes, then locked">
+    <Card title="Operator notes" subtitle="Editable only for 10min and then locked">
       <div className="flex flex-col">
         <SelectField
           id="note-type"
@@ -540,6 +582,7 @@ function NotesCard({
 
 export function JobDetailView({ initial }: { initial: JobDetail }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [job, setJob] = useState(initial);
   // Each card starts over from the saved record after its own save, so a
   // note being written is never wiped by an address save, or the reverse.
@@ -547,15 +590,33 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
   const [notesVersion, setNotesVersion] = useState(0);
   const [toastMessage, showToast] = useToast();
 
+  useEffect(() => {
+    // Feature 4002, plan decision 15: after Dispatch the page returns here
+    // with the toast riding the URL, the same pattern the Contractors list
+    // uses for "Save always returns to the list with a toast."
+    const toast = searchParams.get("toast");
+    if (toast) {
+      showToast(toast);
+      router.replace(`/ops/jobs/${encodeURIComponent(job.reference)}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   return (
     <>
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <div className="flex min-w-0 flex-col gap-4">
+        {/* Mobile stack order: Request, Customer, Addresses, Contractor/Dispatch,
+            Operator notes -- Addresses before Dispatch mirrors the actual
+            dependency (no address, no dispatch). Desktop's two-column
+            arrangement (Request+Contractor left, Customer+Addresses+Notes
+            right) is unchanged via the explicit xl: column/row placement. */}
+        <div className="order-1 min-w-0 xl:order-none xl:col-start-1 xl:row-start-1">
           <RequestCard job={job} />
-          <ContractorCard job={job} />
         </div>
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="order-2 min-w-0 xl:order-none xl:col-start-2 xl:row-start-1">
           <CustomerCard job={job} />
+        </div>
+        <div className="order-3 min-w-0 xl:order-none xl:col-start-2 xl:row-start-2">
           <AddressesCard
             key={`addresses-${String(addressesVersion)}`}
             job={job}
@@ -567,6 +628,11 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
               router.refresh();
             }}
           />
+        </div>
+        <div className="order-4 min-w-0 xl:order-none xl:col-start-1 xl:row-start-2">
+          <ContractorCard job={job} />
+        </div>
+        <div className="order-5 min-w-0 xl:order-none xl:col-start-2 xl:row-start-3">
           <NotesCard
             key={`notes-${String(notesVersion)}`}
             job={job}

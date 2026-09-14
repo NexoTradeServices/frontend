@@ -1,12 +1,12 @@
 // Feature 2001, contractor onboarding (Mike's path) -- frontend e2e (ADR
 // 0001, Playwright).
 //
-// AC1  Mike/the owner see Bob, Dave, Priya -- Active tags; Bob reads Ready
-//      to dispatch (his fixture-seeded service area, and address no longer
-//      counts -- design, "Managing the contractor record"), Dave and Priya
-//      read Not ready, Priya names "insurance renewal (expired)", both name
-//      "service area (not set up yet)"; Bob (contractor) gets the
-//      wrong-door card
+// AC1  Mike/the owner see Bob, Dave, Priya -- Active tags; Bob and Dave read
+//      Ready to dispatch (their fixture-seeded service areas -- Feature
+//      4002, plan decision 16 gave Dave his -- and address no longer counts,
+//      design "Managing the contractor record"); Priya reads Not ready,
+//      naming "insurance renewal (expired)" and "service area (not set up
+//      yet)"; Bob (contractor) gets the wrong-door card
 // AC2  Add a contractor with just name/phone/email: lands on the list with
 //      the toast, the new row shows Not ready to dispatch with the full
 //      missing list
@@ -62,7 +62,7 @@ async function deactivateOpenContractor(page: import("@playwright/test").Page) {
   await expect(page.getByText(/Their session is gone/)).toBeVisible();
 }
 
-test("AC1: Mike sees Bob Ready to dispatch, Dave and Priya Not ready (Priya's insurance expired, both missing a service area)", async ({
+test("AC1: Mike sees Bob and Dave Ready to dispatch, Priya Not ready (her insurance expired, no service area)", async ({
   page,
 }) => {
   await page.goto("/ops/contractors");
@@ -85,24 +85,24 @@ test("AC1: Mike sees Bob Ready to dispatch, Dave and Priya Not ready (Priya's in
     // and address no longer counts toward Ready to dispatch (design,
     // "Managing the contractor record" -- backend/src/contractors/ready.ts,
     // project/setup/frontend-test-harness.md) -- his fixture leaves him with
-    // nothing missing, so he reads Ready. Dave and Priya still have none.
+    // nothing missing, so he reads Ready. Feature 4002, plan decision 16
+    // gives Dave a service area too (Victoria Park, 25km), so he now reads
+    // Ready on unchanged seed data. Priya still has none.
     //
     // `exact: true` here matters: without it, this locator's plain-string
     // match is a case-insensitive SUBSTRING match, and "Ready to dispatch" is
     // a substring of "Not ready to dispatch" -- this assertion could not
     // fail, green on either tag, from feature 2001 until this fix (found by
     // the first CI run against a truly fresh database, 08/09/26).
-    await expect(
-      page.getByRole("link").filter({ hasText: "Bob Reilly" }).getByText("Ready to dispatch", { exact: true }),
-    ).toBeVisible();
-    for (const name of ["Dave Hurst", "Priya Nair"]) {
-      const row = page.getByRole("link").filter({ hasText: name });
-      await expect(row.getByText("Not ready to dispatch")).toBeVisible();
-      await expect(row.getByText(/service area \(not set up yet\)/)).toBeVisible();
+    for (const name of ["Bob Reilly", "Dave Hurst"]) {
+      await expect(
+        page.getByRole("link").filter({ hasText: name }).getByText("Ready to dispatch", { exact: true }),
+      ).toBeVisible();
     }
-    await expect(
-      page.getByRole("link").filter({ hasText: "Priya Nair" }).getByText(/insurance renewal \(expired\)/),
-    ).toBeVisible();
+    const priya = page.getByRole("link").filter({ hasText: "Priya Nair" });
+    await expect(priya.getByText("Not ready to dispatch")).toBeVisible();
+    await expect(priya.getByText(/service area \(not set up yet\)/)).toBeVisible();
+    await expect(priya.getByText(/insurance renewal \(expired\)/)).toBeVisible();
   });
 });
 

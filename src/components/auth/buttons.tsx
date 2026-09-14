@@ -61,14 +61,16 @@ export function PrimaryButton({
 export function PrimaryLink({
   href,
   size = "full",
+  className,
   children,
 }: {
   href: string;
   size?: PrimarySize;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <Link href={href} className={`${sizeClasses[size]} bg-brand-accent`}>
+    <Link href={href} className={`${sizeClasses[size]} bg-brand-accent ${className ?? ""}`}>
       {children}
     </Link>
   );

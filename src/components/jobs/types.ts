@@ -74,6 +74,12 @@ export interface JobDetail {
   siteSameAsBilling: boolean;
   siteLocked: boolean;
   contractor: ContractorView | null;
+  /** Feature 4002, AC29: the level and its price, once the job is dispatched. */
+  serviceLevel: "normal" | "weekend" | "emergency" | null;
+  priceLine: string | null;
+  /** Feature 4002, AC1/AC2: the job page's own Dispatch button. */
+  canDispatch: boolean;
+  dispatchBlockedReason: string | null;
   notes: NoteView[];
 }
 

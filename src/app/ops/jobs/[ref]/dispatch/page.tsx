@@ -1,9 +1,6 @@
-// The job page -- Feature 4001, ops job queue and job detail.
-// Architecture & Routing / Page inventory: `/ops/jobs/[ref]`, ops + owner --
-// where the confirming call is captured. Reached from a queue row, or from
-// the new-job-request email's link (opened logged out, the login gate shows
-// first, then this job).
-import { Suspense } from "react";
+// The dispatch page -- Feature 4002, dispatch to assignment.
+// Architecture & Routing / Page inventory: `/ops/jobs/[ref]/dispatch`, ops +
+// owner, reached from the job page's Contractor card.
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { getSessionUser } from "@/lib/session";
@@ -12,8 +9,8 @@ import { LoginGate } from "@/components/auth/login-gate";
 import { WrongDoor } from "@/components/auth/wrong-door";
 import { PortalShell } from "@/components/portal-shell/portal-shell";
 import { StatusTag } from "@/components/ui/status-tag";
-import { JobDetailView } from "@/components/jobs/job-detail";
-import type { JobDetail } from "@/components/jobs/types";
+import { DispatchView } from "@/components/jobs/dispatch/dispatch-view";
+import type { DispatchFacts } from "@/components/jobs/dispatch/types";
 
 const PORTAL_NAME = "Operations portal";
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -21,18 +18,22 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 function Breadcrumb({ reference }: { reference: string }) {
   return (
     <>
-      <Link
-        href="/ops/jobs"
-        className="inline-flex min-h-11 min-w-11 items-center text-muted-text underline underline-offset-2"
-      >
+      <Link href="/ops/jobs" className="inline-flex min-h-11 min-w-11 items-center text-muted-text underline underline-offset-2">
         Jobs
       </Link>
-      / {reference}
+      {" / "}
+      <Link
+        href={`/ops/jobs/${encodeURIComponent(reference)}`}
+        className="inline-flex min-h-11 min-w-11 items-center text-muted-text underline underline-offset-2"
+      >
+        {reference}
+      </Link>
+      {" / Dispatch"}
     </>
   );
 }
 
-export default async function JobPage({ params }: { params: Promise<{ ref: string }> }) {
+export default async function DispatchPage({ params }: { params: Promise<{ ref: string }> }) {
   const { ref } = await params;
   const [user, displayName] = await Promise.all([getSessionUser(), getDisplayName()]);
   if (!user) return <LoginGate portalName={PORTAL_NAME} displayName={displayName} />;
@@ -41,7 +42,7 @@ export default async function JobPage({ params }: { params: Promise<{ ref: strin
   }
 
   const cookieStore = await cookies();
-  const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(ref)}`, {
+  const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(ref)}/dispatch`, {
     headers: { cookie: cookieStore.toString() },
     cache: "no-store",
   });
@@ -50,33 +51,31 @@ export default async function JobPage({ params }: { params: Promise<{ ref: strin
       <PortalShell
         user={user}
         active="jobs"
-        title={ref}
+        title={`Dispatch ${ref}`}
         subtitle="No job has this reference."
         breadcrumb={<Breadcrumb reference={ref} />}
         displayName={displayName}
       >
         <div className="rounded-[10px] border border-hairline bg-surface p-5 text-sm text-secondary-text">
-          Check the reference, or find the job from the queue by its customer code, name or phone.
+          Check the reference, or find the job from the queue.
         </div>
       </PortalShell>
     );
   }
   if (res.status !== 200) return <WrongDoor user={user} portalName={PORTAL_NAME} displayName={displayName} />;
-  const job = (await res.json()) as JobDetail;
+  const facts = (await res.json()) as DispatchFacts;
 
   return (
     <PortalShell
       user={user}
       active="jobs"
-      title={job.reference}
-      titleAside={<StatusTag status={job.status} />}
-      breadcrumb={<Breadcrumb reference={job.reference} />}
-      subtitle={`Received ${job.receivedLabel} via ${job.source === "web" ? "the web form" : "phone"}`}
+      title={`Dispatch ${facts.reference}`}
+      titleAside={<StatusTag status="new" />}
+      breadcrumb={<Breadcrumb reference={facts.reference} />}
+      subtitle={`${facts.trade} - ${facts.suburb} - ${facts.customerName}`}
       displayName={displayName}
     >
-      <Suspense>
-        <JobDetailView initial={job} />
-      </Suspense>
+      <DispatchView initial={facts} />
     </PortalShell>
   );
 }
