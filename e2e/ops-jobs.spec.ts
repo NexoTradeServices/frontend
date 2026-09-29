@@ -118,8 +118,8 @@ test("AC13: Karl's first enquiry -- Mike picks a billing address, leaves the job
   await expect(billing).toHaveValue("");
   await expect(page.getByLabel("Job site address same as billing address")).toBeChecked();
   // change.md V6: nothing to save yet (no billing on file, no site stored),
-  // so Save addresses is quiet.
-  await expect(page.getByRole("button", { name: "Save addresses" })).toBeDisabled();
+  // so Save is quiet.
+  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
   await expect(page.getByText("Not saved yet", { exact: true })).toHaveCount(0);
 
   await billing.fill("14 Marine Terrace, Fremantle WA 6160");
@@ -127,11 +127,11 @@ test("AC13: Karl's first enquiry -- Mike picks a billing address, leaves the job
   await page.getByRole("button", { name: /Marine Terrace.*Fremantle.*WA/ }).first().click();
   // While the pick's own round trip runs the button reads "Picking address..."
   // -- this waits for the pick to land, never saving with it unset.
-  const save = page.getByRole("button", { name: "Save addresses" });
+  const save = page.getByRole("button", { name: "Save", exact: true });
   await expect(save).toBeEnabled({ timeout: 20_000 });
   await expect(page.getByText("Not saved yet", { exact: true })).toBeVisible();
   await save.click();
-  await expect(page.getByText(`Addresses saved for ${reference}.`)).toBeVisible();
+  await expect(page.getByText(`Saved ${reference}.`)).toBeVisible();
   // Saved: quiet again until the next change (V6).
   await expect(save).toBeDisabled();
   await expect(page.getByText("Not saved yet", { exact: true })).toHaveCount(0);
@@ -257,7 +257,7 @@ test.describe(() => {
     await expectTapTargets(page);
     // Reached, whichever job opened: it is quiet (disabled) when that job has
     // nothing to save -- change.md V6; AC13 proves it goes live and back.
-    await expectReachable(page, page.getByRole("button", { name: "Save addresses" }), false);
+    await expectReachable(page, page.getByRole("button", { name: "Save", exact: true }), false);
     await expectReachable(page, page.getByLabel("Note", { exact: true }));
     await expectReachable(page, page.getByRole("button", { name: "Add note" }));
     await expectNoSidewaysScroll(page);
