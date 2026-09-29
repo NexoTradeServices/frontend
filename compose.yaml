@@ -1,0 +1,32 @@
+# Local development: frontend + (via include) Postgres + backend.
+#   docker compose up          (from this folder: starts all three)
+# Expects ../backend next to this repo.
+# Prod does NOT use this file: Vercel builds the app itself.
+#
+# One-time setup on a new machine:  docker network create edge
+# The site is served by the Caddy container on the "edge" network, which also
+# answers to idelta.com.au and api.idelta.com.au inside that network, so
+# server-side calls to https://api.idelta.com.au reach the backend through Caddy.
+name: tradeservice
+
+include:
+  - ../backend/compose.yaml
+
+services:
+  ts-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    init: true
+    volumes:
+      - .:/app
+      - ts-frontend-node-modules:/app/node_modules
+      - ts-frontend-next:/app/.next
+    depends_on:
+      - ts-backend
+    networks:
+      - edge
+
+volumes:
+  ts-frontend-node-modules:
+  ts-frontend-next:
