@@ -51,6 +51,24 @@ export interface NoteView {
   editableForSeconds: number;
 }
 
+export interface SiteContact {
+  name: string;
+  phone: string;
+  email: string | null;
+}
+
+/** Feature 4008: one row of the job page's Messages card, already worded by the backend. */
+export interface MessageView {
+  id: string;
+  to: string;
+  channel: "Email" | "Text";
+  whenLabel: string;
+  what: string;
+  status: "queued" | "sent" | "delivered" | "failed";
+  statusLabel: string;
+  error: string | null;
+}
+
 export interface JobDetail {
   reference: string;
   status: JobStatus;
@@ -73,6 +91,10 @@ export interface JobDetail {
   siteAddress: PickedAddress | null;
   siteSameAsBilling: boolean;
   siteLocked: boolean;
+  /** Feature 4008: who lets the contractor in; null = the customer is the contact. */
+  siteContact: SiteContact | null;
+  /** Completed or cancelled -- the site contact is read-only. */
+  closed: boolean;
   contractor: ContractorView | null;
   /** Feature 4002, AC29: the level and its price, once the job is dispatched. */
   serviceLevel: "normal" | "weekend" | "emergency" | null;
@@ -81,6 +103,7 @@ export interface JobDetail {
   canDispatch: boolean;
   dispatchBlockedReason: string | null;
   notes: NoteView[];
+  messages: MessageView[];
 }
 
 export interface ApiError {

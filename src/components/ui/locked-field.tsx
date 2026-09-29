@@ -6,7 +6,7 @@
 // normal service-level multiplier (plan decision 1: the base rates ARE the
 // normal price -- an editable normal multiplier would quietly break "the
 // price shown is the price billed").
-export function LockedField({ label, value, helper }: { label: string; value: string; helper: string }) {
+export function LockedField({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
     <div className="mb-3.5">
       <label className="mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase">
@@ -19,7 +19,7 @@ export function LockedField({ label, value, helper }: { label: string; value: st
         </svg>
         {value}
       </div>
-      <p className="mt-[5px] text-xs text-muted-text">{helper}</p>
+      {helper ? <p className="mt-[5px] text-xs text-muted-text">{helper}</p> : null}
     </div>
   );
 }

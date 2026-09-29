@@ -6,6 +6,10 @@
 // (billing + the tick box + site, ONE Save -- Portal form screens) and the
 // operator notes log (a stacked add form at every width, newest first, the
 // author's Edit for 10 minutes, "(edited)").
+//
+// Feature 4008: the Addresses card gains the site contact (name, phone,
+// email) under the same one Save, and the Messages card lists every message
+// sent about the job -- to whom, email or text, when, what, where it stands.
 "use client";
 
 import { useEffect, useState } from "react";
@@ -15,8 +19,9 @@ import { PlacesField, fullAddress, type PickedAddress } from "@/components/ui/pl
 import { LockedField } from "@/components/ui/locked-field";
 import { SelectField } from "@/components/ui/select-field";
 import { PrimaryButton, PrimaryLink } from "@/components/auth/buttons";
+import { Field } from "@/components/auth/field";
 import { Toast, useToast } from "@/components/ui/toast";
-import type { ApiError, JobDetail, NoteView } from "./types";
+import type { ApiError, JobDetail, MessageView, NoteView } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -171,6 +176,32 @@ function sameAddress(a: PickedAddress | null, b: PickedAddress | null): boolean 
   return a.placeId === b.placeId && a.street === b.street;
 }
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+interface ContactForm {
+  name: string;
+  phone: string;
+  email: string;
+}
+type ContactField = keyof ContactForm;
+type ContactErrors = Partial<Record<ContactField, string>>;
+
+/** Patterns / Validation timing: the group is all-or-nothing -- name and phone together, email checked when given. */
+function contactErrorsOf(form: ContactForm): ContactErrors {
+  const name = form.name.trim();
+  const phone = form.phone.trim();
+  const email = form.email.trim();
+  const errors: ContactErrors = {};
+  if ((name !== "" || phone !== "" || email !== "") && name === "") errors.name = "Required.";
+  if ((name !== "" || phone !== "" || email !== "") && phone === "") errors.phone = "Required.";
+  if (email !== "" && !EMAIL_PATTERN.test(email)) errors.email = "That does not look like an email address.";
+  return errors;
+}
+
+function formOf(contact: JobDetail["siteContact"]): ContactForm {
+  return { name: contact?.name ?? "", phone: contact?.phone ?? "", email: contact?.email ?? "" };
+}
+
 function AddressesCard({
   job,
   onSaved,
@@ -178,7 +209,6 @@ function AddressesCard({
   job: JobDetail;
   onSaved: (next: JobDetail, message: string) => void;
 }) {
-  const name = job.customer.name;
   const [billing, setBilling] = useState<PickedAddress | null>(job.customer.billingAddress);
   const [billingChanged, setBillingChanged] = useState(false);
   const [billingError, setBillingError] = useState<string | undefined>();
@@ -189,6 +219,8 @@ function AddressesCard({
   const [sitePicking, setSitePicking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | undefined>();
+  const [contact, setContact] = useState<ContactForm>(formOf(job.siteContact));
+  const [contactErrors, setContactErrors] = useState<ContactErrors>({});
 
   const picking = billingPicking || sitePicking;
   const effectiveSite = sameAsBilling ? billing : site;
@@ -203,15 +235,50 @@ function AddressesCard({
   // stored. Owner at the feel-pass, change.md V6.
   const billingWouldChange = billingChanged && billing !== null && !sameAddress(billing, job.customer.billingAddress);
   const siteWouldChange = !job.siteLocked && !sameAddress(effectiveSite, job.siteAddress);
-  const pending = billingWouldChange || siteWouldChange;
+  // Feature 4008: the site contact rides the same Save; a closed job's is read-only.
+  const stored = formOf(job.siteContact);
+  const contactWouldChange =
+    !job.closed &&
+    (contact.name.trim() !== stored.name ||
+      contact.phone.trim() !== stored.phone ||
+      contact.email.trim() !== stored.email);
+  const pending = billingWouldChange || siteWouldChange || contactWouldChange;
+  // The group shows no stars while it is empty; the moment any field holds a
+  // value the star appears on each field the group needs (Validation timing).
+  const contactStarted = contact.name.trim() !== "" || contact.phone.trim() !== "" || contact.email.trim() !== "";
+
+  function changeContact(field: ContactField, value: string) {
+    const next = { ...contact, [field]: value };
+    setContact(next);
+    // A shown error re-checks as the value changes; nothing new appears until blur or Save.
+    setContactErrors((previous) => {
+      const fresh = contactErrorsOf(next);
+      const updated: ContactErrors = {};
+      for (const key of ["name", "phone", "email"] as const) {
+        if (previous[key] !== undefined && fresh[key] !== undefined) updated[key] = fresh[key];
+      }
+      return updated;
+    });
+  }
+
+  function blurContact(field: ContactField) {
+    const fresh = contactErrorsOf(contact);
+    setContactErrors((previous) => ({ ...previous, [field]: fresh[field] }));
+  }
 
   async function save() {
     if (billingError || siteError) {
       setFormError("Pick the marked address from the list, then save.");
       return;
     }
+    const contactProblems = job.closed ? {} : contactErrorsOf(contact);
+    if (Object.keys(contactProblems).length > 0) {
+      setContactErrors(contactProblems);
+      return;
+    }
     setFormError(undefined);
     const body: Record<string, unknown> = {};
+    if (!job.closed) body["siteContact"] = contact;
     // An untouched or cleared billing field leaves the one on file as it is.
     if (billingChanged && billing) body["billingAddress"] = billing;
     // Once dispatched the site is frozen -- it is never sent (Ops job actions - Edit).
@@ -230,14 +297,17 @@ function AddressesCard({
       if (!res.ok) {
         if (payload.field === "billingAddress") setBillingError(payload.error);
         else if (payload.field === "siteAddress") setSiteError(payload.error);
+        else if (payload.field === "siteContactName") setContactErrors({ name: payload.error });
+        else if (payload.field === "siteContactPhone") setContactErrors({ phone: payload.error });
+        else if (payload.field === "siteContactEmail") setContactErrors({ email: payload.error });
         else setFormError(payload.error);
         return;
       }
       onSaved(
         payload.job,
         payload.moved
-          ? `Addresses saved for ${job.reference}. The job moved to ${payload.moved.to}.`
-          : `Addresses saved for ${job.reference}.`,
+          ? `Saved ${job.reference}. The job moved to ${payload.moved.to}.`
+          : `Saved ${job.reference}.`,
       );
     } catch {
       setFormError("Save failed - check your connection and try again.");
@@ -247,15 +317,11 @@ function AddressesCard({
   }
 
   return (
-    <Card title="Addresses">
+    <Card title="Addresses and site contact">
       <PlacesField
         id="billing-address"
         label="Billing address"
-        helper={
-          job.customer.billingAddress
-            ? `${name}'s own address, on every invoice. Changing it here changes it for all of ${name}'s future invoices.`
-            : undefined
-        }
+        helper="Shown on invoice"
         value={billing}
         onChange={(value) => {
           setBilling(value);
@@ -305,17 +371,12 @@ function AddressesCard({
               greyed and locked (owner at the feel-pass, change.md V4). */}
           {sameAsBilling ? (
             billing === null ? null : (
-              <LockedField
-                label="Job site address"
-                value={fullAddress(billing)}
-                helper="Untick the box to use a different address."
-              />
+              <LockedField label="Job site address" value={fullAddress(billing)} />
             )
           ) : (
             <PlacesField
               id="site-address"
               label="Job site address"
-              helper="Address where the actual job is required."
               value={site}
               onChange={setSite}
               error={siteError}
@@ -332,8 +393,77 @@ function AddressesCard({
         </>
       )}
 
+      <div data-testid="site-contact" className="mt-1 mb-3.5">
+        <span className={labelClass}>Site contact</span>
+        {job.closed ? (
+          <div className="mt-[5px]">
+            {job.siteContact ? (
+              <dl className="grid gap-1 text-sm text-ink">
+                <div>
+                  <dt className="sr-only">Name</dt>
+                  <dd className="font-semibold">{job.siteContact.name}</dd>
+                </div>
+                <div>
+                  <dt className="sr-only">Phone</dt>
+                  <dd className="tabular-nums">{job.siteContact.phone}</dd>
+                </div>
+                {job.siteContact.email ? (
+                  <div>
+                    <dt className="sr-only">Email</dt>
+                    <dd className="break-all">{job.siteContact.email}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            ) : (
+              <p className="text-sm text-muted-text">None</p>
+            )}
+          </div>
+        ) : (
+          <>
+            <p className="mt-[5px] mb-2.5 text-xs text-muted-text">
+              Enter if someone other than the customer will be on site
+            </p>
+            <Field
+              id="site-contact-name"
+              label="Name"
+              required={contactStarted}
+              value={contact.name}
+              onChange={(event) => changeContact("name", event.target.value)}
+              onBlur={() => blurContact("name")}
+              error={contactErrors.name}
+              autoComplete="off"
+            />
+            <Field
+              id="site-contact-phone"
+              label="Phone"
+              type="tel"
+              required={contactStarted}
+              value={contact.phone}
+              onChange={(event) => changeContact("phone", event.target.value)}
+              onBlur={() => blurContact("phone")}
+              error={contactErrors.phone}
+              autoComplete="off"
+            />
+            <Field
+              id="site-contact-email"
+              label="Email"
+              inputMode="email"
+              value={contact.email}
+              onChange={(event) => changeContact("email", event.target.value)}
+              onBlur={() => blurContact("email")}
+              error={contactErrors.email}
+              autoComplete="off"
+            />
+          </>
+        )}
+      </div>
+
       {formError ? <p className="mb-2 text-xs text-brand-destructive">{formError}</p> : null}
-      <div className="flex flex-col gap-2 border-t border-hairline pt-3.5 md:flex-row md:items-center md:justify-end md:gap-3">
+      <div
+        className={`flex-col gap-2 border-t border-hairline pt-3.5 md:flex-row md:items-center md:justify-end md:gap-3 ${
+          job.closed && !pending && !saving ? "hidden" : "flex"
+        }`}
+      >
         {pending && !saving ? <span className="text-xs font-semibold text-brand-warning">Not saved yet</span> : null}
         {pending || saving ? (
           <PrimaryButton
@@ -344,18 +474,94 @@ function AddressesCard({
             disabled={picking}
             className="md:mt-0 md:inline-block md:min-h-11 md:w-auto md:px-[18px] md:py-2.5"
           >
-            {picking ? "Picking address..." : "Save addresses"}
+            {picking ? "Picking address..." : "Save"}
           </PrimaryButton>
-        ) : (
+        ) : job.closed ? null : (
           <button
             type="button"
             disabled
             className="min-h-[52px] w-full rounded-md border border-hairline bg-ground px-4 text-sm font-bold text-muted-text md:min-h-11 md:w-auto md:px-[18px]"
           >
-            {picking ? "Picking address..." : "Save addresses"}
+            {picking ? "Picking address..." : "Save"}
           </button>
         )}
       </div>
+    </Card>
+  );
+}
+
+const MESSAGE_TAGS: Record<MessageView["status"], string> = {
+  queued: "bg-message-waiting-bg text-message-waiting",
+  sent: "bg-message-sent-bg text-message-sent",
+  delivered: "bg-message-delivered-bg text-message-delivered",
+  failed: "bg-error-bg text-brand-destructive",
+};
+
+function MessageTag({ message }: { message: MessageView }) {
+  return (
+    <span
+      data-message-status={message.status}
+      className={`inline-block shrink-0 rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] whitespace-nowrap uppercase ${MESSAGE_TAGS[message.status]}`}
+    >
+      {message.statusLabel}
+    </span>
+  );
+}
+
+/** Feature 4008: every message sent about the job, newest first -- a table from 768px, cards below (Patterns / Table to cards). */
+function MessagesCard({ job }: { job: JobDetail }) {
+  const th = "border-b border-hairline px-2 py-2.5 text-left align-bottom text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
+  const td = "border-b border-hairline px-2 py-3 align-top text-secondary-text";
+  return (
+    <Card title="Messages">
+      {job.messages.length === 0 ? (
+        <p className="text-[13px] text-muted-text">No messages yet.</p>
+      ) : (
+        <>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr>
+                  <th className={th}>To</th>
+                  <th className={th}>Via</th>
+                  <th className={th}>When</th>
+                  <th className={th}>What</th>
+                  <th className={th}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {job.messages.map((message) => (
+                  <tr key={message.id} data-testid="message-row" className="last:[&>td]:border-b-0">
+                    <td className={`${td} font-semibold text-ink`}>{message.to}</td>
+                    <td className={td}>{message.channel}</td>
+                    <td className={`${td} tabular-nums`}>{message.whenLabel}</td>
+                    <td className={td}>{message.what}</td>
+                    <td className={td}>
+                      <MessageTag message={message} />
+                      {message.error ? <span className="mt-1 block text-xs text-brand-destructive">{message.error}</span> : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <ul className="flex flex-col md:hidden">
+            {job.messages.map((message) => (
+              <li key={message.id} data-testid="message-card" className="border-t border-hairline py-3 first:border-t-0 first:pt-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-ink">{message.what}</span>
+                  <MessageTag message={message} />
+                </div>
+                <p className="mt-1 text-sm text-secondary-text">To {message.to}</p>
+                <p className="text-xs text-muted-text tabular-nums">
+                  {message.channel} - {message.whenLabel}
+                </p>
+                {message.error ? <p className="mt-1 text-xs text-brand-destructive">{message.error}</p> : null}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </Card>
   );
 }
@@ -604,19 +810,19 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
 
   return (
     <>
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] xl:grid-rows-[auto_auto_auto_1fr]">
         {/* Mobile stack order: Request, Customer, Addresses, Contractor/Dispatch,
-            Operator notes -- Addresses before Dispatch mirrors the actual
-            dependency (no address, no dispatch). Desktop's two-column
-            arrangement (Request+Contractor left, Customer+Addresses+Notes
-            right) is unchanged via the explicit xl: column/row placement. */}
+            Messages, Operator notes -- Addresses before Dispatch mirrors the
+            actual dependency (no address, no dispatch). Desktop's two-column
+            arrangement (Request+Contractor+Messages+Notes left, Customer+Addresses
+            right) rides the explicit xl: column/row placement. */}
         <div className="order-1 min-w-0 xl:order-none xl:col-start-1 xl:row-start-1">
           <RequestCard job={job} />
         </div>
         <div className="order-2 min-w-0 xl:order-none xl:col-start-2 xl:row-start-1">
           <CustomerCard job={job} />
         </div>
-        <div className="order-3 min-w-0 xl:order-none xl:col-start-2 xl:row-start-2">
+        <div className="order-3 min-w-0 xl:order-none xl:col-start-2 xl:row-span-3 xl:row-start-2">
           <AddressesCard
             key={`addresses-${String(addressesVersion)}`}
             job={job}
@@ -632,7 +838,10 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
         <div className="order-4 min-w-0 xl:order-none xl:col-start-1 xl:row-start-2">
           <ContractorCard job={job} />
         </div>
-        <div className="order-5 min-w-0 xl:order-none xl:col-start-2 xl:row-start-3">
+        <div className="order-5 min-w-0 xl:order-none xl:col-start-1 xl:row-start-3">
+          <MessagesCard job={job} />
+        </div>
+        <div className="order-6 min-w-0 xl:order-none xl:col-start-1 xl:row-start-4">
           <NotesCard
             key={`notes-${String(notesVersion)}`}
             job={job}
