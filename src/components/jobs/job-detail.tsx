@@ -21,7 +21,7 @@ import { SelectField } from "@/components/ui/select-field";
 import { PrimaryButton, PrimaryLink } from "@/components/auth/buttons";
 import { Field } from "@/components/auth/field";
 import { Toast, useToast } from "@/components/ui/toast";
-import type { ApiError, JobDetail, MessageView, NoteView } from "./types";
+import type { ApiError, EarlierBooking, JobDetail, MessageView, NoteView } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -98,6 +98,63 @@ const LEVEL_LABELS: Record<"normal" | "weekend" | "emergency", string> = {
   emergency: "Emergency",
 };
 
+/**
+ * Feature 4003, Quick fixes: the job actions the platform has not built yet,
+ * each shown only where it would work, outlined, greyed and disabled, naming
+ * the feature that switches it on. Architect skill, Writing the plan, step 2a.
+ */
+const ACTION_PLACEHOLDERS: { label: string; feature: string; statuses: JobDetail["status"][] }[] = [
+  { label: "Edit", feature: "4004", statuses: ["new"] },
+  { label: "Reassign", feature: "4006", statuses: ["assigned", "scheduled"] },
+  { label: "Reschedule", feature: "4006", statuses: ["assigned", "scheduled"] },
+  { label: "On hold", feature: "5002", statuses: ["scheduled", "in_progress"] },
+  { label: "Mark no-show", feature: "6005", statuses: ["scheduled", "in_progress"] },
+  { label: "Raise callback", feature: "6004", statuses: ["completed"] },
+  { label: "Correct and reissue", feature: "6007", statuses: ["completed"] },
+  { label: "Cancel", feature: "4006", statuses: ["new", "assigned", "scheduled"] },
+];
+
+function ActionPlaceholders({ job }: { job: JobDetail }) {
+  const shown = ACTION_PLACEHOLDERS.filter((action) => action.statuses.includes(job.status));
+  if (shown.length === 0) return null;
+  return (
+    <div className="mt-3.5 flex flex-wrap gap-2 border-t border-hairline pt-3" data-testid="action-placeholders">
+      {shown.map((action) => (
+        <button
+          key={action.label}
+          type="button"
+          disabled
+          className="min-h-11 rounded-md border border-hairline bg-transparent px-3.5 text-[13px] font-bold text-muted-text"
+        >
+          {action.label} - coming in {action.feature}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Feature 4003, plan decision 10: every booking on the job but the one in play, newest first. */
+function EarlierBookings({ bookings }: { bookings: EarlierBooking[] }) {
+  if (bookings.length === 0) return null;
+  return (
+    <div className="mt-3.5 flex flex-col gap-2 border-t border-hairline pt-3" data-testid="earlier-bookings">
+      <span className={labelClass}>Earlier bookings</span>
+      {bookings.map((booking, index) => (
+        <div key={index} className="text-[13px]">
+          <div className="text-ink">
+            <b>{booking.contractorName}</b> <span className="text-secondary-text">{booking.contractorCode}</span> -{" "}
+            {booking.what.toLowerCase()} <span className="tabular-nums">{booking.whenLabel}</span>
+          </div>
+          <div className="text-secondary-text">
+            {booking.slotLabel ? <span className="tabular-nums">For {booking.slotLabel}.</span> : null}
+            {booking.note ? <> &ldquo;{booking.note}&rdquo;</> : null}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ContractorCard({ job }: { job: JobDetail }) {
   return (
     <Card title="Contractor">
@@ -140,6 +197,8 @@ function ContractorCard({ job }: { job: JobDetail }) {
       ) : (
         <p className="text-[13px] text-muted-text">Not dispatched yet.</p>
       )}
+      <EarlierBookings bookings={job.earlierBookings} />
+      <ActionPlaceholders job={job} />
     </Card>
   );
 }

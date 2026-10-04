@@ -58,6 +58,17 @@ function ContractorLine({ row }: { row: QueueRow }) {
   return <span className="block text-xs text-muted-text">{row.status === "new" ? "Not dispatched" : "-"}</span>;
 }
 
+/** Feature 4003: a job waiting at new behind a decline says who declined, and his note. */
+function DeclinedBadge({ row }: { row: QueueRow }) {
+  if (!row.declined) return null;
+  return (
+    <span data-testid="declined-badge" className="mt-1.5 block text-xs">
+      <span className="block font-bold text-brand-warning">Declined by {row.declined.by}</span>
+      {row.declined.note ? <span className="block text-secondary-text">&ldquo;{row.declined.note}&rdquo;</span> : null}
+    </span>
+  );
+}
+
 function NoSiteFlag({ row }: { row: QueueRow }) {
   if (!row.noSiteAddress) return null;
   return <span className="mt-0.5 block text-xs text-brand-warning">No site address yet - call not made</span>;
@@ -105,6 +116,7 @@ function QueueTable({ rows }: { rows: QueueRow[] }) {
                   {row.reference}
                 </Link>
                 <StatusTag status={row.status} />
+                <DeclinedBadge row={row} />
               </td>
               <td className={td}>
                 <span className="block font-semibold text-ink">{row.customerName}</span>
@@ -166,6 +178,7 @@ function QueueCards({ rows }: { rows: QueueRow[] }) {
               Received {row.receivedLabel} via {SOURCE_LABELS[row.source]}
             </span>
             {row.waiting ? <span className="block text-brand-warning">Waiting {row.waiting}</span> : null}
+            <DeclinedBadge row={row} />
             {row.contractor ? (
               <span className="block">
                 {row.contractor.name} - {row.contractor.standing}
