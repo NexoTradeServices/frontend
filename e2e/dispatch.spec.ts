@@ -20,6 +20,7 @@
 // cast; every job it dispatches is one of its own, never a seeded one.
 import { test, expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { login } from "./helpers/login";
+import { pickFreeWeekday, saturdayAfter } from "./helpers/dispatched-job";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
@@ -65,49 +66,6 @@ async function putBillingAddress(page: Page, reference: string): Promise<void> {
 }
 
 const MONDAY = "2026-12-07";
-
-function addDays(date: string, days: number): string {
-  const next = new Date(`${date}T00:00:00.000Z`);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next.toISOString().slice(0, 10);
-}
-
-/**
- * A fresh Monday, picked at random -- every test that actually calls POST
- * dispatch writes a REAL, PERMANENT CalendarEvent for Bob (this suite's
- * jobs are never deleted, matching every other e2e spec's own convention),
- * so a fixed date collides with an earlier run's leftover booking and reads
- * a false "busy". Read-only tests (never past the candidate list) keep the
- * plain MONDAY constant above -- nothing they do can collide.
- *
- * Bounded to 1-20 weeks out (mid-December 2026 to late April 2027): Bob's
- * fixture licence expires 30/06/27 and his insurance 28/02/28 (cast.md via
- * fixtures.ts) -- picking wide enough to land past either would read a
- * genuine "Not ready" instead of proving the busy path this is for.
- */
-function freshMonday(): string {
-  return addDays(MONDAY, 7 * (1 + Math.floor(Math.random() * 20)));
-}
-
-/**
- * `freshMonday()`, but actually checked against Bob's real calendar first --
- * only ~20 candidate Mondays exist (bounded by his licence), and after
- * enough feel-pass re-runs across one session a random pick collides with
- * an earlier run's own leftover booking (found live, 14/09/26). Requires
- * `page` already signed in as an ops user (Bob's day is an ops-only read).
- */
-async function pickFreeMonday(page: Page): Promise<string> {
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    const candidate = freshMonday();
-    const res = await page.request.get(`${apiUrl}/api/contractors/CON-014/day?date=${candidate}`);
-    if (!res.ok()) continue;
-    const { blocks } = (await res.json()) as { blocks: { startMinutes: number; endMinutes: number }[] };
-    // Covers every slot either test actually uses (7:00am-10:00am).
-    const busy = blocks.some((block) => block.startMinutes < 600 && block.endMinutes > 420);
-    if (!busy) return candidate;
-  }
-  throw new Error("could not find a free Monday for Bob in the fixture's licensed window after 40 attempts");
-}
 
 async function expectNoSidewaysScroll(page: Page) {
   const { scrollWidth, clientWidth } = await page.evaluate(() => ({
@@ -177,8 +135,8 @@ test("AC2: a job with no address at all -- Dispatch is off, with the reason", as
 test("AC6, AC17, AC18, AC22, AC29, AC34: the whole dispatch flow", async ({ page, request }) => {
   await page.goto("/ops/jobs");
   await login(page, "mike@idelta.com.au");
-  const monday = await pickFreeMonday(page);
-  const saturday = addDays(monday, 5);
+  const monday = await pickFreeWeekday(page);
+  const saturday = saturdayAfter(monday);
 
   const reference = await postEnquiry(request, "ac6", "Plumbing", FREMANTLE, monday);
   await putBillingAddress(page, reference);
@@ -248,7 +206,7 @@ test("AC19: a busy contractor still opens his day; a Not ready one does not", as
   await login(page, "mike@idelta.com.au");
 
   // Busy: dispatch a first job to Bob at 7:00-8:00am, then a second job at the same slot shows him busy.
-  const busyDate = await pickFreeMonday(page);
+  const busyDate = await pickFreeWeekday(page);
   const first = await postEnquiry(request, "ac19a", "Plumbing", FREMANTLE, busyDate);
   await putBillingAddress(page, first);
   const dispatchRes = await page.request.post(`${apiUrl}/api/jobs/${first}/dispatch`, {

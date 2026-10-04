@@ -29,6 +29,8 @@ export interface QueueRow {
   noSiteAddress: boolean;
   closedLabel: string | null;
   contractor: ContractorView | null;
+  /** Feature 4003: waiting at new behind a decline -- who declined, and his note. */
+  declined: { by: string; note: string | null } | null;
 }
 
 export type QueueCounts = Record<StatusFilter, number>;
@@ -69,6 +71,16 @@ export interface MessageView {
   error: string | null;
 }
 
+/** Feature 4003: one earlier booking, already worded by the backend. */
+export interface EarlierBooking {
+  contractorName: string;
+  contractorCode: string;
+  what: string;
+  whenLabel: string;
+  slotLabel: string | null;
+  note: string | null;
+}
+
 export interface JobDetail {
   reference: string;
   status: JobStatus;
@@ -96,6 +108,8 @@ export interface JobDetail {
   /** Completed or cancelled -- the site contact is read-only. */
   closed: boolean;
   contractor: ContractorView | null;
+  /** Feature 4003: every booking on the job but the one in play, newest first. */
+  earlierBookings: EarlierBooking[];
   /** Feature 4002, AC29: the level and its price, once the job is dispatched. */
   serviceLevel: "normal" | "weekend" | "emergency" | null;
   priceLine: string | null;
