@@ -11,6 +11,7 @@
 
 import { useState } from "react";
 import { PrimaryButton } from "@/components/auth/buttons";
+import { ReadOnlyPhotoGallery } from "@/components/ui/photo-gallery";
 import { DeadLinkCard, GoToJobsLink, cardClass, labelClass } from "./respond-cards";
 import type { RespondDead, RespondOpen } from "./types";
 
@@ -77,6 +78,12 @@ function JobScreen({
                   <li key={answer}>{answer}</li>
                 ))}
               </ul>
+            </div>
+          ) : null}
+          {job.photos.length > 0 ? (
+            <div>
+              <span className={`${labelClass} mb-1`}>Customer&apos;s photos</span>
+              <ReadOnlyPhotoGallery photos={job.photos} />
             </div>
           ) : null}
           {job.instructions.length > 0 ? (

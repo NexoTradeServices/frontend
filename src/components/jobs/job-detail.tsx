@@ -20,6 +20,7 @@ import { LockedField } from "@/components/ui/locked-field";
 import { SelectField } from "@/components/ui/select-field";
 import { PrimaryButton, PrimaryLink } from "@/components/auth/buttons";
 import { Field } from "@/components/auth/field";
+import { ReadOnlyPhotoGallery } from "@/components/ui/photo-gallery";
 import { Toast, useToast } from "@/components/ui/toast";
 import type { ApiError, EarlierBooking, JobDetail, MessageView, NoteView } from "./types";
 
@@ -85,6 +86,13 @@ function RequestCard({ job }: { job: JobDetail }) {
             </ul>
           ) : (
             <p className="text-[13px] font-normal text-muted-text">None answered</p>
+          )}
+        </Fact>
+        <Fact label="Photos" wide>
+          {job.photos.length > 0 ? (
+            <ReadOnlyPhotoGallery photos={job.photos} />
+          ) : (
+            <p className="text-[13px] font-normal text-muted-text">No photos</p>
           )}
         </Fact>
       </div>
