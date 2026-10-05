@@ -146,6 +146,10 @@ jobs:
           API_BASE_URL: http://localhost:8080
           BETTER_AUTH_SECRET: ci-only-secret-change-me-32-chars-min
           DATABASE_URL: postgresql://tradeservice:tradeservice@localhost:5432/tradeservice_dev
+          # Feature 3003: with no cloud name the job and respond reads return no
+          # photos at all. A placeholder is enough -- the browser tests fake every
+          # Cloudinary address (e2e/helpers/mock-cloudinary.ts), nothing is contacted.
+          CLOUDINARY_CLOUD_NAME: ci-placeholder-cloud
         run: |
           nohup node dist/index.js > /tmp/backend.log 2>&1 &
           for i in $(seq 1 30); do

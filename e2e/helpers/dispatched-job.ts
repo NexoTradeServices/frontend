@@ -93,7 +93,11 @@ export async function dispatchThrowawayJob(
   page: Page,
   request: APIRequestContext,
   tag: string,
-  options: { siteContact?: { name: string; phone: string } } = {},
+  options: {
+    siteContact?: { name: string; phone: string };
+    /** Feature 3003: photos on the enquiry, as the form would send them. */
+    photos?: { storageKey: string; fileName: string }[];
+  } = {},
 ): Promise<DispatchedJob> {
   await page.goto("/ops/jobs");
   await login(page, "mike@idelta.com.au");
@@ -112,6 +116,7 @@ export async function dispatchThrowawayJob(
       description: "An e2e throwaway job for feature 4003.",
       marketingEmail: false,
       marketingSms: false,
+      ...(options.photos ? { photos: options.photos } : {}),
     },
   });
   expect(enquiry.status()).toBe(201);

@@ -14,6 +14,8 @@ export interface RespondOpen {
   customerFirstName: string;
   description: string | null;
   answers: string[];
+  /** Feature 3003: the customer's enquiry photos, oldest first. */
+  photos: { fileName: string; thumbnailUrl: string; fullUrl: string }[];
   instructions: { authorFirstName: string; dateLabel: string; note: string }[];
 }
 

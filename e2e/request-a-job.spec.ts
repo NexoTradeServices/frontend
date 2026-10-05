@@ -12,6 +12,8 @@
 //      moved off the "every field required, no stars" case once real
 //      optional fields existed); the word "(optional)" is never used
 // AC10 no picker, no "emergency" option, anywhere on the form
+// 3003 (enquiry photos) lives in its own describe at the foot of this file:
+//      AC5 AC5b AC6 AC7 AC8 AC9 AC10, at phone width, Cloudinary faked
 // AC11 a trade's own questions render as labelled text answers under
 //      "Additional questions" on the Notes step ("Tell us what's wrong"),
 //      optional, never their own step; a trade with none shows that same
@@ -32,6 +34,8 @@
 // matches the `formData` snapshot this file read moments earlier.
 import { test, expect, type Page } from "@playwright/test";
 import { MOCKS_GOOGLE_PLACES, installMockGooglePlaces } from "./helpers/mock-google-places";
+import { installMockCloudinary } from "./helpers/mock-cloudinary";
+import { MOBILE_VIEWPORT } from "../playwright.config";
 
 interface ServiceTypeDto {
   trade: string;
@@ -223,5 +227,222 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     await page.getByRole("button", { name: "Continue" }).click(); // schedule
     await expect(page.getByRole("heading", { name: "Tell us what's wrong" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Additional questions" })).toHaveCount(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Feature 3003 -- enquiry photos
+//
+// Phone width: the form is designed Mobile first. Cloudinary is faked
+// (helpers/mock-cloudinary.ts); the enquiry itself goes to the real dev
+// backend, so each test that sends one leaves a genuine, permanent Job row
+// behind, under its own throwaway e2e-3003-... email.
+// ---------------------------------------------------------------------------
+const JPEG = (name: string) => ({ name, mimeType: "image/jpeg", buffer: Buffer.from("not-really-a-jpeg") });
+const LONG_NAME = "IMG_2041 leaking mixer tap under the sink.jpg";
+
+test.describe("Feature 3003 -- enquiry photos", () => {
+  test.use(MOBILE_VIEWPORT);
+
+  let formData: FormDataDto;
+
+  test.beforeAll(async ({ request }) => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
+    formData = (await (await request.get(`${apiUrl}/api/enquiries/form-data`)).json()) as FormDataDto;
+  });
+
+  test.beforeEach(async ({ page }) => {
+    if (MOCKS_GOOGLE_PLACES) await installMockGooglePlaces(page);
+  });
+
+  /** Suburb, trade and schedule done; the page is on "Tell us what's wrong". */
+  async function reachNotesStep(page: Page) {
+    await page.goto("/request-a-job");
+    await pickJoondalup(page);
+    await page.getByRole("button", { name: "Continue" }).click();
+    await pickTrade(page, nonPlumbing(formData.serviceTypes).trade);
+    await page.getByLabel("Date").fill("2026-09-09");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByLabel("What's happening")).toBeVisible();
+  }
+
+  /** From the notes step to the pricing step, ready to press "Request a job". */
+  async function reachPricingStep(page: Page, tag: string) {
+    await page.getByLabel("What's happening").fill("Mixer tap leaking from the base.");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByLabel("Your name").fill("Sarah Chen");
+    await page.getByLabel("Email", { exact: true }).fill(uniqueEmail(`3003-${tag}`));
+    await page.getByLabel("Phone").fill("0400 001 050");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByRole("heading", { name: "Pricing" })).toBeVisible();
+  }
+
+  const cells = (page: Page) => page.getByTestId("photo-cell");
+
+  /**
+   * Records each enquiry the form posts. The reCAPTCHA token is dropped on the
+   * way: a headless browser is scored as a bot by the live check, and "no
+   * token" is the backend's own unreachable-check path -- it lets the request
+   * through exactly as a human's, so the enquiry itself stays the real thing.
+   */
+  async function captureEnquiries(page: Page): Promise<Record<string, unknown>[]> {
+    const posted: Record<string, unknown>[] = [];
+    await page.route(/\/api\/enquiries$/, async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      const body = JSON.parse(route.request().postData() ?? "{}") as Record<string, unknown>;
+      delete body.recaptchaToken;
+      posted.push(body);
+      return route.continue({ postData: JSON.stringify(body) });
+    });
+    return posted;
+  }
+
+  test("AC5, AC5b: a picked photo shows uploading, then its thumbnail with its name cut short; the x takes it off and deletes it from Cloudinary", async ({
+    page,
+  }) => {
+    const cloudinary = await installMockCloudinary(page, { uploadDelayMs: 1500 });
+    await reachNotesStep(page);
+    await expect(page.getByRole("heading", { name: "Photos" })).toBeVisible();
+
+    await page.getByLabel("Add photo").setInputFiles(JPEG(LONG_NAME));
+    await expect(cells(page)).toHaveCount(1);
+    await expect(cells(page).first()).toHaveAttribute("data-status", "uploading");
+    await expect(page.getByRole("status", { name: "Uploading" })).toBeVisible();
+
+    await expect(cells(page).first()).toHaveAttribute("data-status", "done", { timeout: 10_000 });
+    await expect(page.getByRole("status", { name: "Uploading" })).toHaveCount(0);
+    await expect(cells(page).first().getByRole("img")).toBeVisible();
+    // One line, cut short with "..." -- the whole name stays on the title for the curious.
+    const caption = cells(page).first().locator("[title]");
+    await expect(caption).toHaveText(/^IMG_2041 le\.\.\.$/);
+    await expect(caption).toHaveAttribute("title", LONG_NAME);
+    await expect(page.getByText("1 of 5 photos")).toBeVisible();
+
+    await page.getByRole("button", { name: `Remove ${LONG_NAME}` }).click();
+    await expect(cells(page)).toHaveCount(0);
+    await expect(page.getByText("0 of 5 photos")).toBeVisible();
+    // The delete went to Cloudinary with the photo's own token.
+    await expect.poll(() => cloudinary.deletes.length).toBe(1);
+    expect(cloudinary.deletes[0]).toBe(`token-${cloudinary.publicIds[0]}`);
+  });
+
+  test("AC5b: a delete Cloudinary refuses still takes the photo off the form, with no message", async ({ page }) => {
+    const cloudinary = await installMockCloudinary(page, { failDelete: true });
+    await reachNotesStep(page);
+
+    await page.getByLabel("Add photo").setInputFiles(JPEG("tap.jpg"));
+    await expect(cells(page).first()).toHaveAttribute("data-status", "done", { timeout: 10_000 });
+    await page.getByRole("button", { name: "Remove tap.jpg" }).click();
+
+    await expect(cells(page)).toHaveCount(0);
+    await expect.poll(() => cloudinary.deletes.length).toBe(1);
+    await expect(page.getByText(/delete|couldn't|failed/i)).toHaveCount(0);
+  });
+
+  test("AC6: five photos take the Add tile away and the Caption reads 5 of 5 photos", async ({ page }) => {
+    await installMockCloudinary(page);
+    await reachNotesStep(page);
+
+    await page
+      .getByLabel("Add photo")
+      .setInputFiles(["one.jpg", "two.jpg", "three.jpg", "four.jpg", "five.jpg"].map(JPEG));
+    await expect(cells(page)).toHaveCount(5);
+    await expect(page.getByText("5 of 5 photos")).toBeVisible();
+    await expect(page.getByLabel("Add photo")).toHaveCount(0);
+
+    // Taking one off brings the Add tile back.
+    await page.getByRole("button", { name: "Remove three.jpg" }).click();
+    await expect(page.getByLabel("Add photo")).toHaveCount(1);
+    await expect(page.getByText("4 of 5 photos")).toBeVisible();
+  });
+
+  test("AC7: a file over 10MB, or one that is not a photo, is refused at the pick and never uploaded", async ({ page }) => {
+    const cloudinary = await installMockCloudinary(page);
+    await reachNotesStep(page);
+
+    await page.getByLabel("Add photo").setInputFiles({
+      name: "huge.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.alloc(10 * 1024 * 1024 + 1),
+    });
+    await expect(page.getByText("Photos must be under 10MB")).toBeVisible();
+    await expect(cells(page)).toHaveCount(0);
+
+    await page.getByLabel("Add photo").setInputFiles({
+      name: "invoice.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4"),
+    });
+    await expect(page.getByText("Only photos can be added")).toBeVisible();
+    await expect(page.getByText("Photos must be under 10MB")).toHaveCount(0);
+    await expect(cells(page)).toHaveCount(0);
+
+    await page.getByLabel("Add photo").setInputFiles({
+      name: "animated.gif",
+      mimeType: "image/gif",
+      buffer: Buffer.from("GIF89a"),
+    });
+    await expect(page.getByText("Only photos can be added")).toBeVisible();
+
+    expect(cloudinary.uploads).toEqual([]);
+  });
+
+  test("AC8: a photo that fails to upload shows Didn't upload; the enquiry still sends, without it", async ({ page }) => {
+    const cloudinary = await installMockCloudinary(page, { failUpload: true });
+    await reachNotesStep(page);
+
+    await page.getByLabel("Add photo").setInputFiles(JPEG("tap.jpg"));
+    await expect(cells(page).first()).toHaveAttribute("data-status", "failed", { timeout: 10_000 });
+    await expect(page.getByText("Didn't upload")).toBeVisible();
+    // It keeps its x.
+    await expect(page.getByRole("button", { name: "Remove tap.jpg" })).toBeVisible();
+    expect(cloudinary.uploads).toEqual(["tap.jpg"]);
+
+    const posted = await captureEnquiries(page);
+    await reachPricingStep(page, "ac8");
+    await page.getByRole("button", { name: "Request a job" }).click();
+    await expect(page).toHaveURL(/\/request-a-job\/confirmed\?ref=JOB-/, { timeout: 20_000 });
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).not.toHaveProperty("photos");
+  });
+
+  test("AC9: Request a job stays busy while a photo is still uploading, then sends the enquiry with it", async ({ page }) => {
+    const cloudinary = await installMockCloudinary(page, { uploadDelayMs: 4000 });
+    await reachNotesStep(page);
+
+    await page.getByLabel("Add photo").setInputFiles(JPEG("slow-tap.jpg"));
+    await expect(cells(page).first()).toHaveAttribute("data-status", "uploading");
+    await reachPricingStep(page, "ac9");
+
+    const posted = await captureEnquiries(page);
+    await page.getByRole("button", { name: "Request a job" }).click();
+    const busy = page.getByRole("button", { name: "Sending..." });
+    await expect(busy).toBeDisabled();
+    // Nothing has gone to the backend while the photo is still going up.
+    expect(cloudinary.publicIds).toHaveLength(0);
+    await expect(page).toHaveURL(/\/request-a-job\/confirmed\?ref=JOB-/, { timeout: 30_000 });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]?.photos).toEqual([{ storageKey: cloudinary.publicIds[0], fileName: "slow-tap.jpg" }]);
+  });
+
+  test("AC10: with the signature unavailable the Add tile is disabled with the warning, and the enquiry still sends", async ({
+    page,
+  }) => {
+    const cloudinary = await installMockCloudinary(page, { signatureStatus: 503 });
+    await reachNotesStep(page);
+
+    await expect(
+      page.getByText("Photo upload isn't working right now - you can still send your request"),
+    ).toBeVisible();
+    await expect(page.getByLabel("Add photo")).toBeDisabled();
+    // The rest of the form is untouched.
+    await expect(page.getByLabel("What's happening")).toBeEnabled();
+
+    await captureEnquiries(page);
+    await reachPricingStep(page, "ac10");
+    await page.getByRole("button", { name: "Request a job" }).click();
+    await expect(page).toHaveURL(/\/request-a-job\/confirmed\?ref=JOB-/, { timeout: 20_000 });
+    expect(cloudinary.uploads).toEqual([]);
   });
 });

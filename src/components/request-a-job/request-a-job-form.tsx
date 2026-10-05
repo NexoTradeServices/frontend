@@ -18,13 +18,15 @@
 // "(optional)" is never used either way.
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Field } from "@/components/auth/field";
 import { Banner } from "@/components/auth/banner";
 import { PlacesField, type PickedAddress } from "@/components/ui/places-field";
+import { PhotoGallery } from "@/components/ui/photo-gallery";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { TradeIcon } from "./trade-icon";
+import { MAX_PHOTOS, PHOTO_UNAVAILABLE, useEnquiryPhotos } from "./use-enquiry-photos";
 import { formatDayName, formatDollars, formatFriendlyDate, isWeekendDate, todayYmd } from "./money";
 import type { FormDataDto, PreferredWindow } from "./types";
 
@@ -82,12 +84,21 @@ export function RequestAJobForm({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string>();
 
+  const photos = useEnquiryPhotos();
+  const { checkAvailable } = photos;
+
   const selectedType = useMemo(
     () => serviceTypes.find((t) => t.trade === trade) ?? null,
     [serviceTypes, trade],
   );
 
   const step = STEPS[Math.min(stepIndex, STEPS.length - 1)] ?? "suburb";
+
+  // Feature 3003: learn whether photo upload is switched on the first time the
+  // notes step shows.
+  useEffect(() => {
+    if (step === "notes") void checkAvailable();
+  }, [step, checkAvailable]);
 
   const weekend = isWeekendDate(preferredDate);
   const multiplier = selectedType ? (weekend ? selectedType.serviceLevelMultipliers.weekend : selectedType.serviceLevelMultipliers.normal) : 1;
@@ -149,6 +160,9 @@ export function RequestAJobForm({
       const selectedOptions = (selectedType?.prefilledFields ?? [])
         .filter((question) => (questionAnswers[question] ?? "").trim() !== "")
         .map((question) => `${question}: ${questionAnswers[question]!.trim()}`);
+      // Feature 3003: a photo still going up finishes first; the ones that
+      // failed are left out.
+      const uploadedPhotos = await photos.finish();
       const recaptchaToken = await getRecaptchaToken("enquiry_submit");
       const res = await fetch(`${apiUrl}/api/enquiries`, {
         method: "POST",
@@ -173,6 +187,7 @@ export function RequestAJobForm({
           description: description.trim(),
           marketingEmail,
           marketingSms,
+          ...(uploadedPhotos.length > 0 ? { photos: uploadedPhotos } : {}),
           recaptchaToken,
         }),
       });
@@ -372,6 +387,22 @@ export function RequestAJobForm({
                   ))}
                 </div>
               ) : null}
+
+              <div className="mt-6 border-t border-hairline pt-5">
+                <h2 className="mb-3 font-heading text-sm font-extrabold text-ink">Photos</h2>
+                <PhotoGallery
+                  photos={photos.photos}
+                  limit={MAX_PHOTOS}
+                  addDisabled={photos.available === false}
+                  onPick={photos.pick}
+                  onRemove={photos.remove}
+                />
+                {photos.available === false ? (
+                  <p className="mt-[5px] text-xs text-brand-warning">{PHOTO_UNAVAILABLE}</p>
+                ) : photos.message ? (
+                  <p className="mt-[5px] text-xs text-brand-destructive">{photos.message}</p>
+                ) : null}
+              </div>
             </>
           ) : null}
 

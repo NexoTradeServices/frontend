@@ -10,6 +10,8 @@
 //      (the link itself is proven at the backend, ops-jobs.test.ts AC24)
 // AC25 (BKLG-022) Assigned renders #6b4fa3 on #efeafa through the one
 //      shared tag -- on the queue and on Bob's dashboard card for JOB-1042
+// 3003 AC11 Sarah's enquiry photos in "The request" card with their file names;
+//      tapping one opens the full photo in a new tab; "No photos" without
 // AC29 at 390px: every action reachable, no sideways scroll, every tap
 //      target at least 44px -- on the queue and on the job page
 // AC30 at 390px the status chips stay one row that scrolls sideways
@@ -22,6 +24,7 @@
 import { test, expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { login } from "./helpers/login";
 import { MOCKS_GOOGLE_PLACES, installMockGooglePlaces } from "./helpers/mock-google-places";
+import { installMockPhotoImages } from "./helpers/mock-cloudinary";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
@@ -284,4 +287,71 @@ test.describe(() => {
     // The row scrolls; the page never does.
     await expectNoSidewaysScroll(page);
   });
+});
+
+test("3003 AC11: Mike sees the customer's photos in The request card; tapping one opens the full photo in a new tab; a job without says No photos", async ({
+  page,
+  request,
+}) => {
+  await installMockPhotoImages(page);
+  const stamp = String(Date.now());
+  const withPhotos = await request.post(`${apiUrl}/api/enquiries`, {
+    data: {
+      name: "E2E 3003 Photos",
+      email: `e2e-3003-ops-${stamp}@idelta.com.au`,
+      phone: "0400 000 303",
+      location: {
+        suburb: "Fremantle",
+        state: "WA",
+        country: "AU",
+        postcode: "6160",
+        lat: -32.0569,
+        lng: 115.7439,
+        placeId: `e2e-3003-place-${stamp}`,
+      },
+      trade: "Plumbing",
+      selectedOptions: [],
+      preferredDate: "2026-12-01",
+      preferredWindow: "morning",
+      description: "Mixer tap leaking from the base.",
+      marketingEmail: false,
+      marketingSms: false,
+      photos: [
+        { storageKey: `tradeservice/enquiry-photos/e2e-ops-a-${stamp}`, fileName: "leaking mixer tap.jpg" },
+        { storageKey: `tradeservice/enquiry-photos/e2e-ops-b-${stamp}`, fileName: "under the sink.heic" },
+      ],
+    },
+  });
+  expect(withPhotos.status()).toBe(201);
+  const { reference } = (await withPhotos.json()) as { reference: string };
+  const bare = await postEnquiry(request, "3003-bare", "E2E 3003 Bare");
+
+  await page.goto(`/ops/jobs/${reference}`);
+  await login(page, "mike@idelta.com.au");
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: "The request" }) });
+  await expect(card.getByText("Photos", { exact: true })).toBeVisible();
+  const first = card.getByRole("link", { name: "Open leaking mixer tap.jpg" });
+  await expect(first).toBeVisible();
+  // The caption cuts a long name short with "..."; the link keeps the whole name.
+  await expect(card.getByRole("link", { name: "Open under the sink.heic" })).toBeVisible();
+  await expect(card.getByText("under the s...")).toBeVisible();
+  // Read-only: no x, no Add tile, no count.
+  await expect(card.getByRole("button", { name: /Remove/ })).toHaveCount(0);
+  await expect(card.getByText("Add photo")).toHaveCount(0);
+  await expect(card.getByText(/of 5 photos/)).toHaveCount(0);
+  await expect(card.getByText("No photos")).toHaveCount(0);
+
+  // The thumbnail is square and automatic; the link goes to the full photo.
+  await expect(first.getByRole("img")).toHaveAttribute("src", /\/c_fill,g_auto,w_240,h_240,f_auto,q_auto\/tradeservice\/enquiry-photos\/e2e-ops-a-/);
+  await expect(first).toHaveAttribute("target", "_blank");
+  await expect(first).toHaveAttribute("href", /\/image\/upload\/f_auto,q_auto\/tradeservice\/enquiry-photos\/e2e-ops-a-/);
+  const popup = page.waitForEvent("popup");
+  await first.click();
+  const opened = await popup;
+  expect(opened.url()).toMatch(/\/f_auto,q_auto\/tradeservice\/enquiry-photos\/e2e-ops-a-/);
+  await opened.close();
+
+  await page.goto(`/ops/jobs/${bare}`);
+  const bareCard = page.locator("section").filter({ has: page.getByRole("heading", { name: "The request" }) });
+  await expect(bareCard.getByText("No photos")).toBeVisible();
 });

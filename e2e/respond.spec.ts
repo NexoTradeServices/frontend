@@ -9,6 +9,7 @@
 // AC25 a link that does not exist reads "This link doesn't work" with the office number
 // AC26 tapping Decline shows the note box; Back returns with nothing sent
 // AC27 the Texts sent page shows the site contact's slot-confirmed text
+// 3003 AC12 the customer's photos sit under her answers on the respond page; no photo block when the job has none
 // AC-phone (the small screen IS the subject) Accept and Decline stay fixed at
 //      the bottom of a phone, reachable, no sideways scroll, 44px targets
 //
@@ -17,6 +18,7 @@
 // respond link is never burned by a run of this file.
 import { test, expect, type Page } from "@playwright/test";
 import { dispatchThrowawayJob, freeBobsHold, type DispatchedJob } from "./helpers/dispatched-job";
+import { installMockPhotoImages } from "./helpers/mock-cloudinary";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
@@ -188,4 +190,40 @@ test.describe("on a phone", () => {
     await expect(page.getByRole("button", { name: "Back", exact: true })).toBeVisible();
     await expectNoSidewaysScroll(page);
   });
+});
+
+test("3003 AC12: Bob sees the customer's photos under her answers", async ({
+  page,
+  request,
+}) => {
+  await installMockPhotoImages(page);
+  const stamp = String(Date.now());
+  const withPhotos = await newJob(page, request, "ac12a", {
+    photos: [
+      { storageKey: `tradeservice/enquiry-photos/e2e-respond-a-${stamp}`, fileName: "leaking mixer tap.jpg" },
+      { storageKey: `tradeservice/enquiry-photos/e2e-respond-b-${stamp}`, fileName: "under the sink.jpg" },
+    ],
+  });
+  await page.goto(withPhotos.respondPath);
+
+  await expect(page.getByText("Customer's photos", { exact: true })).toBeVisible();
+  const first = page.getByRole("link", { name: "Open leaking mixer tap.jpg" });
+  await expect(first).toBeVisible();
+  // The caption cuts a long name short with "..."; the link keeps the whole name.
+  await expect(page.getByRole("link", { name: "Open under the sink.jpg" })).toBeVisible();
+  await expect(page.getByText("under the s...")).toBeVisible();
+  await expect(first).toHaveAttribute("target", "_blank");
+  await expect(first).toHaveAttribute("href", /\/f_auto,q_auto\/tradeservice\/enquiry-photos\/e2e-respond-a-/);
+  // Read-only: no x, no Add tile, no count.
+  await expect(page.getByRole("button", { name: /Remove/ })).toHaveCount(0);
+  await expect(page.getByText("Add photo")).toHaveCount(0);
+  await expect(page.getByText(/of 5 photos/)).toHaveCount(0);
+});
+
+test("3003 AC12: a job with no photos shows no photo block", async ({ page, request }) => {
+  await installMockPhotoImages(page);
+  const without = await newJob(page, request, "ac12b");
+  await page.goto(without.respondPath);
+  await expect(page.getByRole("heading", { name: "The job" })).toBeVisible();
+  await expect(page.getByText("Customer's photos")).toHaveCount(0);
 });
