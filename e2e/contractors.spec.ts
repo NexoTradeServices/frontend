@@ -411,3 +411,20 @@ test.describe(() => {
     await page.getByRole("button", { name: "Keep active" }).click();
   });
 });
+// Feature 2006, AC14: the Contractor agreement card on the ops record, and no
+// control to accept. Nothing is ever published in the shared dev database, so
+// the real backend answers "No agreement published yet."; the accepted and
+// not-yet-accepted renderings are proven in tests/agreement-views.test.ts and
+// the data behind them in the backend's contractors.test.ts.
+test("2006 AC14: Bob's and Dave's records carry a Contractor agreement card with no accept control", async ({ page }) => {
+  await page.goto("/ops/contractors/CON-014");
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "Contractor agreement" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("No agreement published yet.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Accept/ })).toHaveCount(0);
+
+  await page.goto("/ops/contractors/CON-021");
+  await expect(page.getByRole("heading", { name: "Contractor agreement" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("No agreement published yet.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Accept/ })).toHaveCount(0);
+});

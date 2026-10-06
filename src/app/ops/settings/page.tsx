@@ -6,6 +6,7 @@ import { getDisplayName } from "@/lib/identity";
 import { LoginGate } from "@/components/auth/login-gate";
 import { WrongDoor } from "@/components/auth/wrong-door";
 import { PortalShell } from "@/components/portal-shell/portal-shell";
+import { AgreementCard } from "@/components/settings/agreement-card";
 import { SettingsForm, type SettingsDto } from "@/components/settings/settings-form";
 
 const PORTAL_NAME = "Operations portal";
@@ -36,6 +37,7 @@ export default async function OpsSettingsPage() {
       displayName={displayName}
     >
       <SettingsForm initial={settings} />
+      <AgreementCard timezone={settings.timezone} />
     </PortalShell>
   );
 }

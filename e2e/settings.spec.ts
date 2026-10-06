@@ -13,6 +13,16 @@
 // AC7  the 390px responsive floor: the app-bar menu opens with the full
 //      nav, every field and Save reachable, no horizontal scrolling
 //
+// Feature 2006 (contractor agreement) adds, below:
+// AC2  the Legal identity card saves the legal entity name and a picked
+//      business address, and both come back on reload (the real backend)
+// AC3  pick a PDF, a label, Publish: the version lists as Current, with an
+//      Open PDF that opens the file in a new tab (the backend's answers
+//      faked -- helpers/mock-agreement.ts)
+// AC4  a refusal shows as the file's or the label's own error; the
+//      legal-identity one as an error Banner at the top of the card
+// AC5  the dialog states how many active contractors it will stop
+//
 // Also carries one test with no AC number, added by
 // project/setup/frontend-test-harness.md Part 2: the app-bar menu's own
 // nav content and order, for Mike, at 390px -- not a feature AC, but the
@@ -31,6 +41,8 @@ import { test, expect, type Page } from "@playwright/test";
 import { login, ensureLoggedInAs } from "./helpers/login";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 import { withPlatformSettingsLock } from "./helpers/singleton-lock";
+import { installMockGooglePlaces } from "./helpers/mock-google-places";
+import { installMockFileHost, installMockOwnerAgreements } from "./helpers/mock-agreement";
 
 async function logout(page: Page) {
   const menuButton = page.getByRole("button", { name: "Open menu" });
@@ -169,6 +181,13 @@ async function restoreSeededSettings(page: Page): Promise<void> {
     await expect(page.getByText("Saved.")).toBeVisible();
   }
 
+  // Feature 2006: the Legal identity card's test writes both fields.
+  if ((await page.getByLabel("Legal entity name").inputValue()) !== "Trade Services") {
+    await page.getByLabel("Legal entity name").fill("Trade Services");
+    await page.getByRole("button", { name: "Save settings" }).click();
+    await expect(page.getByText("Saved.")).toBeVisible();
+  }
+
   await logout(page);
 }
 
@@ -191,7 +210,10 @@ test.describe(() => {
         await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible({ timeout: 10_000 });
         await expect(page.getByRole("link", { name: "Settings" })).toBeVisible();
         await expect(page.getByText("Owner", { exact: true })).toBeVisible();
-        await expect(page.getByLabel("ABN")).toHaveValue("");
+        // (Feature 2006's base seed gives a fresh database a placeholder ABN, a
+        // database seeded earlier has none -- so the ABN is cleared by hand below,
+        // where the GST gate needs it empty.)
+        await expect(page.getByLabel("Legal entity name")).toBeVisible();
         await expect(page.getByLabel("Operator phone")).toHaveValue("08 0000 0000");
         await expect(page.getByLabel("Business inbox")).toHaveValue("ops@idelta.com.au");
         await expect(page.getByLabel("Timezone")).toHaveValue("Australia/Perth");
@@ -214,6 +236,7 @@ test.describe(() => {
         await expect(page.getByLabel("Payment terms")).toHaveValue("14");
 
         // AC4 -- flipping GST on with no ABN is blocked client-side, no network round trip.
+        await page.getByLabel("ABN").fill("");
         await page.getByRole("switch", { name: "GST registered" }).click();
         await page.getByRole("button", { name: "Save settings" }).click();
         await expect(page.getByText(/Enter the ABN first/)).toBeVisible();
@@ -234,4 +257,125 @@ test.describe(() => {
       });
     },
   );
+  test("2006 AC2: the Legal identity card saves the legal name and a picked address; both come back on reload", async ({
+    page,
+  }) => {
+    // Always the stand-in, not only in CI: this test is about the settings card, and a settings save must not depend on Google being up.
+    await installMockGooglePlaces(page);
+    await withPlatformSettingsLock(async () => {
+      await page.goto("/ops/settings");
+      await login(page, "owner@idelta.com.au");
+      await expect(page.getByRole("heading", { name: "Legal identity" })).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText("Printed on contracts and invoices")).toBeVisible();
+
+      await page.getByLabel("Legal entity name").fill("Trade Services Pty Ltd");
+      const address = page.getByLabel("Business address");
+      await expect(address).toBeEnabled({ timeout: 10_000 });
+      // The page is server-rendered: type again until hydration has caught up and the list answers.
+      await expect(async () => {
+        await address.fill("");
+        await address.fill("14 Marine Terrace, Fremantle WA 6160");
+        await expect(page.getByText("Google suggestions")).toBeVisible({ timeout: 2_000 });
+      }).toPass({ timeout: 20_000 });
+      await page.getByRole("button", { name: /Marine Terrace.*Fremantle.*WA/ }).click();
+      await page.getByRole("button", { name: "Save settings" }).click();
+      await expect(page.getByText("Saved.")).toBeVisible({ timeout: 10_000 });
+
+      await page.reload();
+      await expect(page.getByLabel("Legal entity name")).toHaveValue("Trade Services Pty Ltd");
+      await expect(page.getByLabel("Business address")).toHaveValue(/Marine Terrace.*Fremantle/);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Feature 2006 -- publishing the contractor agreement (the backend's answers faked)
+// ---------------------------------------------------------------------------
+
+const PDF_BYTES = Buffer.from("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF");
+
+test("2006 AC3 + AC4 + AC5: pick a PDF and a label, see the count, meet each refusal at its own field, publish, list it Current, open it", async ({
+  page,
+}) => {
+  await installMockFileHost(page.context());
+  const mock = await installMockOwnerAgreements(page, { activeContractors: 3 });
+  await page.goto("/ops/settings");
+  await login(page, "owner@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "Contractor agreement" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("No agreement published yet.")).toBeVisible();
+  await expect(page.getByText("No file chosen")).toBeVisible();
+
+  // Nothing chosen: each field's own "Required.", no dialog.
+  await page.getByRole("button", { name: "Publish version" }).click();
+  await expect(page.getByText("Required.")).toHaveCount(2);
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+
+  await page.getByLabel("Agreement file").setInputFiles({ name: "contractor-agreement.pdf", mimeType: "application/pdf", buffer: PDF_BYTES });
+  await expect(page.getByText("contractor-agreement.pdf")).toBeVisible();
+  await page.getByLabel("Version label").fill("1");
+
+  // AC5: the dialog says how many active contractors it will stop.
+  await page.getByRole("button", { name: "Publish version" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog.getByRole("heading", { name: "Publish version 1?" })).toBeVisible();
+  await expect(dialog).toContainText("Every active contractor (3) must accept it before new jobs can be sent to them.");
+  await expect(dialog).toContainText("Jobs already booked go ahead.");
+
+  // AC4: the legal-identity refusal is an error Banner on the card.
+  mock.nextRefusal = { status: 409, error: "Fill in the legal name, ABN and address in Settings first", field: "legalIdentity" };
+  await dialog.getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(page.getByText("Fill in the legal name, ABN and address in Settings first")).toBeVisible();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+
+  // AC4: a refusal about the file is the File field's error.
+  await page.getByRole("button", { name: "Publish version" }).click();
+  mock.nextRefusal = { status: 400, error: "That isn't a PDF - choose a PDF file.", field: "file" };
+  await page.getByRole("alertdialog").getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(page.getByText("That isn't a PDF - choose a PDF file.")).toBeVisible();
+
+  // AC4: a refusal about the label is the label's error.
+  await page.getByRole("button", { name: "Publish version" }).click();
+  mock.nextRefusal = { status: 409, error: "That version label is already used.", field: "version" };
+  await page.getByRole("alertdialog").getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(page.getByText("That version label is already used.")).toBeVisible();
+
+  // AC3: published; listed as Current with an Open PDF.
+  await page.getByRole("button", { name: "Publish version" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(page.getByText("Version 1 published.")).toBeVisible();
+  expect(mock.publishes.at(-1)).toMatchObject({ label: "1", contentType: "application/pdf" });
+  expect(mock.publishes.at(-1)?.bytes).toBe(PDF_BYTES.length);
+  const row = page.getByRole("row").filter({ hasText: "The owner" });
+  await expect(row).toContainText("Current");
+  await expect(page.getByText("No agreement published yet.")).toHaveCount(0);
+
+  const [popup] = await Promise.all([page.waitForEvent("popup"), row.getByRole("button", { name: "Open PDF" }).click()]);
+  await popup.waitForURL(/files\.test\/agreements\/mock-1\.pdf/);
+  expect(mock.opened).toContain("mock-1");
+  await popup.close();
+
+  await logout(page);
+});
+
+test.describe(() => {
+  test.use(MOBILE_VIEWPORT);
+
+  test("2006 AC3: at phone width the versions are Record cards and nothing scrolls sideways", async ({ page }) => {
+    await installMockOwnerAgreements(page, {
+      versions: [
+        { id: "mock-2", version: "2", issuedAt: "2026-09-09T04:00:00.000Z", issuedBy: "The owner", current: true },
+        { id: "mock-1", version: "1", issuedAt: "2026-09-01T04:00:00.000Z", issuedBy: "The owner", current: false },
+      ],
+    });
+    await page.goto("/ops/settings");
+    await login(page, "owner@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Contractor agreement" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Version 2", { exact: true }).filter({ visible: true })).toBeVisible();
+    await expect(page.getByText("Current").filter({ visible: true })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Open PDF" })).toHaveCount(2);
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    await logout(page);
+  });
 });

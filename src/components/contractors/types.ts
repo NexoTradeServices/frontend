@@ -1,6 +1,7 @@
 // Shared shapes -- Feature 2001, contractor onboarding (Mike's path).
 // Mirrors the backend's DTO (backend/src/contractors/routes.ts, toDto()).
 import type { PickedAddress } from "@/components/ui/places-field";
+import type { ContractorAgreementDto } from "@/components/agreement/types";
 
 export interface ContractorSpecialtyDto {
   trade: string;
@@ -40,6 +41,8 @@ export interface ContractorDto {
   coreLocationSuburb: string | null;
   ready: boolean;
   missing: string[];
+  /** Feature 2006 -- the agreement as ops reads it (never ticked from here). */
+  agreement: ContractorAgreementDto;
   hasCredential: boolean;
   credentialSetAt: string | null;
   lastInviteSentAt: string | null;

@@ -24,6 +24,7 @@ import { Banner } from "@/components/auth/banner";
 import { Toast, useToast } from "@/components/ui/toast";
 import { TradeRows, emptyTradeRow, type TradeRowDraft, type TradeRowErrors } from "./trade-rows";
 import { ContractorRecordHeader } from "./record-header";
+import { ContractorAgreementCard } from "./agreement-card";
 import { dispatchState, fmtDate, isFutureDate, type ApiFieldError, type ContractorDto } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -575,6 +576,8 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
             </p>
           </div>
         ) : null}
+
+        {contractor ? <ContractorAgreementCard code={contractor.code} agreement={contractor.agreement} /> : null}
 
         <div className="flex justify-end gap-3">
           <button
