@@ -16,6 +16,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   severity = "standard",
   loading = false,
+  loadingLabel = "Saving...",
   onConfirm,
   onCancel,
 }: {
@@ -26,6 +27,8 @@ export function ConfirmDialog({
   cancelLabel?: string;
   severity?: "standard" | "destructive";
   loading?: boolean;
+  /** the confirm button's label while it works */
+  loadingLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -60,7 +63,7 @@ export function ConfirmDialog({
               severity === "destructive" ? "bg-brand-destructive" : "bg-brand-accent"
             }`}
           >
-            {loading ? "Saving..." : confirmLabel}
+            {loading ? loadingLabel : confirmLabel}
           </button>
         </div>
       </div>

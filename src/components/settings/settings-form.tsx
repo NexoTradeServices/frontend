@@ -16,6 +16,7 @@ import { ToggleSwitch } from "@/components/ui/toggle-switch";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PrimaryButton } from "@/components/auth/buttons";
 import { Banner } from "@/components/auth/banner";
+import { PlacesField, type PickedAddress } from "@/components/ui/places-field";
 
 export interface SettingsDto {
   id: string;
@@ -25,6 +26,8 @@ export interface SettingsDto {
   gstStatusChangedByUserId: string | null;
   gstStatusChangedBy: { id: string; name: string } | null;
   businessAbn: string | null;
+  legalEntityName: string;
+  businessAddress: PickedAddress | null;
   gstRatePercent: string;
   paymentTermsDays: number;
   serviceReachKm: number;
@@ -95,6 +98,10 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
   const [settings, setSettings] = useState(initial);
 
   const [displayName, setDisplayName] = useState(initial.displayName);
+  const [legalEntityName, setLegalEntityName] = useState(initial.legalEntityName);
+  const [businessAddress, setBusinessAddress] = useState<PickedAddress | null>(initial.businessAddress);
+  const [addressError, setAddressError] = useState<string | undefined>();
+  const [addressPicking, setAddressPicking] = useState(false);
   const [gstRegistered, setGstRegistered] = useState(initial.gstRegistered);
   const [businessAbn, setBusinessAbn] = useState(initial.businessAbn ?? "");
   const [gstRatePercent, setGstRatePercent] = useState(initial.gstRatePercent);
@@ -133,6 +140,8 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
       displayName,
       gstRegistered,
       businessAbn: businessAbn.trim() === "" ? null : businessAbn.trim(),
+      legalEntityName: legalEntityName.trim(),
+      businessAddress,
       gstRatePercent: Number(gstRatePercent),
       paymentTermsDays: Number(paymentTermsDays),
       serviceReachKm: Number(serviceReachKm),
@@ -195,6 +204,12 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
       setFieldErrors({ displayName: `Keep it to ${DISPLAY_NAME_MAX_LENGTH} characters or fewer.` });
       return;
     }
+
+    if (legalEntityName.trim() === "") {
+      setFieldErrors({ legalEntityName: "Required." });
+      return;
+    }
+    if (addressError) return;
 
     // The ABN gate, mirrored client-side (the server enforces it for real -- AC4).
     if (gstRegistered && businessAbn.trim() === "") {
@@ -294,6 +309,32 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
             />
           </div>
         </div>
+      </div>
+
+      <div className="mb-4.5 max-w-[720px] rounded-[10px] border border-hairline bg-surface p-5">
+        <h3 className="font-heading text-base font-extrabold text-ink">Legal identity</h3>
+        <p className="mb-3.5 text-xs text-muted-text">Printed on contracts and invoices</p>
+        <div className="flex flex-wrap gap-4">
+          <div className="min-w-[200px] flex-1">
+            <Field
+              id="legalEntityName"
+              label="Legal entity name"
+              required
+              value={legalEntityName}
+              onChange={(e) => setLegalEntityName(e.target.value)}
+              error={fieldErrors["legalEntityName"]}
+            />
+          </div>
+        </div>
+        <PlacesField
+          id="businessAddress"
+          label="Business address"
+          value={businessAddress}
+          onChange={setBusinessAddress}
+          error={addressError ?? fieldErrors["businessAddress"]}
+          onErrorChange={setAddressError}
+          onPickingChange={setAddressPicking}
+        />
       </div>
 
       <div className="mb-4.5 max-w-[720px] rounded-[10px] border border-hairline bg-surface p-5">
@@ -472,8 +513,8 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
 
       <div className="flex max-w-[720px] justify-end">
         <PrimaryButton
-          loading={saving}
-          loadingLabel="Saving..."
+          loading={saving || addressPicking}
+          loadingLabel={addressPicking ? "Picking address..." : "Saving..."}
           className="mt-0 w-full sm:w-auto sm:min-w-[180px]"
         >
           Save settings
