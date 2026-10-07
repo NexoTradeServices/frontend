@@ -16,7 +16,7 @@
 // parallel test run could have changed; it only exercises login, wrong-door,
 // and log out, all reversible.
 import { test, expect } from "@playwright/test";
-import { login } from "./helpers/login";
+import { login, waitForHydration } from "./helpers/login";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 
 test("AC1: Mike logs in at /ops and lands in the ops portal", async ({ page }) => {
@@ -29,6 +29,9 @@ test("AC1: Mike logs in at /ops and lands in the ops portal", async ({ page }) =
   await expect(page).toHaveURL(/\/ops\/jobs$/, { timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible();
   await expect(page.getByText("mike@idelta.com.au").first()).toBeVisible();
+  // The menu's Jobs entry is shown and marked current (desktop sidebar).
+  const jobsEntry = page.getByRole("navigation", { name: "Sidebar" }).getByRole("link", { name: "Jobs", exact: true });
+  await expect(jobsEntry).toHaveAttribute("aria-current", "page");
 
   // Below the shell's lg breakpoint (1024px since feature 4001, BKLG-024),
   // log out lives behind the menu button -- open it first where it exists.
@@ -63,6 +66,7 @@ test("AC2: a wrong password shows the generic banner, never a field-specific one
   page,
 }) => {
   await page.goto("/ops");
+  await waitForHydration(page, "email");
   await page.getByLabel("Email").fill("mike@idelta.com.au");
   await page.getByLabel("Password").fill("not-the-right-password");
   await page.getByRole("button", { name: "Log in" }).click();
@@ -75,6 +79,7 @@ test("the forgot-password form reaches the no-enumeration sent state", async ({ 
   await page.getByRole("link", { name: "Forgot your password?" }).click();
   await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible();
 
+  await waitForHydration(page, "email");
   await page.getByLabel("Email").fill("mike@idelta.com.au");
   await page.getByRole("button", { name: "Email me a reset link" }).click();
 

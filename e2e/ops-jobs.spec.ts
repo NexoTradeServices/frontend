@@ -1,6 +1,6 @@
 // Feature 4001 -- ops job queue and job detail, frontend e2e (ADR 0001).
 //
-// AC1  Mike logs in at /ops and lands on /ops/jobs; Jobs is shown and current
+// (AC1, Mike lands on /ops/jobs with Jobs shown and current, is in auth.spec.ts AC1.)
 // AC7  a web enquiry submitted while the queue is open appears within 30
 //      seconds with no reload, and the Updated line moves forward
 // AC13 Karl's first enquiry: Mike picks a billing address (Places stood in
@@ -62,16 +62,6 @@ async function expectPair(tag: Locator) {
   await expect(tag).toHaveCSS("color", "rgb(107, 79, 163)");
   await expect(tag).toHaveCSS("background-color", "rgb(239, 234, 250)");
 }
-
-test("AC1: Mike logs in at /ops and lands on /ops/jobs, the menu's Jobs entry shown and marked current", async ({ page }) => {
-  await page.goto("/ops");
-  await login(page, "mike@idelta.com.au");
-  await expect(page).toHaveURL(/\/ops\/jobs$/, { timeout: 15_000 });
-  await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible();
-  const jobs = page.getByRole("navigation", { name: "Sidebar" }).getByRole("link", { name: "Jobs", exact: true });
-  await expect(jobs).toBeVisible();
-  await expect(jobs).toHaveAttribute("aria-current", "page");
-});
 
 test("AC7: a web enquiry submitted while the queue is open appears within 30 seconds with no reload, and the Updated line moves forward", async ({
   page,
@@ -139,17 +129,8 @@ test("AC13: Karl's first enquiry -- Mike picks a billing address, leaves the job
   await expect(save).toBeDisabled();
   await expect(page.getByText("Not saved yet", { exact: true })).toHaveCount(0);
 
-  // What was stored, read back through the API on Mike's own session.
-  const res = await page.request.get(`${apiUrl}/api/jobs/${reference}`);
-  expect(res.status()).toBe(200);
-  const job = (await res.json()) as {
-    customer: { billingAddress: { street: string; placeId: string } | null };
-    siteAddress: { street: string; placeId: string } | null;
-    siteSameAsBilling: boolean;
-  };
-  expect(job.customer.billingAddress?.street).toMatch(/Marine Terrace/);
-  expect(job.siteAddress).toEqual(job.customer.billingAddress);
-  expect(job.siteSameAsBilling).toBe(true);
+  // What was stored -- the customer's billing address and the job site equal to it --
+  // is proven at the backend, tests/ops-jobs.test.ts AC13.
 
   await page.reload();
   await expect(page.getByLabel("Billing address", { exact: true })).toHaveValue(/Marine Terrace.*Fremantle/);

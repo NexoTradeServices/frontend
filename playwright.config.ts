@@ -30,6 +30,7 @@
 // CI (project/setup/frontend-test-harness.md Part 3) overrides this to its
 // own hermetic http://localhost:3000, where COOKIE_DOMAIN=localhost instead.
 import { defineConfig, devices } from "@playwright/test";
+import { BASE_URL, testRunStorageState } from "./e2e/helpers/test-run";
 
 const IPHONE_13 = devices["iPhone 13"];
 
@@ -44,6 +45,10 @@ export const MOBILE_VIEWPORT = {
 
 export default defineConfig({
   testDir: "./e2e",
+  // Feature 9002: sweep the `e2e` test-data label before the first test and
+  // after the last (e2e/helpers/test-run.ts).
+  globalSetup: "./e2e/global-setup.ts",
+  globalTeardown: "./e2e/global-teardown.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -69,8 +74,11 @@ export default defineConfig({
   workers: 2,
   reporter: "list",
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "https://idelta.com.au",
+    baseURL: BASE_URL,
     ...devices["Desktop Chrome"],
+    // Feature 9002: every browser context and every API request carries the
+    // test-run cookie, set once here -- never per test.
+    storageState: testRunStorageState(),
     viewport: { width: 1440, height: 900 },
     trace: "retain-on-failure",
   },

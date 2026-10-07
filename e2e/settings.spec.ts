@@ -1,17 +1,18 @@
 // Feature 1006, admin settings screen -- frontend e2e (ADR 0001, Playwright).
 //
-// AC1  the owner opens /ops/settings: the OWNER nav group shows, the
-//      seeded values render
-// AC2  Mike (ops) and Bob (contractor) get the wrong-door card at
-//      /ops/settings; Mike's ops-portal nav shows no OWNER group
-// AC3  the owner edits a plain field and saves; a reload shows the change
-// AC4  the ABN gate, mirrored client-side: no ABN, no network call, just
-//      the field error
-// AC5  with an ABN, the flip passes the confirm dialog and the audit
-//      caption appears
-// AC6  the Business inbox field edits operatorEmail
-// AC7  the 390px responsive floor: the app-bar menu opens with the full
-//      nav, every field and Save reachable, no horizontal scrolling
+// Feature 9002 moved every server rule this file used to re-prove to
+// tests/settings.test.ts in the backend: the owner-only doors for Mike and Bob
+// (AC2, 403), the seeded values (AC2), a saved plain field (AC3), the ABN gate
+// (AC4), the GST audit pair (AC5) and the Business inbox (AC6). The one
+// wrong-door test left here is Mike's; Bob's wrong-door card is auth.spec.ts.
+//
+// What stays here:
+// AC1/AC2 the OWNER nav group shows for the owner and not for Mike
+// AC4  the ABN gate, mirrored client-side: no ABN, no network call, just the field error
+// AC5  with an ABN, the flip passes the confirm dialog and the audit caption appears
+// AC7  the 390px responsive floor: the app-bar menu opens with the full nav,
+//      every field and Save reachable, no horizontal scrolling
+// AC12 the required-field stars
 //
 // Feature 2006 (contractor agreement) adds, below:
 // AC2  the Legal identity card saves the legal entity name and a picked
@@ -60,12 +61,6 @@ test("AC2: Mike (ops) gets the wrong-door card at /ops/settings", async ({ page 
   await expect(page.getByRole("heading", { name: "Wrong portal" })).toBeVisible();
 });
 
-test("AC2: Bob (contractor) gets the wrong-door card at /ops/settings too", async ({ page }) => {
-  await page.goto("/ops/settings");
-  await login(page, "bob@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Wrong portal" })).toBeVisible();
-});
-
 test("AC2: Mike's ops-portal nav shows no OWNER group -- Settings is owner-only", async ({ page }) => {
   await page.goto("/ops");
   await login(page, "mike@idelta.com.au");
@@ -73,6 +68,7 @@ test("AC2: Mike's ops-portal nav shows no OWNER group -- Settings is owner-only"
   await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible({ timeout: 15_000 });
 
   await expect(page.getByRole("link", { name: "Settings" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Pricing" })).toHaveCount(0);
   await expect(page.getByText("Owner", { exact: true })).toHaveCount(0);
 
   await logout(page);
@@ -198,42 +194,19 @@ test.describe(() => {
   });
 
   test(
-    "AC1 + AC3 + AC5 + AC6: seeded values render; the owner edits, saves, flips GST through the confirm dialog and sees the audit caption",
+    "AC1 + AC4 + AC5: the owner's nav group shows; flipping GST on with no ABN is stopped in the form; with one it goes through the confirm dialog and shows the audit caption",
     async ({ page }) => {
       await withPlatformSettingsLock(async () => {
         await page.goto("/ops/settings");
         await login(page, "owner@idelta.com.au");
 
-        // AC1 -- the OWNER nav group shows, and the seeded values render, one field per card.
-        // (/ops/settings renders from two sequential server-side fetches -- session,
-        // then settings -- a longer, honest wait for genuinely slower real work.)
+        // AC1 -- the OWNER nav group shows. (The values on the screen, the saved
+        // payment terms and the saved Business inbox are proven at the backend,
+        // tests/settings.test.ts AC2, AC3 and AC6.)
         await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible({ timeout: 10_000 });
         await expect(page.getByRole("link", { name: "Settings" })).toBeVisible();
         await expect(page.getByText("Owner", { exact: true })).toBeVisible();
-        // (Feature 2006's base seed gives a fresh database a placeholder ABN, a
-        // database seeded earlier has none -- so the ABN is cleared by hand below,
-        // where the GST gate needs it empty.)
         await expect(page.getByLabel("Legal entity name")).toBeVisible();
-        await expect(page.getByLabel("Operator phone")).toHaveValue("08 0000 0000");
-        await expect(page.getByLabel("Business inbox")).toHaveValue("ops@idelta.com.au");
-        await expect(page.getByLabel("Timezone")).toHaveValue("Australia/Perth");
-        await expect(page.getByLabel("GST rate")).toHaveValue("10");
-        await expect(page.getByLabel("Payment terms")).toHaveValue("7");
-        await expect(page.getByLabel("No-show call-out fee")).toHaveValue("150.00");
-        await expect(page.getByLabel("Return visit minimum")).toHaveValue("30");
-        await expect(page.getByLabel("Contractor part cap")).toHaveValue("150.00");
-        await expect(page.getByLabel("Service reach")).toHaveValue("25");
-        await expect(page.getByLabel("Payout cycle")).toHaveValue("weekly");
-        await expect(page.getByLabel("Payout day")).toHaveValue("fri");
-        await expect(page.getByLabel("Email provider")).toHaveValue("mailjet");
-        await expect(page.getByLabel("SMS provider")).toHaveValue("clicksend");
-
-        // AC3 -- edit a plain field and save; a reload shows the change.
-        await page.getByLabel("Payment terms").fill("14");
-        await page.getByRole("button", { name: "Save settings" }).click();
-        await expect(page.getByText("Saved.")).toBeVisible();
-        await page.reload();
-        await expect(page.getByLabel("Payment terms")).toHaveValue("14");
 
         // AC4 -- flipping GST on with no ABN is blocked client-side, no network round trip.
         await page.getByLabel("ABN").fill("");
@@ -241,19 +214,12 @@ test.describe(() => {
         await page.getByRole("button", { name: "Save settings" }).click();
         await expect(page.getByText(/Enter the ABN first/)).toBeVisible();
 
-        // AC5 -- with an ABN, the flip passes the confirm dialog and stamps the audit pair.
+        // AC5 -- with an ABN, the flip passes the confirm dialog and shows the audit caption.
         await page.getByLabel("ABN").fill("51 824 753 556");
         await page.getByRole("button", { name: "Save settings" }).click();
         await expect(page.getByRole("heading", { name: "Switch GST on?" })).toBeVisible();
         await page.getByRole("button", { name: "Switch on" }).click();
         await expect(page.getByText(/Changed \d{2}\/\d{2}\/\d{2} by The owner/)).toBeVisible();
-
-        // AC6 -- the Business inbox field edits operatorEmail.
-        await page.getByLabel("Business inbox").fill("admin@idelta.com.au");
-        await page.getByRole("button", { name: "Save settings" }).click();
-        await expect(page.getByText("Saved.")).toBeVisible();
-        await page.reload();
-        await expect(page.getByLabel("Business inbox")).toHaveValue("admin@idelta.com.au");
       });
     },
   );

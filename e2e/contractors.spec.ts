@@ -1,157 +1,39 @@
 // Feature 2001, contractor onboarding (Mike's path) -- frontend e2e (ADR
 // 0001, Playwright).
 //
-// AC1  Mike/the owner see Bob, Dave, Priya -- Active tags; Bob and Dave read
-//      Ready to dispatch (their fixture-seeded service areas -- Feature
-//      4002, plan decision 16 gave Dave his -- and address no longer counts,
-//      design "Managing the contractor record"); Priya reads Not ready,
-//      naming "insurance renewal (expired)" and "service area (not set up
-//      yet)"; Bob (contractor) gets the wrong-door card
-// AC2  Add a contractor with just name/phone/email: lands on the list with
-//      the toast, the new row shows Not ready to dispatch with the full
-//      missing list
-// AC5  Bob's Plumbing row, insurance and payout round-trip; this PUT plus
-//      his fixture-seeded service area leaves him with nothing missing at
-//      all (address stopped counting, see AC1 above)
-// AC6  a blank licence expiry refuses the whole save with a field error; a
-//      past expiry saves and shows the warning
-// AC8  a deactivated contractor with the RIGHT password sees the
-//      operatorPhone message; reactivating restores his login (AC9),
-//      leaving the seeded Bob exactly as this suite found him
-// AC11 [IMPL] (plan.md) -- the Google Places key turned out to be already
-//      provisioned and network-reachable here (project/setup/
-//      01-dev-environment.md, section 6, ticked 03/09/26), so this proves
-//      BOTH branches: a real pick stores the structured address, and a
-//      simulated script failure (route-blocked) degrades to the
-//      unavailable state with the form still saving. In CI the "real pick"
-//      half calls a stand-in instead of Google (helpers/mock-google-places.ts,
-//      project/setup/frontend-test-harness.md Part 3) -- the referrer-
-//      restricted key never leaves this machine, and CI never depends on
-//      Google being up.
-// AC13 this file, and every other spec touched by BKLG-013, log in through the
-//      shared helper (frontend/e2e/helpers/login.ts) -- proven by three
-//      consecutive clean `npm run test:e2e` runs, not by an assertion here
-// AC14 the 390px responsive floor on the list, the form and the deactivate
-//      confirm dialog
+// Browser tests only for what needs a browser (project/design/trades-platform-design.md,
+// Ground rules, "Tests leave nothing behind, and prove each thing once"). Feature 9002
+// moved every server rule this file used to re-prove to tests/contractors.test.ts in the
+// backend: the list with Bob and Dave Ready and Priya Not ready (AC1), the owner's view
+// and Bob's refusal (AC1), a contractor saved with just the three fields (AC2), Bob's
+// Plumbing row round-trip in whole cents (AC5), the blank and past licence expiry (AC6),
+// and the deactivated login with its operator-phone message and the reactivated login
+// (AC8, AC9). The agreement card on the record is covered by the frontend unit test
+// tests/agreement-views.test.ts and the backend's AC14.
 //
-// Runs against the seeded dev database (`npm run db:seed:fixtures`), same
-// constraint as auth.spec.ts/settings.spec.ts/pricing.spec.ts -- AC2's and
-// AC6's new contractors cannot be deleted (design has none), so each test
-// deactivates its own throwaway row as cleanup; AC8/AC9 restores Bob to
-// Active, the same "leave it as we found it" discipline.
+// What stays here:
+// AC6  a blank licence expiry stops the form with "Required."; the expired warning on the record
+// AC8/9 the status switch, its confirm dialog and toasts, on a throwaway contractor
+// AC11 the Google Places pick, and the field degrading when the script is blocked
+// AC14 the 390px responsive floor on the list, the form and the deactivate dialog
+//
+// Every contractor a test adds carries the `e2e` test-data label (the test-run
+// cookie, playwright.config.ts) and is swept by the run's global setup and
+// teardown (e2e/helpers/test-run.ts) -- nothing here cleans up after itself, and
+// nothing writes to the seeded cast.
 import { test, expect } from "@playwright/test";
-import { login, ensureLoggedInAs } from "./helpers/login";
+import { login } from "./helpers/login";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 import { MOCKS_GOOGLE_PLACES, installMockGooglePlaces } from "./helpers/mock-google-places";
-import { withContractorStatusLock } from "./helpers/singleton-lock";
 
-// A unique suffix per test, on BOTH the name and the email -- a test that
-// fails before its own cleanup step leaves a stray active row behind, and
-// without this, the next run's `hasText` row lookup resolves to more than
-// one element (Playwright strict mode) instead of a clean, unrelated fail.
+// A unique suffix per test, on BOTH the name and the email, so a row lookup
+// by text resolves to exactly one element.
 function uniqueTag(tag: string): string {
   return `${tag}-${Date.now().toString()}`;
 }
 function uniqueEmail(tag: string): string {
   return `e2e-${uniqueTag(tag)}@idelta.com.au`;
 }
-
-async function deactivateOpenContractor(page: import("@playwright/test").Page) {
-  await page.getByRole("switch", { name: "Contractor status" }).click();
-  await page.getByRole("button", { name: "Deactivate" }).click();
-  await expect(page.getByText(/Their session is gone/)).toBeVisible();
-}
-
-test("AC1: Mike sees Bob and Dave Ready to dispatch, Priya Not ready (her insurance expired, no service area)", async ({
-  page,
-}) => {
-  await page.goto("/ops/contractors");
-  await login(page, "mike@idelta.com.au");
-
-  // Held around the read, not the whole test (login() already held it, and
-  // released it, for the login itself) -- project/setup/
-  // frontend-test-harness.md. Bob's tags here are only meaningful if he is
-  // genuinely Active for the whole read; contractors.spec.ts's own AC8+AC9
-  // switches him off and on again elsewhere and holds the same lock for its
-  // whole body, so this either reads his real, steady state or waits for
-  // that test to finish restoring it.
-  await withContractorStatusLock(async () => {
-    await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
-
-    for (const name of ["Bob Reilly", "Dave Hurst", "Priya Nair"]) {
-      await expect(page.getByRole("link").filter({ hasText: name }).getByText("Active", { exact: true })).toBeVisible();
-    }
-    // Feature 2002, decision 13: Bob's fixture carries a saved service area,
-    // and address no longer counts toward Ready to dispatch (design,
-    // "Managing the contractor record" -- backend/src/contractors/ready.ts,
-    // project/setup/frontend-test-harness.md) -- his fixture leaves him with
-    // nothing missing, so he reads Ready. Feature 4002, plan decision 16
-    // gives Dave a service area too (Victoria Park, 25km), so he now reads
-    // Ready on unchanged seed data. Priya still has none.
-    //
-    // `exact: true` here matters: without it, this locator's plain-string
-    // match is a case-insensitive SUBSTRING match, and "Ready to dispatch" is
-    // a substring of "Not ready to dispatch" -- this assertion could not
-    // fail, green on either tag, from feature 2001 until this fix (found by
-    // the first CI run against a truly fresh database, 08/09/26).
-    for (const name of ["Bob Reilly", "Dave Hurst"]) {
-      await expect(
-        page.getByRole("link").filter({ hasText: name }).getByText("Ready to dispatch", { exact: true }),
-      ).toBeVisible();
-    }
-    const priya = page.getByRole("link").filter({ hasText: "Priya Nair" });
-    await expect(priya.getByText("Not ready to dispatch")).toBeVisible();
-    await expect(priya.getByText(/service area \(not set up yet\)/)).toBeVisible();
-    await expect(priya.getByText(/insurance renewal \(expired\)/)).toBeVisible();
-  });
-});
-
-test("AC1: the owner sees the same list; Bob (contractor) gets the wrong-door card", async ({ page }) => {
-  await page.goto("/ops/contractors");
-  await login(page, "owner@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByRole("link").filter({ hasText: "Bob Reilly" })).toBeVisible();
-
-  const menuButton = page.getByRole("button", { name: "Open menu" });
-  if (await menuButton.isVisible()) await menuButton.click();
-  await page.getByRole("button", { name: "Log out" }).click();
-  // Log out's own client-side refresh swaps the portal for the login gate
-  // in place (no URL change) -- wait for that landmark before navigating
-  // again, or the next goto races it (seen on tablet: "Navigation ...
-  // interrupted by another navigation").
-  await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10_000 });
-
-  await page.goto("/ops/contractors");
-  await login(page, "bob@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Wrong portal" })).toBeVisible();
-});
-
-test("AC2: add a contractor with just the three required fields", async ({ page }) => {
-  await page.goto("/ops/contractors/new");
-  await login(page, "mike@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
-
-  const tag = uniqueTag("ac2");
-  const name = `E2E Throwaway ${tag}`;
-  const email = uniqueEmail("ac2");
-  await page.getByLabel("Name", { exact: true }).fill(name);
-  await page.getByLabel("Phone", { exact: true }).fill("0412 000 111");
-  await page.getByLabel("Email", { exact: true }).fill(email);
-  await page.getByRole("button", { name: "Save" }).click();
-
-  await expect(page).toHaveURL(/\/ops\/contractors$/, { timeout: 10_000 });
-  await expect(page.getByText(`${name} added. Welcome email sent to ${email}.`)).toBeVisible();
-
-  const row = page.getByRole("link").filter({ hasText: name });
-  await expect(row.getByText("Not ready to dispatch")).toBeVisible();
-  await expect(row.getByText(/Missing: /)).toBeVisible();
-
-  // Cleanup -- no delete exists (plan.md Scope / Out); deactivate the
-  // throwaway row instead, same spirit as settings.spec.ts's restores.
-  await row.click();
-  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
-  await deactivateOpenContractor(page);
-});
 
 test("AC11: a real Google pick stores the structured address and round-trips", async ({ page }) => {
   if (MOCKS_GOOGLE_PLACES) await installMockGooglePlaces(page);
@@ -185,8 +67,6 @@ test("AC11: a real Google pick stores the structured address and round-trips", a
   await row.click();
   await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByLabel("Address")).toHaveValue(/Marine Terrace.*Fremantle/);
-
-  await deactivateOpenContractor(page);
 });
 
 test("AC11: with the Places script blocked, the address field is disabled with the warning line and the form still saves", async ({
@@ -214,166 +94,47 @@ test("AC11: with the Places script blocked, the address field is disabled with t
   const row = page.getByRole("link").filter({ hasText: name });
   await row.click();
   await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
-  await deactivateOpenContractor(page);
+
+  // AC8/AC9: the status switch, its confirm dialog and toasts -- on this
+  // throwaway contractor, never on a seeded one.
+  await page.getByRole("switch", { name: "Contractor status" }).click();
+  await page.getByRole("button", { name: "Deactivate" }).click();
+  await expect(page.getByText(/Their session is gone/)).toBeVisible();
+  await expect(page.getByText("Deactivated -- no dispatch, no login")).toBeVisible();
+  await page.getByRole("switch", { name: "Contractor status" }).click();
+  await expect(page.getByText(`${name} reactivated.`)).toBeVisible();
+  await expect(page.getByText("Active -- dispatched when ready")).toBeVisible();
 });
 
-/** Idempotent: reads the switch's own aria-checked rather than assuming a
- * starting state, and does nothing if Bob is already Active. */
-async function ensureBobActive(page: import("@playwright/test").Page): Promise<void> {
-  await withContractorStatusLock(async () => {
-    await ensureLoggedInAs(page, "/ops/contractors/CON-014", "mike@idelta.com.au");
-    await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
-    const statusSwitch = page.getByRole("switch", { name: "Contractor status" });
-    if ((await statusSwitch.getAttribute("aria-checked")) === "false") {
-      await statusSwitch.click();
-      await expect(page.getByText("Bob Reilly reactivated.")).toBeVisible();
-    }
-  });
-}
+test("AC6: a blank licence expiry stops the form with Required.; a past expiry saves and shows the warning on his record", async ({
+  page,
+}) => {
+  await page.goto("/ops/contractors/new");
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
 
-// AC5 and AC8+AC9 both write to the SHARED seeded Bob (CON-014) row --
-// serialized so they never race each other's PUT under fullyParallel
-// workers (unlike settings.spec.ts's/pricing.spec.ts's single shared
-// writer, this file has two, so a project-only skip is not enough).
-test.describe.serial("Bob (CON-014) -- the shared writer tests", () => {
-  // Bob must end every run Active, whatever happened above. AC8+AC9
-  // deactivates him partway through and reactivates him at the end of the
-  // SAME test -- if it fails or times out before reaching that (found by
-  // CI: a ~15-action compound test can outrun the 30s default test timeout
-  // on a resource-constrained runner even with nothing actually broken),
-  // that reactivation never runs, and every OTHER test that logs in as Bob
-  // or reads his status stays broken for the rest of the suite. This
-  // check-and-fix is idempotent, so it costs almost nothing on the
-  // ordinary path where AC8+AC9 already put him back itself.
-  test.afterEach(async ({ page }) => {
-    await ensureBobActive(page);
-  });
+  const name = `E2E Expiry Case ${uniqueTag("ac6")}`;
+  await page.getByLabel("Name", { exact: true }).fill(name);
+  await page.getByLabel("Phone", { exact: true }).fill("0412 000 222");
+  await page.getByLabel("Email", { exact: true }).fill(uniqueEmail("ac6"));
+  await page.getByLabel("Trade", { exact: true }).selectOption("Plumbing");
+  await page.getByLabel("Call-out rate").fill("200.00");
+  await page.getByLabel("Standard rate").fill("150.00");
+  await page.getByLabel("Licence number").fill("PL-0001");
+  // Licence expiry left blank on purpose.
+  await page.getByRole("button", { name: "Save" }).click();
 
-  test("AC5: Bob's Plumbing row, insurance and payout round-trip as whole cents", async ({ page }) => {
-    await page.goto("/ops/contractors/CON-014");
-    await login(page, "mike@idelta.com.au");
-    await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("Required.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
+  await expect(page).toHaveURL(/\/ops\/contractors\/new$/);
 
-    // Bob carries a second trade (Electrical) alongside Plumbing -- scope to
-    // his Plumbing row specifically, not just the first rate field on the
-    // page.
-    const plumbingRow = page.locator('[data-trade="Plumbing"]');
-    await expect(plumbingRow.getByLabel("Call-out rate")).toHaveValue("200.00");
-    await expect(plumbingRow.getByLabel("Standard rate")).toHaveValue("150.00");
-    await expect(plumbingRow.getByLabel("Licence number")).toHaveValue("PL-8841");
-    await expect(page.getByLabel("Insurer")).toHaveValue("QBE");
-    await expect(page.getByLabel("BSB")).toHaveValue("066-000");
-
-    await page.getByRole("button", { name: "Save" }).click();
-    await expect(page).toHaveURL(/\/ops\/contractors$/, { timeout: 10_000 });
-    await expect(page.getByText("Bob Reilly saved.")).toBeVisible();
-
-    await page.goto("/ops/contractors/CON-014");
-    const plumbingRowAfterSave = page.locator('[data-trade="Plumbing"]');
-    await expect(plumbingRowAfterSave.getByLabel("Call-out rate")).toHaveValue("200.00");
-    await expect(plumbingRowAfterSave.getByLabel("Standard rate")).toHaveValue("150.00");
-    // This dev DB's Bob predates the migration (Feature 1001's original
-    // seed), so his old free-text address survived it as
-    // { street: "Fremantle WA 6160" } (AC12) -- present, so "address" was
-    // never his gap here. [IMPL] (plan.md) applies to a FRESH database (the
-    // backend suite's throwaway one), where the current fixture seed never
-    // sets Bob's own address at all and "address" stays missing there.
-    // Feature 2002: his fixture now carries a saved service area too, so
-    // this dev DB's Bob has nothing left missing and reads Ready.
-    await expect(page.getByText("Ready to dispatch", { exact: true })).toBeVisible();
-    await expect(page.getByText("Not ready to dispatch.")).not.toBeVisible();
-  });
-
-  test("AC6: a blank licence expiry refuses the save; a past expiry saves and shows the warning", async ({ page }) => {
-    await page.goto("/ops/contractors/new");
-    await login(page, "mike@idelta.com.au");
-    await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
-
-    const tag = uniqueTag("ac6");
-    const name = `E2E Expiry Case ${tag}`;
-    const email = uniqueEmail("ac6");
-    await page.getByLabel("Name", { exact: true }).fill(name);
-    await page.getByLabel("Phone", { exact: true }).fill("0412 000 222");
-    await page.getByLabel("Email", { exact: true }).fill(email);
-    await page.getByLabel("Trade", { exact: true }).selectOption("Plumbing");
-    await page.getByLabel("Call-out rate").fill("200.00");
-    await page.getByLabel("Standard rate").fill("150.00");
-    await page.getByLabel("Licence number").fill("PL-0001");
-    // Licence expiry left blank on purpose.
-    await page.getByRole("button", { name: "Save" }).click();
-
-    await expect(page.getByText("Required.")).toBeVisible();
-    await expect(page).toHaveURL(/\/ops\/contractors\/new$/);
-
-    await page.getByLabel("Licence expiry").fill("2020-01-01");
-    await page.getByRole("button", { name: "Save" }).click();
-    await expect(page).toHaveURL(/\/ops\/contractors$/, { timeout: 10_000 });
-    await expect(page.getByText(`${name} added. Welcome email sent to ${email}.`)).toBeVisible();
-
-    const row = page.getByRole("link").filter({ hasText: name });
-    await expect(row.getByText(/Missing: .*at least one active trade with a current licence/)).toBeVisible();
-    await row.click();
-    await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText("Already expired -- this trade cannot be dispatched until renewed.")).toBeVisible();
-
-    await deactivateOpenContractor(page);
-  });
-
-  test("AC8 + AC9: a deactivated contractor with the right password is told to call the office; reactivating restores his login", async ({
-    page,
-  }) => {
-    // Held for the WHOLE body -- project/setup/frontend-test-harness.md.
-    // Bob is genuinely, if briefly, deactivated partway through this test;
-    // every reader of his status (his own login elsewhere, and
-    // contractors.spec.ts's own AC1 list read) waits out this whole window
-    // via the same lock rather than risk landing on it.
-    await withContractorStatusLock(async () => {
-      await page.goto("/ops/contractors/CON-014");
-      await login(page, "mike@idelta.com.au");
-      await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
-      await deactivateOpenContractor(page);
-      await expect(page.getByText("Deactivated -- no dispatch, no login")).toBeVisible();
-
-      const menuButton = page.getByRole("button", { name: "Open menu" });
-      if (await menuButton.isVisible()) await menuButton.click();
-      await page.getByRole("button", { name: "Log out" }).click();
-      await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10_000 });
-
-      // AC8: the right password, told why -- never a field-specific message.
-      await page.goto("/contractor");
-      await page.getByLabel("Email").fill("bob@idelta.com.au");
-      await page.getByLabel("Password").fill("dev-password-123");
-      await page.getByRole("button", { name: "Log in" }).click();
-      await expect(page.getByText(/Your account is not active\. Call us on 08 0000 0000\./)).toBeVisible();
-
-      // A wrong password still gets the generic banner, not the operatorPhone one.
-      await page.getByLabel("Password").fill("not-the-right-password");
-      await page.getByRole("button", { name: "Log in" }).click();
-      await expect(page.getByText(/don't match/)).toBeVisible();
-
-      // AC9: reactivate Bob (no confirm) and restore the seeded row.
-      await page.goto("/ops/contractors/CON-014");
-      await login(page, "mike@idelta.com.au");
-      await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
-      await page.getByRole("switch", { name: "Contractor status" }).click();
-      await expect(page.getByText("Bob Reilly reactivated.")).toBeVisible();
-      await expect(page.getByText("Active -- dispatched when ready")).toBeVisible();
-
-      const mikeMenu = page.getByRole("button", { name: "Open menu" });
-      if (await mikeMenu.isVisible()) await mikeMenu.click();
-      await page.getByRole("button", { name: "Log out" }).click();
-      await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10_000 });
-
-      await page.goto("/contractor");
-      await page.getByLabel("Email").fill("bob@idelta.com.au");
-      await page.getByLabel("Password").fill("dev-password-123");
-      await page.getByRole("button", { name: "Log in" }).click();
-      await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-      const bobMenu = page.getByRole("button", { name: "Open menu" });
-      if (await bobMenu.isVisible()) await bobMenu.click();
-      await page.getByRole("button", { name: "Log out" }).click();
-    });
-  });
+  // What the server stores and what it says is missing: tests/contractors.test.ts AC6.
+  await page.getByLabel("Licence expiry").fill("2020-01-01");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page).toHaveURL(/\/ops\/contractors$/, { timeout: 10_000 });
+  await page.getByRole("link").filter({ hasText: name }).click();
+  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("Already expired -- this trade cannot be dispatched until renewed.")).toBeVisible();
 });
 
 test.describe(() => {
@@ -410,21 +171,4 @@ test.describe(() => {
     await expect(page.getByRole("button", { name: "Deactivate" })).toBeVisible();
     await page.getByRole("button", { name: "Keep active" }).click();
   });
-});
-// Feature 2006, AC14: the Contractor agreement card on the ops record, and no
-// control to accept. Nothing is ever published in the shared dev database, so
-// the real backend answers "No agreement published yet."; the accepted and
-// not-yet-accepted renderings are proven in tests/agreement-views.test.ts and
-// the data behind them in the backend's contractors.test.ts.
-test("2006 AC14: Bob's and Dave's records carry a Contractor agreement card with no accept control", async ({ page }) => {
-  await page.goto("/ops/contractors/CON-014");
-  await login(page, "mike@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Contractor agreement" })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("No agreement published yet.")).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Accept/ })).toHaveCount(0);
-
-  await page.goto("/ops/contractors/CON-021");
-  await expect(page.getByRole("heading", { name: "Contractor agreement" })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("No agreement published yet.")).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Accept/ })).toHaveCount(0);
 });

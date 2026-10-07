@@ -164,8 +164,12 @@ export function RequestAJobForm({
       // failed are left out.
       const uploadedPhotos = await photos.finish();
       const recaptchaToken = await getRecaptchaToken("enquiry_submit");
+      // credentials: "include" so the test-run cookie (feature 9002, Data Model /
+      // Test data) rides this cross-origin call like every other one; the server
+      // ignores it in production.
       const res = await fetch(`${apiUrl}/api/enquiries`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
