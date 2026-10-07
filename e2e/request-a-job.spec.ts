@@ -5,7 +5,9 @@
 //      with a JOB- reference
 // AC2  a weekend date shows the weekend rate; a weekday shows normal --
 //      the two never disagree with each other on the page
-// AC3  a repeat enquiry (a known email) completes the same flow
+// (AC3, a repeat enquiry from a known email, is proven at the backend --
+//      tests/enquiries.test.ts AC3 -- and no longer here, where it wrote a job
+//      onto the cast's Sarah.)
 // AC4  the confirmation page reads "we'll call you shortly" and carries no
 //      "Set a password" offer
 // AC8  every required field carries a star (change.md V3 -- this form
@@ -182,24 +184,6 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     await expect(page.getByText("Weekend rate")).toBeVisible();
     await expect(page.getByText(formatDollars(weekendCallout), { exact: true })).toBeVisible();
     await expect(page.getByText(`then ${formatDollars(weekendStandard)} per additional hour`)).toBeVisible();
-  });
-
-  test("AC3: a repeat enquiry from a known email completes the same flow", async ({ page }) => {
-    const trade = nonPlumbing(formData.serviceTypes);
-
-    await page.goto("/request-a-job");
-    await pickJoondalup(page);
-    await page.getByRole("button", { name: "Continue" }).click();
-    await pickTrade(page, trade.trade);
-    await page.getByRole("button", { name: "Continue" }).click(); // schedule (defaults are fine)
-    await page.getByLabel("What's happening").fill("Sarah again.");
-    await page.getByRole("button", { name: "Continue" }).click();
-    await page.getByLabel("Your name").fill("Sarah Chen");
-    await page.getByLabel("Email", { exact: true }).fill("sarah@idelta.com.au"); // the cast's own known email
-    await page.getByLabel("Phone").fill("0400 001 050");
-    await page.getByRole("button", { name: "Continue" }).click();
-    await page.getByRole("button", { name: "Request a job" }).click();
-    await expect(page).toHaveURL(/\/request-a-job\/confirmed\?ref=JOB-/, { timeout: 20_000 });
   });
 
   test("AC11: a trade's own questions render as labelled text answers under Additional questions; a trade with none shows no such section", async ({ page }) => {

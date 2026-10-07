@@ -74,13 +74,6 @@ export async function pickFreeWeekday(page: Page): Promise<string> {
   throw new Error("could not find a free weekday morning for Bob after 80 attempts");
 }
 
-/** The first Saturday after `date` (a weekday) -- the weekend-price day. */
-export function saturdayAfter(date: string): string {
-  const day = new Date(`${date}T00:00:00.000Z`);
-  day.setUTCDate(day.getUTCDate() + (6 - day.getUTCDay()));
-  return day.toISOString().slice(0, 10);
-}
-
 export interface DispatchedJob {
   reference: string;
   /** The respond page's path, `/a/<token>`, read from Bob's text. */

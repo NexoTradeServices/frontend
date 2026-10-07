@@ -7,10 +7,10 @@
 // AC17 picking a contractor opens his day; Previous/Next day moves it
 // AC18 tapping a half hour moves the start there, keeping the hold's length
 // AC19 a busy contractor still opens his day; a Not ready one does not
-// AC22 the price shown follows the day (a Saturday reads the weekend rate)
 // AC29 after dispatch the job page shows Assigned, waiting for his answer,
 //      and the service level with its price
-// AC34 the interim /dev/texts page carries the dispatch's block
+// (AC22, the price following the day, and AC34, the dispatch's block on the
+//  interim texts page, are proven at the backend -- tests/dispatch.test.ts.)
 // AC41 at 390px every action on the dispatch page is reachable, no sideways
 //      scroll, every tap target at least 44px
 //
@@ -20,7 +20,7 @@
 // cast; every job it dispatches is one of its own, never a seeded one.
 import { test, expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { login } from "./helpers/login";
-import { pickFreeWeekday, saturdayAfter } from "./helpers/dispatched-job";
+import { pickFreeWeekday } from "./helpers/dispatched-job";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
@@ -132,11 +132,10 @@ test("AC2: a job with no address at all -- Dispatch is off, with the reason", as
   await expect(disabledButton).toBeDisabled();
 });
 
-test("AC6, AC17, AC18, AC22, AC29, AC34: the whole dispatch flow", async ({ page, request }) => {
+test("AC6, AC17, AC18, AC29: the dispatch flow", async ({ page, request }) => {
   await page.goto("/ops/jobs");
   await login(page, "mike@idelta.com.au");
   const monday = await pickFreeWeekday(page);
-  const saturday = saturdayAfter(monday);
 
   const reference = await postEnquiry(request, "ac6", "Plumbing", FREMANTLE, monday);
   await putBillingAddress(page, reference);
@@ -163,13 +162,6 @@ test("AC6, AC17, AC18, AC22, AC29, AC34: the whole dispatch flow", async ({ page
   await expect(page.getByLabel("Start (AWST)")).toHaveValue("540"); // 9:00am
   await expect(page.getByLabel("Hold")).toHaveValue("60");
 
-  // AC22: a Saturday reads the weekend rate.
-  await page.getByLabel("Day", { exact: true }).fill(saturday);
-  await expect(page.getByText("First hour (includes call-out) $375, then $270/h")).toBeVisible({ timeout: 10_000 });
-  // Back to the Monday slot for the actual dispatch.
-  await page.getByLabel("Day", { exact: true }).fill(monday);
-  await expect(page.getByText("First hour (includes call-out) $250, then $180/h")).toBeVisible({ timeout: 10_000 });
-
   const goButton = page.getByRole("button", { name: /Dispatch to Bob/ });
   await expect(goButton).toBeEnabled({ timeout: 10_000 });
   await goButton.click();
@@ -181,24 +173,6 @@ test("AC6, AC17, AC18, AC22, AC29, AC34: the whole dispatch flow", async ({ page
   await expect(page.getByText("Assigned", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/Waiting for Bob's answer - proposed/)).toBeVisible();
   await expect(page.getByText(/Normal.*First hour \(includes call-out\) \$250, then \$180\/h/)).toBeVisible();
-
-  // AC34: the interim texts page carries this dispatch's block. The page is
-  // a server read of whatever the dispatcher has already delivered, and the
-  // running dev process drains its queue on its own 15-second interval
-  // (notifications/dispatcher.ts) -- not the test's clock to control, so
-  // this polls with a real reload rather than a single fixed wait.
-  await expect
-    .poll(
-      async () => {
-        await page.goto("/dev/texts");
-        return page.locator("section", { hasText: reference }).count();
-      },
-      { timeout: 30_000, intervals: [2_000] },
-    )
-    .toBeGreaterThan(0);
-  const block = page.locator("section", { hasText: reference });
-  await expect(block.getByText("CONTRACTOR SMS")).toBeVisible();
-  await expect(block.getByRole("heading", { name: new RegExp(reference) })).toBeVisible();
 });
 
 test("AC19: a busy contractor still opens his day; a Not ready one does not", async ({ page, request }) => {

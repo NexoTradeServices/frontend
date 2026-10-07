@@ -58,12 +58,6 @@ async function star(page: Page, id: string): Promise<string> {
   return page.locator(`label[for="${id}"]`).evaluate((el) => getComputedStyle(el, "::after").content);
 }
 
-async function storedContact(page: Page, reference: string): Promise<unknown> {
-  const res = await page.request.get(`${apiUrl}/api/jobs/${reference}`);
-  expect(res.status()).toBe(200);
-  return ((await res.json()) as { siteContact: unknown }).siteContact;
-}
-
 test("AC17: the Site contact group shows no stars while empty; a name stars Name and Phone, emptying it takes them away", async ({
   page,
   request,
@@ -103,14 +97,14 @@ test("AC18: Save with a name and no phone stays pressable, says Required. under 
   await expect(page.locator("#site-contact-phone")).toHaveAttribute("aria-invalid", "true");
   await expect(save).toBeEnabled();
   await expect(page.getByText(`Saved ${reference}.`)).toHaveCount(0);
-  expect(await storedContact(page, reference)).toBeNull();
+  // That nothing was stored is proven at the backend, tests/site-contact.test.ts AC3.
 });
 
 function group(page: Page) {
   return page.getByTestId("site-contact");
 }
 
-test("AC2: Mike types Lena Park, her phone and email and presses Save -- toast, and the job holds her", async ({
+test("AC2: Mike types Lena Park, her phone and email and presses Save -- the email error, the toast, Save quiet again", async ({
   page,
   request,
 }) => {
@@ -127,11 +121,7 @@ test("AC2: Mike types Lena Park, her phone and email and presses Save -- toast, 
   await expect(group(page).getByText("That does not look like an email address.")).toHaveCount(0);
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText(`Saved ${reference}.`)).toBeVisible();
-  expect(await storedContact(page, reference)).toEqual({
-    name: "Lena Park",
-    phone: "0400 002 050",
-    email: "lena@idelta.com.au",
-  });
+  // What the job holds is proven at the backend, tests/site-contact.test.ts AC2.
   // Saved: quiet again until the next change.
   await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
 });
