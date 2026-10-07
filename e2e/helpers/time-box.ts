@@ -1,5 +1,5 @@
-// The Time box -- Feature 5001. A box you type the digits into plus AM | PM
-// buttons, so a test sets "8:07am" the way a person does.
+// The Time box -- Feature 5001. One box with an hour part and a minute part you type into, plus
+// AM | PM buttons, so a test sets "8:07am" the way a person does.
 import { expect, type Page } from "@playwright/test";
 
 function split(time: string): { digits: string; meridiem: "am" | "pm" } {
@@ -12,11 +12,15 @@ function split(time: string): { digits: string; meridiem: "am" | "pm" } {
 export async function pickTime(page: Page, selector: string, time: string): Promise<void> {
   const { digits, meridiem } = split(time);
   await page.locator(`${selector}-${meridiem}`).click();
-  await page.locator(selector).fill(digits);
+  const [hour, minute] = digits.split(":");
+  await page.locator(selector).fill(hour ?? "");
+  await page.locator(`${selector}-minute`).fill(minute ?? "");
 }
 
 export async function expectTime(page: Page, selector: string, time: string): Promise<void> {
   const { digits, meridiem } = split(time);
-  await expect(page.locator(selector)).toHaveValue(digits);
+  const [hour, minute] = digits.split(":");
+  await expect(page.locator(selector)).toHaveValue(hour ?? "");
+  await expect(page.locator(`${selector}-minute`)).toHaveValue(minute ?? "");
   await expect(page.locator(`${selector}-${meridiem}`)).toHaveAttribute("aria-pressed", "true");
 }

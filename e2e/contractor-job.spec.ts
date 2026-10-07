@@ -64,10 +64,12 @@ test.describe("Bob's job screen, on a phone", () => {
     await expect(page.locator("#entry-0-end")).toHaveAttribute("aria-invalid", "true");
 
     // Typing 13:05 sets PM by itself; Now fills Finish with the clock.
-    await page.locator("#entry-0-start").fill("13:05");
+    await page.locator("#entry-0-start").fill("13");
+    await page.locator("#entry-0-start-minute").fill("05");
     await expect(page.locator("#entry-0-start-pm")).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Now" }).first().click();
     await expect(page.locator("#entry-0-end")).not.toHaveValue("");
+    await expect(page.locator("#entry-0-end-minute")).not.toHaveValue("");
     await pickTime(page, "#entry-0-start", "8:07am");
     await pickTime(page, "#entry-0-end", "11:05am");
     await page.getByRole("button", { name: "+ Add a visit" }).click();
