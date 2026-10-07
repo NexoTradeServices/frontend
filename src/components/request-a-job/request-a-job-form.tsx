@@ -48,7 +48,7 @@ const STEP_LABELS: Record<StepKey, string> = {
 const WINDOWS: { value: PreferredWindow; label: string; note: string }[] = [
   { value: "morning", label: "Morning", note: "7:00 - 12:00" },
   { value: "afternoon", label: "Afternoon", note: "12:00 - 17:00" },
-  { value: "evening", label: "Evening", note: "17:00 - 20:00" },
+  { value: "evening", label: "Evening", note: "17:00 - 19:00" },
 ];
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -78,6 +78,7 @@ export function RequestAJobForm({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [businessName, setBusinessName] = useState("");
   const [marketingEmail, setMarketingEmail] = useState(false);
   const [marketingSms, setMarketingSms] = useState(false);
   const [detailErrors, setDetailErrors] = useState<Record<string, string>>({});
@@ -175,6 +176,8 @@ export function RequestAJobForm({
           name: name.trim(),
           email: email.trim(),
           phone: phone.trim(),
+          // Feature 1017: only when filled; a returning customer's is never changed from here.
+          ...(businessName.trim() !== "" ? { businessName: businessName.trim() } : {}),
           location: {
             suburb: location.suburb,
             state: location.state,
@@ -437,6 +440,14 @@ export function RequestAJobForm({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 error={detailErrors.phone}
+              />
+              <Field
+                id="business-name"
+                label="Business name"
+                helper="Only if this job is for a business"
+                value={businessName}
+                onChange={(e) => setBusinessName(e.target.value)}
+                autoComplete="organization"
               />
               <div className="mt-5 flex flex-col gap-2.5">
                 <label className="flex cursor-pointer items-center gap-2.5">

@@ -110,6 +110,7 @@ export interface JobDetail {
   customer: {
     code: string;
     name: string;
+    businessName: string | null;
     phone: string | null;
     email: string;
     billingAddress: PickedAddress | null;

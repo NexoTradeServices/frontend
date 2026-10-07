@@ -45,6 +45,8 @@ export const MOBILE_VIEWPORT = {
 
 export default defineConfig({
   testDir: "./e2e",
+  // Dev tooling: a stray spec in _scratch/ can never be picked up.
+  testIgnore: ["**/_scratch/**"],
   // Feature 9002: sweep the `e2e` test-data label before the first test and
   // after the last (e2e/helpers/test-run.ts).
   globalSetup: "./e2e/global-setup.ts",
