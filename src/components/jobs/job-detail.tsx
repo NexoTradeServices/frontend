@@ -435,6 +435,8 @@ function AddressesCard({
 }) {
   const [billing, setBilling] = useState<PickedAddress | null>(job.customer.billingAddress);
   const [billingChanged, setBillingChanged] = useState(false);
+  // Feature 1017: the customer's own, fixable on any job like the billing address.
+  const [businessName, setBusinessName] = useState(job.customer.businessName ?? "");
   const [billingError, setBillingError] = useState<string | undefined>();
   const [sameAsBilling, setSameAsBilling] = useState(job.siteSameAsBilling);
   const [site, setSite] = useState<PickedAddress | null>(job.siteSameAsBilling ? null : job.siteAddress);
@@ -466,7 +468,8 @@ function AddressesCard({
     (contact.name.trim() !== stored.name ||
       contact.phone.trim() !== stored.phone ||
       contact.email.trim() !== stored.email);
-  const pending = billingWouldChange || siteWouldChange || contactWouldChange;
+  const businessNameWouldChange = businessName.trim() !== (job.customer.businessName ?? "");
+  const pending = billingWouldChange || siteWouldChange || contactWouldChange || businessNameWouldChange;
   // The group shows no stars while it is empty; the moment any field holds a
   // value the star appears on each field the group needs (Validation timing).
   const contactStarted = contact.name.trim() !== "" || contact.phone.trim() !== "" || contact.email.trim() !== "";
@@ -505,6 +508,8 @@ function AddressesCard({
     if (!job.closed) body["siteContact"] = contact;
     // An untouched or cleared billing field leaves the one on file as it is.
     if (billingChanged && billing) body["billingAddress"] = billing;
+    // Empty clears it; the server trims.
+    if (businessNameWouldChange) body["businessName"] = businessName.trim();
     // Once dispatched the site is frozen -- it is never sent (Ops job actions - Edit).
     if (!job.siteLocked) {
       body["site"] = sameAsBilling ? { sameAsBilling: true } : { sameAsBilling: false, address: site };
@@ -554,6 +559,13 @@ function AddressesCard({
         error={billingError}
         onErrorChange={setBillingError}
         onPickingChange={setBillingPicking}
+      />
+      <Field
+        id="business-name"
+        label="Business name"
+        value={businessName}
+        onChange={(event) => setBusinessName(event.target.value)}
+        autoComplete="off"
       />
 
       {job.siteLocked ? (

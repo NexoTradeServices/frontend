@@ -16,6 +16,11 @@
 // AC10 no picker, no "emergency" option, anywhere on the form
 // 3003 (enquiry photos) lives in its own describe at the foot of this file:
 //      AC5 AC5b AC6 AC7 AC8 AC9 AC10, at phone width, Cloudinary faked
+// 1017 AC1  the details step shows Business name under Phone, no star, the hint
+//      "Only if this job is for a business"; the enquiry goes through empty
+// 1017 AC5  the evening window's note reads 17:00 - 19:00
+//      (the business name reaching the customer record is proven at the
+//      backend, tests/enquiries.test.ts 1017 AC2)
 // AC11 a trade's own questions render as labelled text answers under
 //      "Additional questions" on the Notes step ("Tell us what's wrong"),
 //      optional, never their own step; a trade with none shows that same
@@ -129,6 +134,9 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     // A fixed weekday, well clear of any weekend.
     await page.getByLabel("Date").fill("2026-09-09");
     await expect(page.getByText("Morning", { exact: true })).toBeVisible();
+    // 1017 AC5: the evening window ends at 19:00.
+    await expect(page.getByText("17:00 - 19:00", { exact: true })).toBeVisible();
+    await expect(page.getByText("17:00 - 20:00")).toHaveCount(0);
     await page.getByRole("button", { name: "Continue" }).click();
 
     // AC10: emergency is never offered anywhere on this form.
@@ -144,6 +152,15 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     await page.getByLabel("Your name").fill("Karl");
     await page.getByLabel("Email", { exact: true }).fill(uniqueEmail("ac1"));
     await page.getByLabel("Phone").fill("0400 000 111");
+    // 1017 AC1: Business name sits under Phone, unstarred, with its hint, and is left empty here.
+    const businessName = page.getByLabel("Business name");
+    await expect(businessName).toBeVisible();
+    await expect(businessName).toHaveValue("");
+    expect(await hasRequiredStar(page, "Business name")).toBe(false);
+    await expect(page.getByText("Only if this job is for a business", { exact: true })).toBeVisible();
+    const phoneBox = await page.getByLabel("Phone").boundingBox();
+    const businessBox = await businessName.boundingBox();
+    expect(businessBox?.y ?? 0).toBeGreaterThan(phoneBox?.y ?? Number.MAX_SAFE_INTEGER);
     await page.getByRole("button", { name: "Continue" }).click();
 
     await expect(page.getByRole("heading", { name: "Pricing" })).toBeVisible();

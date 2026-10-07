@@ -6,6 +6,10 @@
 // AC13 Karl's first enquiry: Mike picks a billing address (Places stood in
 //      on CI, the real lookup locally), leaves the tick, saves -- the job
 //      site equals the billing address
+// 1017 AC3 the Business name Field sits in the Addresses card; Mike adds
+//      "Rossi's Cafe" to a customer with none, Save keeps it, then he clears it
+//      (the dispatched-job and other-jobs cases are proven at the backend,
+//      tests/ops-jobs.test.ts 1017 AC3)
 // AC24 the email's job link opened logged out: the ops login, then that job
 //      (the link itself is proven at the backend, ops-jobs.test.ts AC24)
 // AC25 (BKLG-022) Assigned renders #6b4fa3 on #efeafa through the one
@@ -135,6 +139,39 @@ test("AC13: Karl's first enquiry -- Mike picks a billing address, leaves the job
   await page.reload();
   await expect(page.getByLabel("Billing address", { exact: true })).toHaveValue(/Marine Terrace.*Fremantle/);
   await expect(page.getByLabel("Job site address same as billing address")).toBeChecked();
+});
+
+test("1017 AC3: Mike adds Rossi's Cafe as the business name beside the billing address, saves, then clears it", async ({
+  page,
+  request,
+}) => {
+  if (MOCKS_GOOGLE_PLACES) await installMockGooglePlaces(page);
+  const reference = await postEnquiry(request, "1017", "Nina Rossi");
+
+  await page.goto(`/ops/jobs/${reference}`);
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: reference, exact: true })).toBeVisible();
+
+  const businessName = page.getByLabel("Business name");
+  const save = page.getByRole("button", { name: "Save", exact: true });
+  await expect(businessName).toBeVisible();
+  await expect(businessName).toHaveValue("");
+  await expect(save).toBeDisabled();
+
+  await businessName.fill("Rossi's Cafe");
+  await expect(page.getByText("Not saved yet", { exact: true })).toBeVisible();
+  await save.click();
+  await expect(page.getByText(`Saved ${reference}.`)).toBeVisible();
+  await expect(save).toBeDisabled();
+
+  await page.reload();
+  await expect(page.getByLabel("Business name")).toHaveValue("Rossi's Cafe");
+
+  await page.getByLabel("Business name").fill("");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText(`Saved ${reference}.`)).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Business name")).toHaveValue("");
 });
 
 test("AC24: the email's job link, opened logged out, shows the ops login and then that job", async ({ page, request }) => {
