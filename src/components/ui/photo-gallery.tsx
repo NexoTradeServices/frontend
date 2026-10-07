@@ -101,12 +101,18 @@ export function PhotoGallery({
   photos,
   limit,
   addDisabled,
+  showCount = true,
+  inputLabel,
   onPick,
   onRemove,
 }: {
   photos: GalleryPhoto[];
   limit: number;
   addDisabled: boolean;
+  /** "2 of 5 photos" under the grid; a single-photo use (a part's receipt) leaves it off. */
+  showCount?: boolean;
+  /** The name a screen reader gives the file picker. */
+  inputLabel?: string;
   onPick: (files: File[]) => void;
   onRemove: (id: string) => void;
 }) {
@@ -134,7 +140,8 @@ export function PhotoGallery({
               <span>Add photo</span>
               <input
                 type="file"
-                multiple
+                multiple={limit > 1}
+                aria-label={inputLabel}
                 disabled={addDisabled}
                 accept=".jpg,.jpeg,.png,.webp,.heic,image/jpeg,image/png,image/webp,image/heic"
                 className="sr-only"
@@ -144,9 +151,11 @@ export function PhotoGallery({
           </li>
         ) : null}
       </ul>
-      <span className={captionClass}>
-        {photos.length} of {limit} photos
-      </span>
+      {showCount ? (
+        <span className={captionClass}>
+          {photos.length} of {limit} photos
+        </span>
+      ) : null}
     </div>
   );
 }

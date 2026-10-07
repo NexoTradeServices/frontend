@@ -11,6 +11,8 @@ export interface JobCardDto {
   trade: string;
   suburb: string;
   slotLabel: string | null;
+  /** Feature 5001: an accepted or in-progress card opens its job screen. */
+  opens: boolean;
 }
 
 export type ReadinessPen = "own" | "mikes";

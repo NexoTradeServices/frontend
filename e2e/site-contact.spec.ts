@@ -8,14 +8,21 @@
 // AC13-AC16 (UI) the Messages card lists the job's messages, to whom, how, when, what and
 //      where each stands -- a table on desktop, cards on a phone
 //
-// AC20's on-screen half (a completed job's site contact read-only) has no test here: no
-// completed job exists in the seeded cast and nothing in the app can complete one yet --
-// change.md V1. The read behind it is proven at the backend (site-contact.test.ts AC20).
+// AC20's on-screen half (a completed job's site contact read-only) is the 5001 test at the
+// end of this file: a job Bob completes through his job screen shows the site contact as
+// values only on Mike's job page. The read behind it is proven at the backend
+// (site-contact.test.ts AC20).
+//
+// 5001 AC10 a job with a site contact, completed through the job screen, shows the site
+//      contact read-only on the ops job page - values only, no inputs, no Save
 //
 // Every job this file touches is its own: a throwaway enquiry (a permanent Customer + Job
 // row, nothing is ever deleted) carrying an e2e-4008-... email. No seeded job is written to.
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
 import { login } from "./helpers/login";
+import { BASE_URL, testRunStorageState } from "./helpers/test-run";
+import { acceptedJobForBob, openJobScreen } from "./helpers/accepted-job";
+import { pickTime } from "./helpers/time-box";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
@@ -178,4 +185,39 @@ test.describe("on a phone", () => {
     const messages = await card.getByRole("heading", { name: "Messages", exact: true }).boundingBox();
     expect(notes?.y ?? 0).toBeGreaterThan(messages?.y ?? Number.POSITIVE_INFINITY);
   });
+});
+
+test("5001 AC10: a job completed through Bob's job screen shows the site contact read-only on Mike's job page - values only, no inputs, no Save", async ({
+  page,
+  browser,
+  request,
+}) => {
+  const job = await acceptedJobForBob(browser, request, "ac10", { siteContact: { name: "Lena Park", phone: "0400 002 050" } });
+
+  // Bob completes it on his phone.
+  const bob = await browser.newContext({ ...MOBILE_VIEWPORT, baseURL: BASE_URL, storageState: testRunStorageState() });
+  try {
+    const bobsPage = await bob.newPage();
+    await openJobScreen(bobsPage, job);
+    await pickTime(bobsPage, "#entry-0-start", "8:07am");
+    await pickTime(bobsPage, "#entry-0-end", "11:05am");
+    await bobsPage.locator("#completion-notes").fill("Replaced the cartridge.");
+    await bobsPage.getByRole("button", { name: "Complete job" }).click();
+    await bobsPage.getByRole("alertdialog").getByRole("button", { name: "Complete", exact: true }).click();
+    await expect(bobsPage.getByText(`Completed ${job.reference}.`)).toBeVisible();
+  } finally {
+    await bob.close();
+  }
+
+  // Mike's job page: the contact as values, nothing to type in, nothing to save.
+  await openJob(page, job.reference);
+  const contact = group(page);
+  await expect(contact.getByText("Lena Park")).toBeVisible();
+  await expect(contact.getByText("0400 002 050")).toBeVisible();
+  await expect(contact.locator("input")).toHaveCount(0);
+  await expect(page.locator("#site-contact-name")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Save", exact: true })).toHaveCount(0);
+  // The same page shows the visit as the frozen record.
+  await expect(page.getByRole("heading", { name: "Time on site" })).toBeVisible();
+  await expect(page.getByText("Replaced the cartridge.")).toBeVisible();
 });

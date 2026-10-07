@@ -5,6 +5,10 @@
 //   - the backend's upload signature (POST /api/enquiries/photo-signature)
 //   - Cloudinary's upload and delete_by_token endpoints (api.cloudinary.com)
 //   - the picture itself (res.cloudinary.com), a 1px PNG
+// Feature 5001 adds the contractor's receipt signature (POST
+// /api/contractor/jobs/<ref>/receipt-signature) to the faked addresses: the
+// same fake upload, a public id inside tradeservice/receipts. Confirming the
+// upload (POST .../receipts) is NOT faked -- it is the real backend.
 // Every call is recorded so a test can say what was (not) sent.
 import type { Page, Route } from "@playwright/test";
 
@@ -70,6 +74,38 @@ export async function installMockCloudinary(page: Page, options: CloudinaryMockO
     });
   });
 
+  await page.route(`${apiUrl}/api/contractor/jobs/*/receipt-signature`, async (route: Route) => {
+    // A credentialed call: the browser accepts only the page's own origin and named headers.
+    const headers = {
+      "access-control-allow-origin": route.request().headers()["origin"] ?? "*",
+      "access-control-allow-credentials": "true",
+      "access-control-allow-headers": "content-type",
+      "access-control-allow-methods": "POST, OPTIONS",
+    };
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers });
+      return;
+    }
+    if ((options.signatureStatus ?? 200) === 503) {
+      await route.fulfill({ status: 503, headers, json: { error: "photo upload is unavailable" } });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      headers,
+      json: {
+        cloudName: "e2e-cloud",
+        apiKey: "000000000000000",
+        timestamp: Math.floor(Date.now() / 1000),
+        signature: "e2e-signature",
+        uploadPreset: "tradeservice-enquiry-photos",
+        folder: "tradeservice/receipts",
+        allowedFormats: "jpg,png,webp,heic",
+        returnDeleteToken: true,
+      },
+    });
+  });
+
   await page.route("https://api.cloudinary.com/v1_1/*/image/upload", async (route: Route) => {
     if (route.request().method() === "OPTIONS") {
       await route.fulfill({ status: 204, headers: CORS });
@@ -83,7 +119,8 @@ export async function installMockCloudinary(page: Page, options: CloudinaryMockO
       await route.fulfill({ status: 400, headers: CORS, json: { error: { message: "Upload failed" } } });
       return;
     }
-    const publicId = `tradeservice/enquiry-photos/e2e-${String(mock.uploads.length)}-${String(Date.now())}`;
+    const folder = /name="folder"\r\n\r\n([^\r]*)/.exec(body)?.[1] ?? "tradeservice/enquiry-photos";
+    const publicId = `${folder}/e2e-${String(mock.uploads.length)}-${String(Date.now())}`;
     mock.publicIds.push(publicId);
     await route.fulfill({
       status: 200,
