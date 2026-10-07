@@ -6,7 +6,8 @@
 // Text button at the row's end, rows divided by a Divider, a Text button
 // "+ Add a visit" under the last. On Mobile the Date sits on its own line and
 // Start and Finish share the next. Finish shows the current time as its
-// computed default - muted italic until the person types their own.
+// computed default - muted italic until the person picks their own. The Time
+// box is our own hour / minute / am-pm control (components/ui/time-box.tsx).
 //
 // Used by Bob's job screen and by the ops job page's "Time on site" card, so
 // the row looks and behaves the same in both. Three modes: `edit`, `frozen`
@@ -15,6 +16,7 @@
 "use client";
 
 import { Lock } from "lucide-react";
+import { TimeBox } from "@/components/ui/time-box";
 import { formatClock, formatVisitDate, nowInZone } from "@/lib/visit-format";
 
 export interface TimeEntryRow {
@@ -177,26 +179,23 @@ export function TimeEntryRows({
                   />
                 </Control>
               </div>
-              <Control id={`${id}-start`} label="Start" required error={at("start")}>
-                <input
+              <Control id={`${id}-start-hour`} label="Start" required error={at("start")}>
+                <TimeBox
                   id={`${id}-start`}
-                  type="time"
+                  label="Start"
                   value={row.start}
-                  aria-invalid={at("start") ? true : undefined}
-                  onChange={(e) => update(index, { start: e.target.value })}
-                  className={`${boxClass} ${at("start") ? "border-brand-destructive" : "border-hairline"}`}
+                  invalid={Boolean(at("start"))}
+                  onChange={(value) => update(index, { start: value })}
                 />
               </Control>
-              <Control id={`${id}-end`} label="Finish" required error={at("end")}>
-                <input
+              <Control id={`${id}-end-hour`} label="Finish" required error={at("end")}>
+                <TimeBox
                   id={`${id}-end`}
-                  type="time"
+                  label="Finish"
                   value={row.end}
-                  aria-invalid={at("end") ? true : undefined}
-                  onChange={(e) => update(index, { end: e.target.value, endIsDefault: false })}
-                  className={`${boxClass} ${at("end") ? "border-brand-destructive" : "border-hairline"} ${
-                    row.endIsDefault ? "text-muted-text italic" : ""
-                  }`}
+                  invalid={Boolean(at("end"))}
+                  muted={row.endIsDefault}
+                  onChange={(value) => update(index, { end: value, endIsDefault: false })}
                 />
               </Control>
               <div className="col-span-2 md:col-span-1">

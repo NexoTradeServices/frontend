@@ -22,6 +22,7 @@ import { test, expect, type APIRequestContext, type Page } from "@playwright/tes
 import { login } from "./helpers/login";
 import { BASE_URL, testRunStorageState } from "./helpers/test-run";
 import { acceptedJobForBob, openJobScreen } from "./helpers/accepted-job";
+import { pickTime } from "./helpers/time-box";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
@@ -198,8 +199,8 @@ test("5001 AC10: a job completed through Bob's job screen shows the site contact
   try {
     const bobsPage = await bob.newPage();
     await openJobScreen(bobsPage, job);
-    await bobsPage.locator("#entry-0-start").fill("08:07");
-    await bobsPage.locator("#entry-0-end").fill("11:05");
+    await pickTime(bobsPage, "#entry-0-start", "8:07am");
+    await pickTime(bobsPage, "#entry-0-end", "11:05am");
     await bobsPage.locator("#completion-notes").fill("Replaced the cartridge.");
     await bobsPage.getByRole("button", { name: "Complete job" }).click();
     await bobsPage.getByRole("alertdialog").getByRole("button", { name: "Complete", exact: true }).click();

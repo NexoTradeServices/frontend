@@ -16,6 +16,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { acceptedJobForBob, openJobScreen } from "./helpers/accepted-job";
 import { installMockCloudinary } from "./helpers/mock-cloudinary";
+import { expectTime, pickTime } from "./helpers/time-box";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 
 /** A 1x1 PNG, the receipt photo. */
@@ -56,18 +57,18 @@ test.describe("Bob's job screen, on a phone", () => {
 
     // One row ready to fill. Finish before start is refused on that row.
     await page.locator("#entry-0-date").fill("2026-10-07");
-    await page.locator("#entry-0-start").fill("11:05");
-    await page.locator("#entry-0-end").fill("08:07");
+    await pickTime(page, "#entry-0-start", "11:05am");
+    await pickTime(page, "#entry-0-end", "8:07am");
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByText("Finish must be after start.")).toBeVisible();
-    await expect(page.locator("#entry-0-end")).toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#entry-0-end-hour")).toHaveAttribute("aria-invalid", "true");
 
-    await page.locator("#entry-0-start").fill("08:07");
-    await page.locator("#entry-0-end").fill("11:05");
+    await pickTime(page, "#entry-0-start", "8:07am");
+    await pickTime(page, "#entry-0-end", "11:05am");
     await page.getByRole("button", { name: "+ Add a visit" }).click();
     await page.locator("#entry-1-date").fill("2026-10-09");
-    await page.locator("#entry-1-start").fill("09:00");
-    await page.locator("#entry-1-end").fill("09:20");
+    await pickTime(page, "#entry-1-start", "9:00am");
+    await pickTime(page, "#entry-1-end", "9:20am");
     await page.locator("#entry-1-note").fill("Back for the washer");
     await expect(page.getByText("Billed 3.5h")).toBeVisible();
 
@@ -90,8 +91,8 @@ test.describe("Bob's job screen, on a phone", () => {
 
     // Reload: everything is back.
     await page.reload();
-    await expect(page.locator("#entry-0-start")).toHaveValue("08:07");
-    await expect(page.locator("#entry-0-end")).toHaveValue("11:05");
+    await expectTime(page, "#entry-0-start", "8:07am");
+    await expectTime(page, "#entry-0-end", "11:05am");
     await expect(page.locator("#entry-1-date")).toHaveValue("2026-10-09");
     await expect(page.locator("#entry-1-note")).toHaveValue("Back for the washer");
     await expect(page.locator("#completion-notes")).toHaveValue("Replaced the cartridge.");
@@ -115,8 +116,8 @@ test.describe("Bob's job screen, on a phone", () => {
     await expect(page.getByText("Required.", { exact: true })).toHaveCount(1);
     await expect(page.getByRole("alertdialog")).toHaveCount(0);
 
-    await page.locator("#entry-0-start").fill("08:07");
-    await page.locator("#entry-0-end").fill("11:05");
+    await pickTime(page, "#entry-0-start", "8:07am");
+    await pickTime(page, "#entry-0-end", "11:05am");
     await page.locator("#completion-notes").fill("Replaced the cartridge.");
     await page.getByRole("button", { name: "Complete job" }).click();
 
@@ -167,8 +168,8 @@ test.describe("Bob's job screen, on a phone", () => {
     await page.getByLabel("Receipt photo for part 1").setInputFiles(RECEIPT);
     await expect(page.getByText("Photo upload isn't working right now - try again shortly")).toBeVisible();
     await page.getByRole("button", { name: "Remove part" }).click();
-    await page.locator("#entry-0-start").fill("08:07");
-    await page.locator("#entry-0-end").fill("11:05");
+    await pickTime(page, "#entry-0-start", "8:07am");
+    await pickTime(page, "#entry-0-end", "11:05am");
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByText(`Saved ${job.reference}.`)).toBeVisible();
   });
