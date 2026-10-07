@@ -71,7 +71,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-body-family);
-  --font-mono: var(--font-geist-mono);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --font-heading: var(--font-heading-family);
   /* Direct Foundations tokens -- bg-ground, text-ink, border-hairline, etc. */
   --color-ground: var(--ground);
