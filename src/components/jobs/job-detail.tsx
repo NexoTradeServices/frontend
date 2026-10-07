@@ -279,9 +279,9 @@ function TimeOnSiteCard({
   if (visit.completed) {
     return (
       <Card title="Time on site" aside={`Billed ${formatHours(visit.billedHours)}h`}>
-        <TimeEntryRows rows={rowsFromEntries(visit.timeEntries, zone)} mode="facts" zone={zone} idPrefix="ops-entry" />
+        <TimeEntryRows rows={rowsFromEntries(visit.timeEntries, zone)} mode="facts" zone={zone} idPrefix="ops-entry" noteLabel="Contractor's visit note" />
         <div className="mt-3.5 border-t border-hairline pt-3.5">
-          <Fact label="Completion notes">
+          <Fact label="Contractor work summary">
             <p className="max-w-[62ch] font-normal whitespace-pre-wrap">{visit.completionNotes === "" ? "-" : visit.completionNotes}</p>
           </Fact>
         </div>
@@ -322,6 +322,7 @@ function TimeOnSiteCard({
         rows={rows}
         zone={zone}
         idPrefix="ops-entry"
+        noteLabel="Contractor's visit note"
         errors={errors}
         onChange={(next) => {
           setRows(next);

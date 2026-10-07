@@ -110,6 +110,7 @@ export function TimeEntryRows({
   zone,
   idPrefix,
   errors = {},
+  noteLabel = "Visit note",
   onChange,
 }: {
   rows: TimeEntryRow[];
@@ -118,6 +119,8 @@ export function TimeEntryRows({
   idPrefix: string;
   /** Keyed `<row index>.date`, `.start`, `.end`, `.note`; `rows` for a whole-list error. */
   errors?: Record<string, string>;
+  /** What the note on each visit is called: "Visit note" on Bob's screen, who wrote it on the ops page. */
+  noteLabel?: string;
   onChange?: (next: TimeEntryRow[]) => void;
 }) {
   if (mode !== "edit") {
@@ -133,7 +136,7 @@ export function TimeEntryRows({
                   <LockedBox label="Start" value={formatClock(row.start)} />
                   <LockedBox label="Finish" value={formatClock(row.end)} />
                   <div className="md:col-span-3">
-                    <LockedBox label="Note" value={row.note === "" ? "-" : row.note} />
+                    <LockedBox label={noteLabel} value={row.note === "" ? "-" : row.note} />
                   </div>
                 </>
               ) : (
@@ -142,7 +145,7 @@ export function TimeEntryRows({
                   <FactBox label="Start" value={formatClock(row.start)} />
                   <FactBox label="Finish" value={formatClock(row.end)} />
                   <div className="md:col-span-3">
-                    <FactBox label="Note" value={row.note === "" ? "-" : row.note} />
+                    <FactBox label={noteLabel} value={row.note === "" ? "-" : row.note} />
                   </div>
                 </>
               )}
@@ -199,10 +202,11 @@ export function TimeEntryRows({
                 />
               </Control>
               <div className="md:col-span-3">
-                <Control id={`${id}-note`} label="Note" error={at("note")}>
+                <Control id={`${id}-note`} label={noteLabel} error={at("note")}>
                   <textarea
                     id={`${id}-note`}
                     rows={3}
+                    placeholder='Anything about this visit - for example "part on order" or "back tomorrow"'
                     value={row.note}
                     onChange={(e) => update(index, { note: e.target.value })}
                     className={`${boxClass} resize-y ${at("note") ? "border-brand-destructive" : "border-hairline"}`}

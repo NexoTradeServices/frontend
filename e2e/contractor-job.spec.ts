@@ -87,10 +87,9 @@ test.describe("Bob's job screen, on a phone", () => {
     await page.locator("#part-0-price").fill("45");
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByText("Required.", { exact: true })).toHaveCount(1);
-    await expect(page.getByText("No file chosen")).toBeVisible();
     // ... and picks up its receipt through the mocked Cloudinary.
     await page.getByLabel("Receipt photo for part 1").setInputFiles(RECEIPT);
-    await expect(page.getByText(RECEIPT.name)).toBeVisible();
+    await expect(page.getByText("bunnings-re...")).toBeVisible();
 
     await expect(page.getByText("Not saved yet").first()).toBeVisible();
     await page.getByRole("button", { name: "Save", exact: true }).click();
@@ -105,7 +104,7 @@ test.describe("Bob's job screen, on a phone", () => {
     await expect(page.locator("#completion-notes")).toHaveValue("Replaced the cartridge.");
     await expect(page.locator("#part-0-name")).toHaveValue("Tap cartridge");
     await expect(page.locator("#part-0-price")).toHaveValue("45.00");
-    await expect(page.getByText(RECEIPT.name)).toBeVisible();
+    await expect(page.getByText("bunnings-re...")).toBeVisible();
     await expect(page.getByText("Billed 3.5h")).toBeVisible();
   });
 
@@ -156,7 +155,7 @@ test.describe("Bob's job screen, on a phone", () => {
     await expect(page.getByText(job.reference)).toHaveCount(0);
   });
 
-  test("AC4: On site shows him in progress, and the job's receipt upload not being set up leaves the rest of the screen saving", async ({
+  test("AC4: I've arrived shows him in progress, and the job's receipt upload not being set up leaves the rest of the screen saving", async ({
     page,
     browser,
     request,
@@ -166,9 +165,9 @@ test.describe("Bob's job screen, on a phone", () => {
     await openJobScreen(page, job);
 
     await expect(page.getByText("Scheduled", { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "On site" }).click();
+    await page.getByRole("button", { name: "I've arrived" }).click();
     await expect(page.getByText("In progress", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "On site" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "I've arrived" })).toHaveCount(0);
 
     // Photo upload unavailable: the part cannot get its receipt, the rest still saves.
     await page.getByRole("button", { name: "+ Add a part" }).click();

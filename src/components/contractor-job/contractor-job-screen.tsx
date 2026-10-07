@@ -9,12 +9,13 @@
 // the Bottom action bar fixed to the bottom of the phone.
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Lock } from "lucide-react";
 import { Field } from "@/components/auth/field";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PhotoGallery, type GalleryPhoto } from "@/components/ui/photo-gallery";
 import { Toast, useToast } from "@/components/ui/toast";
 import {
   FROZEN_MESSAGE,
@@ -43,6 +44,17 @@ interface Receipt {
   fileName: string;
   thumbnailUrl: string;
   fullUrl: string;
+  /** From Cloudinary's answer to the upload: lets the cross delete the picture, as the enquiry form's does. Only held for a photo picked in this visit to the page. */
+  deleteToken?: string;
+  cloudName?: string;
+}
+
+/** Taking a photo off never waits on Cloudinary and never shows a failure (same as the enquiry form). */
+function deleteQuietly(cloudName: string, deleteToken: string): void {
+  void fetch(`https://api.cloudinary.com/v1_1/${cloudName}/delete_by_token`, {
+    method: "POST",
+    body: new URLSearchParams({ token: deleteToken }),
+  }).catch(() => undefined);
 }
 
 interface PartRow {
@@ -52,6 +64,9 @@ interface PartRow {
   price: string;
   receipt: Receipt | null;
   uploading: boolean;
+  /** The photo as picked, while it goes up or after it failed -- its local preview and name. */
+  pending: { fileName: string; preview: string } | null;
+  failed: boolean;
 }
 
 type Errors = Record<string, string>;
@@ -77,10 +92,21 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function LockedValue({ label, value, message }: { label: string; value: string; message?: boolean }) {
+function LockedValue({
+  label,
+  value,
+  message,
+  hideLabel,
+}: {
+  label: string;
+  value: string;
+  message?: boolean;
+  /** The card's own title already says it; the label stays for a screen reader. */
+  hideLabel?: boolean;
+}) {
   return (
     <div className="mb-3.5">
-      <span className={`${labelClass} mb-[5px]`}>{label}</span>
+      <span className={hideLabel ? "sr-only" : `${labelClass} mb-[5px]`}>{label}</span>
       <div className="flex min-h-[44px] items-center gap-2 rounded-md border border-hairline bg-ground px-2.5 py-2 text-sm text-ink">
         <Lock aria-hidden className="size-3.5 shrink-0 text-muted-text" />
         <span className="whitespace-pre-wrap">{value}</span>
@@ -106,15 +132,34 @@ function partRowsOf(job: ContractorJobDto): PartRow[] {
             fullUrl: part.receipt?.fullUrl ?? "",
           },
     uploading: false,
+    pending: null,
+    failed: false,
   }));
 }
 
 function isBlankPart(part: PartRow): boolean {
-  return part.name.trim() === "" && part.price.trim() === "" && part.receipt === null && !part.uploading;
+  return part.name.trim() === "" && part.price.trim() === "" && part.receipt === null && !part.uploading && part.pending === null;
+}
+
+/**
+ * The cap is on ALL his parts on the job added up. The refusal shows live, on the
+ * price of the line that tips the total over, so he learns it as he types - the
+ * server enforces the same rule (backend/src/jobs/visit.ts).
+ */
+function capErrors(parts: PartRow[], cap: number): Record<number, string> {
+  let running = 0;
+  for (const [index, part] of parts.entries()) {
+    const qty = Number(part.qty);
+    const cents = dollarsTextToCents(part.price);
+    if (!Number.isFinite(qty) || qty <= 0 || cents === null) continue;
+    running += Math.round(qty * cents);
+    if (running > cap) return { [index]: `Parts are over ${formatDollars(cap)} in total - ring the office, they order it` };
+  }
+  return {};
 }
 
 function newPart(): PartRow {
-  return { key: freshKey("part"), name: "", qty: "1", price: "", receipt: null, uploading: false };
+  return { key: freshKey("part"), name: "", qty: "1", price: "", receipt: null, uploading: false, pending: null, failed: false };
 }
 
 /** What would be saved, as one string -- Save stays Quiet until it differs from what is stored. */
@@ -163,7 +208,7 @@ async function uploadReceipt(
     form.append("allowed_formats", signature.allowedFormats);
     form.append("return_delete_token", "true");
     const up = await fetch(`https://api.cloudinary.com/v1_1/${signature.cloudName}/image/upload`, { method: "POST", body: form });
-    const uploaded = (await up.json().catch(() => ({}))) as { public_id?: string };
+    const uploaded = (await up.json().catch(() => ({}))) as { public_id?: string; delete_token?: string };
     if (!up.ok || !uploaded.public_id) return { ok: false, message: "Didn't upload - try again" };
     const confirmed = await fetch(`${base}/receipts`, {
       method: "POST",
@@ -173,7 +218,7 @@ async function uploadReceipt(
     });
     if (!confirmed.ok) return { ok: false, message: "Didn't upload - try again" };
     const body = (await confirmed.json()) as Receipt;
-    return { ok: true, receipt: body };
+    return { ok: true, receipt: { ...body, deleteToken: uploaded.delete_token, cloudName: signature.cloudName } };
   } catch {
     return { ok: false, message: "Didn't upload - try again" };
   }
@@ -194,13 +239,13 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
   const [busy, setBusy] = useState<"save" | "complete" | "onsite" | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [toastMessage, showToast] = useToast();
-  const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const frozen = job.frozen;
   const changed = snapshotOf(rows, notes, parts) !== saved;
   const uploading = parts.some((part) => part.uploading);
   const billed = billedHoursOf(rows, job.returnVisitMinimumMinutes);
   const capLabel = formatDollars(job.maxContractorPartAmount);
+  const liveCap = capErrors(parts, job.maxContractorPartAmount);
 
   /** Everything the server gets, and where each sent row sat on screen (blank rows are not sent). */
   function buildRequest(): { body: Record<string, unknown>; entryAt: number[]; partAt: number[] } {
@@ -245,6 +290,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
       if (part.qty.trim() === "" || !Number.isFinite(qty)) found[`part.${String(index)}.qty`] = "Required.";
       else if (qty <= 0) found[`part.${String(index)}.qty`] = "Must be more than zero.";
       if (dollarsTextToCents(part.price) === null) found[`part.${String(index)}.price`] = "Required.";
+      else if (liveCap[index]) found[`part.${String(index)}.price`] = liveCap[index];
       if (part.receipt === null && !part.uploading) found[`part.${String(index)}.receipt`] = "Required.";
     });
     if (forComplete) {
@@ -343,12 +389,15 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
 
   async function chooseReceipt(index: number, key: string, file: File) {
     setReceiptMessages((current) => ({ ...current, [key]: "" }));
-    updatePart(index, { uploading: true });
+    updatePart(index, { uploading: true, failed: false, pending: { fileName: file.name, preview: URL.createObjectURL(file) } });
     const result = await uploadReceipt(job.reference, file);
     setParts((current) =>
-      current.map((part) =>
-        part.key === key ? { ...part, uploading: false, receipt: result.ok ? result.receipt : part.receipt } : part,
-      ),
+      current.map((part) => {
+        if (part.key !== key) return part;
+        if (!result.ok) return { ...part, uploading: false, failed: true };
+        if (part.pending) URL.revokeObjectURL(part.pending.preview);
+        return { ...part, uploading: false, failed: false, pending: null, receipt: result.receipt };
+      }),
     );
     if (result.ok) {
       setErrors((current) => {
@@ -359,6 +408,33 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
     } else {
       setReceiptMessages((current) => ({ ...current, [key]: result.message }));
     }
+  }
+
+  /** The cross on the receipt: take the photo off the part (the part keeps its other fields). */
+  function removeReceipt(index: number) {
+    const part = parts[index];
+    if (part?.pending) URL.revokeObjectURL(part.pending.preview);
+    if (part?.receipt?.deleteToken && part.receipt.cloudName) deleteQuietly(part.receipt.cloudName, part.receipt.deleteToken);
+    updatePart(index, { receipt: null, pending: null, failed: false, uploading: false });
+    setReceiptMessages((current) => ({ ...current, [part?.key ?? ""]: "" }));
+  }
+
+  /** What the receipt cell shows: the photo going up, one that failed, or the one on the part. */
+  function receiptPhotos(part: PartRow): GalleryPhoto[] {
+    if (part.receipt) {
+      return [{ id: part.key, fileName: part.receipt.fileName, status: "done", thumbnailUrl: part.receipt.thumbnailUrl || null }];
+    }
+    if (part.pending) {
+      return [
+        {
+          id: part.key,
+          fileName: part.pending.fileName,
+          status: part.failed ? "failed" : "uploading",
+          thumbnailUrl: part.pending.preview,
+        },
+      ];
+    }
+    return [];
   }
 
   return (
@@ -373,13 +449,13 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
         <div className="order-1 min-w-0 xl:col-start-2 xl:row-start-1 xl:row-span-3">
           <Card title="The job">
             <div className="grid grid-cols-2 gap-x-4.5 gap-y-3.5">
-              <Fact label="Booked for">{job.slotLabel ?? "No date yet"}</Fact>
-              <Fact label="Ask for">{job.contactLine}</Fact>
+              <Fact label="Appointment">{job.slotLabel ?? "No date yet"}</Fact>
+              <Fact label={job.contactIsSiteContact ? "Site contact" : "Customer"}>{job.contactLine}</Fact>
               <div className="col-span-2">
-                <Fact label="Site address">{job.addressLine}</Fact>
+                <Fact label="Job address">{job.addressLine}</Fact>
               </div>
               <div className="col-span-2">
-                <Fact label="What the customer said">
+                <Fact label="Issue description">
                   <p className="max-w-[62ch] font-normal whitespace-pre-wrap">{job.description ?? "-"}</p>
                   {job.answers.length > 0 ? (
                     <ul className="mt-1 list-disc pl-4.5 font-normal">
@@ -394,7 +470,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
             {job.instructions.length > 0 ? (
               <>
                 <div className="mt-3.5 mb-3 border-t border-hairline" />
-                <h3 className={labelClass}>From the office</h3>
+                <h3 className={labelClass}>Instructions</h3>
                 <div className="mt-1.5 flex flex-col gap-2">
                   {job.instructions.map((note, index) => (
                     <div key={index} className="rounded-md border border-hairline bg-ground px-3 py-2.5 text-sm text-ink">
@@ -407,20 +483,25 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                 </div>
               </>
             ) : null}
-            {job.canOnSite && !frozen ? (
+          </Card>
+        </div>
+
+        <div className="order-2 flex min-w-0 flex-col gap-4 xl:col-start-1 xl:row-start-1">
+          {job.canOnSite && !frozen ? (
+            <Card title="Arrival">
+              <p className="mb-3 text-[13px] text-secondary-text">
+                Tap when you get to the job. The office then sees it as in progress.
+              </p>
               <button
                 type="button"
                 onClick={() => void onSite()}
                 disabled={busy !== null}
-                className="mt-3.5 min-h-11 rounded-md border border-hairline bg-surface px-[18px] py-2.5 text-sm font-bold text-ink disabled:opacity-50"
+                className="min-h-[52px] w-full rounded-md border border-hairline bg-surface px-[18px] text-sm font-bold text-ink disabled:opacity-50 md:min-h-11 md:w-auto"
               >
-                On site
+                I&apos;ve arrived
               </button>
-            ) : null}
-          </Card>
-        </div>
-
-        <div className="order-2 min-w-0 xl:col-start-1 xl:row-start-1">
+            </Card>
+          ) : null}
           <Card title="Time on site" aside={`Billed ${formatHours(billed)}h`}>
             <TimeEntryRows
               rows={rows}
@@ -437,17 +518,18 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
         </div>
 
         <div className="order-3 min-w-0 xl:col-start-1 xl:row-start-2">
-          <Card title="Work done">
+          <Card title="Work notes">
             {frozen ? (
-              <LockedValue label="Completion notes" value={notes === "" ? "-" : notes} message />
+              <LockedValue label="Work notes" hideLabel value={notes === "" ? "-" : notes} message />
             ) : (
               <div className="mb-3.5">
-                <label htmlFor="completion-notes" className={`mb-[5px] ${labelClass} ${starClass}`}>
-                  Completion notes
+                <label htmlFor="completion-notes" className="sr-only">
+                  Work notes
                 </label>
                 <textarea
                   id="completion-notes"
                   rows={4}
+                  placeholder="What you did on the job, and anything the office or customer should know"
                   value={notes}
                   aria-invalid={errors["notes"] ? true : undefined}
                   aria-required
@@ -466,7 +548,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
         </div>
 
         <div className="order-4 min-w-0 xl:col-start-1 xl:row-start-3">
-          <Card title="Parts used" aside={`Up to ${capLabel} a line`}>
+          <Card title="Parts used" aside={`Up to ${capLabel} in total`}>
             {parts.length === 0 && frozen ? <p className="text-[13px] text-muted-text">No parts.</p> : null}
             {parts.map((part, index) => {
               const at = (field: string): string | undefined => errors[`part.${String(index)}.${field}`] || undefined;
@@ -476,7 +558,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                   {frozen ? (
                     <>
                       <LockedValue label="Part" value={part.name} />
-                      <div className="grid grid-cols-2 gap-x-3.5">
+                      <div className="grid grid-cols-[5.5rem_1fr] gap-x-3.5">
                         <LockedValue label="Qty" value={part.qty} />
                         <LockedValue label="Price each" value={`$${part.price}`} />
                       </div>
@@ -503,7 +585,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                         error={at("name")}
                         onChange={(e) => updatePart(index, { name: e.target.value })}
                       />
-                      <div className="grid grid-cols-2 gap-x-3.5">
+                      <div className="grid grid-cols-[5.5rem_1fr] gap-x-3.5">
                         <Field
                           id={`${id}-qty`}
                           label="Qty"
@@ -520,39 +602,24 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                           prefix="$"
                           inputMode="decimal"
                           value={part.price}
-                          error={at("price")}
+                          error={at("price") ?? liveCap[index]}
                           onChange={(e) => updatePart(index, { price: e.target.value })}
                         />
                       </div>
                       <div className="mb-3.5">
                         <span className={`mb-[5px] ${labelClass} ${starClass}`}>Receipt photo</span>
-                        <div className="flex flex-col gap-2 md:flex-row md:items-center">
-                          <button
-                            type="button"
-                            disabled={part.uploading}
-                            onClick={() => fileInputs.current[part.key]?.click()}
-                            className="min-h-[52px] w-full rounded-md border border-hairline bg-surface px-4 text-sm font-bold text-ink disabled:opacity-50 md:min-h-11 md:w-auto"
-                          >
-                            {part.uploading ? "Uploading..." : part.receipt ? "Choose another" : "Choose file"}
-                          </button>
-                          <input
-                            ref={(el) => {
-                              fileInputs.current[part.key] = el;
-                            }}
-                            type="file"
-                            accept="image/*"
-                            aria-label={`Receipt photo for part ${String(index + 1)}`}
-                            className="sr-only"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              e.target.value = "";
-                              if (file) void chooseReceipt(index, part.key, file);
-                            }}
-                          />
-                          <span className={`truncate text-sm ${part.receipt ? "text-ink" : "text-muted-text"}`} title={part.receipt?.fileName}>
-                            {part.receipt ? part.receipt.fileName : "No file chosen"}
-                          </span>
-                        </div>
+                        <PhotoGallery
+                          photos={receiptPhotos(part)}
+                          limit={1}
+                          showCount={false}
+                          addDisabled={false}
+                          inputLabel={`Receipt photo for part ${String(index + 1)}`}
+                          onPick={(files) => {
+                            const file = files[0];
+                            if (file) void chooseReceipt(index, part.key, file);
+                          }}
+                          onRemove={() => removeReceipt(index)}
+                        />
                         {at("receipt") ? <p className="mt-[5px] text-xs text-brand-destructive">{at("receipt")}</p> : null}
                         {receiptMessages[part.key] ? <p className="mt-[5px] text-xs text-brand-destructive">{receiptMessages[part.key]}</p> : null}
                       </div>
