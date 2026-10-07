@@ -22,6 +22,8 @@
 //      its own ladder and licence line (the expired-licence TAG itself is
 //      dispatchState()/dispatchStateLabel(), reused unchanged from 2001's
 //      record page, already proven e2e there -- contractors.spec.ts AC6)
+// 5001 AC1 (UI) an accepted or in-progress card is a link to its job screen; the card still
+//      awaiting his answer is not
 // AC13 the contractor menu shows Dashboard, Rates and Service area (built),
 //      the rest still dark
 //
@@ -41,9 +43,9 @@ test.describe(() => {
     // The most deeply nested <div> that carries both texts is the card's own
     // outer element -- every ancestor also "contains" both (text bubbles up),
     // but none more specifically than the card itself.
-    const sarahCard = page.locator("div").filter({ hasText: "JOB-1042" }).filter({ hasText: "Sarah Chen" }).last();
-    const tomCard = page.locator("div").filter({ hasText: "JOB-1051" }).filter({ hasText: "Tom" }).last();
-    const margaretCard = page.locator("div").filter({ hasText: "JOB-1039" }).filter({ hasText: "Margaret" }).last();
+    const sarahCard = page.locator("div, a").filter({ hasText: "JOB-1042" }).filter({ hasText: "Sarah Chen" }).last();
+    const tomCard = page.locator("div, a").filter({ hasText: "JOB-1051" }).filter({ hasText: "Tom" }).last();
+    const margaretCard = page.locator("div, a").filter({ hasText: "JOB-1039" }).filter({ hasText: "Margaret" }).last();
 
     // AC2/AC3: the order (unanswered first, then soonest, then no return date
     // last) and the slot's timezone label are proven at the backend,
@@ -54,6 +56,10 @@ test.describe(() => {
     await expect(sarahCard.getByText("Sarah Chen")).toBeVisible();
     await expect(sarahCard.getByText("Plumbing")).toBeVisible();
     await expect(sarahCard.getByText("Hilton")).toBeVisible();
+
+    // 5001 AC1: Tom's accepted card opens; Sarah's, awaiting an answer, stays flat.
+    await expect(page.getByRole("link", { name: /JOB-1051/ })).toHaveAttribute("href", "/contractor/jobs/JOB-1051");
+    await expect(page.getByRole("link", { name: /JOB-1042/ })).toHaveCount(0);
 
     await expect(tomCard.getByText("Scheduled", { exact: true })).toBeVisible();
     await expect(tomCard.getByText("Tom")).toBeVisible();

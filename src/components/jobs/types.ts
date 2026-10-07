@@ -81,6 +81,18 @@ export interface EarlierBooking {
   note: string | null;
 }
 
+/** Feature 5001: the shown assignment's visit -- time entries ops may fix until Complete, then the frozen record. */
+export interface VisitView {
+  editable: boolean;
+  completed: boolean;
+  timezone: string;
+  timeEntries: { date: string; start: string; end: string; note: string }[];
+  billedHours: number;
+  completionNotes: string | null;
+  /** Whole cents. */
+  parts: { name: string; qty: number; unitPrice: number; lineTotal: number }[];
+}
+
 export interface JobDetail {
   reference: string;
   status: JobStatus;
@@ -110,6 +122,8 @@ export interface JobDetail {
   /** Completed or cancelled -- the site contact is read-only. */
   closed: boolean;
   contractor: ContractorView | null;
+  /** Feature 5001: null until the contractor has accepted. */
+  visit: VisitView | null;
   /** Feature 4003: every booking on the job but the one in play, newest first. */
   earlierBookings: EarlierBooking[];
   /** Feature 4002, AC29: the level and its price, once the job is dispatched. */

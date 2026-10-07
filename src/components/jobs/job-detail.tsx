@@ -22,7 +22,10 @@ import { PrimaryButton, PrimaryLink } from "@/components/auth/buttons";
 import { Field } from "@/components/auth/field";
 import { ReadOnlyPhotoGallery } from "@/components/ui/photo-gallery";
 import { Toast, useToast } from "@/components/ui/toast";
-import type { ApiError, EarlierBooking, JobDetail, MessageView, NoteView } from "./types";
+import { TimeEntryRows, isBlankRow, rowsFromEntries, type TimeEntryRow } from "@/components/ui/time-entry-rows";
+import { formatHours } from "@/lib/billed-hours";
+import { formatDollars } from "@/components/request-a-job/money";
+import type { ApiError, EarlierBooking, JobDetail, MessageView, NoteView, VisitView } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -207,6 +210,159 @@ function ContractorCard({ job }: { job: JobDetail }) {
       )}
       <EarlierBookings bookings={job.earlierBookings} />
       <ActionPlaceholders job={job} />
+    </Card>
+  );
+}
+
+/**
+ * Feature 5001: "Time on site" -- Mike changes the time entries until Complete
+ * (for when Bob rings from the van); once completed it is read-only and also
+ * shows the completion notes and the parts, as the frozen record.
+ */
+function TimeOnSiteCard({
+  job,
+  visit,
+  onSaved,
+}: {
+  job: JobDetail;
+  visit: VisitView;
+  onSaved: (next: JobDetail, message: string) => void;
+}) {
+  const zone = visit.timezone;
+  const [rows, setRows] = useState<TimeEntryRow[]>(() => rowsFromEntries(visit.timeEntries, zone));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | undefined>();
+
+  const snapshot = (list: TimeEntryRow[]) =>
+    JSON.stringify(list.filter((row) => !isBlankRow(row)).map((row) => [row.date, row.start, row.end, row.note.trim()]));
+  const stored = snapshot(rowsFromEntries(visit.timeEntries, zone));
+  const pending = snapshot(rows) !== stored;
+
+  async function save() {
+    const sent = rows.map((row, index) => ({ row, index })).filter(({ row }) => !isBlankRow(row));
+    const problems: Record<string, string> = {};
+    for (const { row, index } of sent) {
+      if (row.date === "") problems[`${String(index)}.date`] = "Required.";
+      if (row.start === "") problems[`${String(index)}.start`] = "Required.";
+      if (row.end === "") problems[`${String(index)}.end`] = "Required.";
+      else if (row.start !== "" && row.end <= row.start) problems[`${String(index)}.end`] = "Finish must be after start.";
+    }
+    setErrors(problems);
+    if (Object.keys(problems).length > 0) return;
+    setFormError(undefined);
+    setSaving(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(job.reference)}/time-entries`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          timeEntries: sent.map(({ row }) => ({ date: row.date, start: row.start, end: row.end, note: row.note })),
+        }),
+      });
+      const payload = (await res.json()) as JobDetail & ApiError;
+      if (!res.ok) {
+        const at = /^timeEntries\[(\d+)\]\.(\w+)$/.exec(payload.field ?? "");
+        if (at) setErrors({ [`${String(sent[Number(at[1])]?.index ?? 0)}.${at[2] ?? ""}`]: payload.error });
+        else setFormError(payload.error);
+        return;
+      }
+      onSaved(payload, `Saved the time on site for ${job.reference}.`);
+    } catch {
+      setFormError("Save failed - check your connection and try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (visit.completed) {
+    return (
+      <Card title="Time on site" aside={`Billed ${formatHours(visit.billedHours)}h`}>
+        <TimeEntryRows rows={rowsFromEntries(visit.timeEntries, zone)} mode="facts" zone={zone} idPrefix="ops-entry" />
+        <div className="mt-3.5 border-t border-hairline pt-3.5">
+          <Fact label="Completion notes">
+            <p className="max-w-[62ch] font-normal whitespace-pre-wrap">{visit.completionNotes === "" ? "-" : visit.completionNotes}</p>
+          </Fact>
+        </div>
+        <div className="mt-3.5 border-t border-hairline pt-3.5">
+          <span className={labelClass}>Parts</span>
+          {visit.parts.length === 0 ? (
+            <p className="mt-1 text-[13px] text-muted-text">No parts.</p>
+          ) : (
+            <table className="mt-1.5 w-full text-sm">
+              <thead>
+                <tr className="text-left">
+                  <th className={`${labelClass} pb-1.5 font-bold`}>Part</th>
+                  <th className={`${labelClass} pb-1.5 text-right font-bold`}>Qty</th>
+                  <th className={`${labelClass} pb-1.5 text-right font-bold`}>Price each</th>
+                  <th className={`${labelClass} pb-1.5 text-right font-bold`}>Line total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visit.parts.map((part, index) => (
+                  <tr key={index} className="border-t border-hairline">
+                    <td className="py-2 pr-2 text-ink">{part.name}</td>
+                    <td className="py-2 text-right tabular-nums text-ink">{part.qty}</td>
+                    <td className="py-2 text-right tabular-nums text-ink">{formatDollars(part.unitPrice)}</td>
+                    <td className="py-2 text-right tabular-nums text-ink">{formatDollars(part.lineTotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card title="Time on site" aside={`Billed ${formatHours(visit.billedHours)}h`}>
+      <TimeEntryRows
+        rows={rows}
+        zone={zone}
+        idPrefix="ops-entry"
+        errors={errors}
+        onChange={(next) => {
+          setRows(next);
+          setErrors({});
+        }}
+      />
+      {formError ? <p className="mb-2 text-xs text-brand-destructive">{formError}</p> : null}
+      <div className="mt-3.5 flex flex-col gap-2 border-t border-hairline pt-3.5 md:flex-row md:items-center md:justify-end md:gap-3">
+        {pending && !saving ? <span className="text-xs font-semibold text-brand-warning">Not saved yet</span> : null}
+        <button
+          type="button"
+          disabled={!pending || saving}
+          onClick={() => {
+            setRows(rowsFromEntries(visit.timeEntries, zone));
+            setErrors({});
+            setFormError(undefined);
+          }}
+          className="min-h-[52px] w-full rounded-md border border-hairline bg-surface px-4 text-sm font-bold text-ink disabled:opacity-50 md:min-h-11 md:w-auto md:px-[18px]"
+        >
+          Cancel
+        </button>
+        {pending || saving ? (
+          <PrimaryButton
+            type="button"
+            onClick={() => void save()}
+            loading={saving}
+            loadingLabel="Saving..."
+            className="md:mt-0 md:inline-block md:min-h-11 md:w-auto md:px-[18px] md:py-2.5"
+          >
+            Save
+          </PrimaryButton>
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="min-h-[52px] w-full rounded-md border border-hairline bg-ground px-4 text-sm font-bold text-muted-text md:min-h-11 md:w-auto md:px-[18px]"
+          >
+            Save
+          </button>
+        )}
+      </div>
     </Card>
   );
 }
@@ -861,6 +1017,7 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
   // note being written is never wiped by an address save, or the reverse.
   const [addressesVersion, setAddressesVersion] = useState(0);
   const [notesVersion, setNotesVersion] = useState(0);
+  const [visitVersion, setVisitVersion] = useState(0);
   const [toastMessage, showToast] = useToast();
 
   useEffect(() => {
@@ -877,7 +1034,7 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
 
   return (
     <>
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] xl:grid-rows-[auto_auto_auto_1fr]">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] xl:grid-rows-[auto_auto_auto_auto_1fr]">
         {/* Mobile stack order: Request, Customer, Addresses, Contractor/Dispatch,
             Messages, Operator notes -- Addresses before Dispatch mirrors the
             actual dependency (no address, no dispatch). Desktop's two-column
@@ -889,7 +1046,7 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
         <div className="order-2 min-w-0 xl:order-none xl:col-start-2 xl:row-start-1">
           <CustomerCard job={job} />
         </div>
-        <div className="order-3 min-w-0 xl:order-none xl:col-start-2 xl:row-span-3 xl:row-start-2">
+        <div className="order-3 min-w-0 xl:order-none xl:col-start-2 xl:row-span-4 xl:row-start-2">
           <AddressesCard
             key={`addresses-${String(addressesVersion)}`}
             job={job}
@@ -905,10 +1062,24 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
         <div className="order-4 min-w-0 xl:order-none xl:col-start-1 xl:row-start-2">
           <ContractorCard job={job} />
         </div>
-        <div className="order-5 min-w-0 xl:order-none xl:col-start-1 xl:row-start-3">
+        {job.visit ? (
+          <div className="order-5 min-w-0 xl:order-none xl:col-start-1 xl:row-start-3">
+            <TimeOnSiteCard
+              key={`visit-${String(visitVersion)}`}
+              job={job}
+              visit={job.visit}
+              onSaved={(next, message) => {
+                setJob(next);
+                setVisitVersion((v) => v + 1);
+                showToast(message);
+              }}
+            />
+          </div>
+        ) : null}
+        <div className="order-6 min-w-0 xl:order-none xl:col-start-1 xl:row-start-4">
           <MessagesCard job={job} />
         </div>
-        <div className="order-6 min-w-0 xl:order-none xl:col-start-1 xl:row-start-4">
+        <div className="order-7 min-w-0 xl:order-none xl:col-start-1 xl:row-start-5">
           <NotesCard
             key={`notes-${String(notesVersion)}`}
             job={job}

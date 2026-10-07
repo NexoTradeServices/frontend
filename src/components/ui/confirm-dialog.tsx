@@ -15,6 +15,7 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel = "Cancel",
   severity = "standard",
+  tone = "accent",
   loading = false,
   loadingLabel = "Saving...",
   onConfirm,
@@ -26,6 +27,8 @@ export function ConfirmDialog({
   confirmLabel: string;
   cancelLabel?: string;
   severity?: "standard" | "destructive";
+  /** A standard dialog's confirm button: the Primary, or the Success one when it confirms something good (Complete). */
+  tone?: "accent" | "success";
   loading?: boolean;
   /** the confirm button's label while it works */
   loadingLabel?: string;
@@ -60,7 +63,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={loading}
             className={`rounded-md px-4 py-2.5 text-sm font-bold text-white ${
-              severity === "destructive" ? "bg-brand-destructive" : "bg-brand-accent"
+              severity === "destructive" ? "bg-brand-destructive" : tone === "success" ? "bg-brand-success" : "bg-brand-accent"
             }`}
           >
             {loading ? loadingLabel : confirmLabel}
