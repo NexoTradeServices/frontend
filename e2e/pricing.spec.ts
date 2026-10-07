@@ -118,6 +118,12 @@ test("AC3 + AC4 + feature 1012 AC2/AC4: the locked normal row, the live multipli
   // Feature 1012 -- add, remove and move the prefilled option rows. The saved
   // order is proven at the backend (tests/service-types.test.ts, AC5); here
   // only the form's own state, so Plumbing is never written.
+  // Start from an empty list whatever the database seeded (a fresh CI database
+  // carries option rows, the dev one does not): taking rows off is form state too.
+  const removeButtons = page.getByRole("button", { name: /^Remove option \d+$/ });
+  while ((await removeButtons.count()) > 0) {
+    await removeButtons.first().click();
+  }
   await page.getByRole("button", { name: "+ Add another" }).click();
   await page.getByLabel("Option 1", { exact: true }).fill("Where in the property is it?");
   await page.getByRole("button", { name: "+ Add another" }).click();
