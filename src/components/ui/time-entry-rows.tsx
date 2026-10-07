@@ -5,8 +5,8 @@
 // in a Multi-line box that can be dragged taller from its corner, a Delete
 // Text button at the row's end, rows divided by a Divider, a Text button
 // "+ Add a visit" under the last. On Mobile the Date sits on its own line and
-// Start and Finish share the next. Finish shows the current time as its
-// computed default - muted italic until the person picks their own. The Time
+// Start and Finish share the next. Start and Finish start empty,
+// showing hh : mm with AM chosen; Finish has a "Now" button. The Time
 // box is our own typed-digits box with AM / PM buttons (components/ui/time-box.tsx).
 //
 // Used by Bob's job screen and by the ops job page's "Time on site" card, so
@@ -25,7 +25,7 @@ export interface TimeEntryRow {
   start: string;
   end: string;
   note: string;
-  /** Finish still holds its computed default (now) -- shown muted italic. */
+  /** Kept for rows built elsewhere; a new row leaves Finish empty, so this is false. */
   endIsDefault: boolean;
 }
 
@@ -37,10 +37,9 @@ export function freshKey(prefix: string): string {
   return `${prefix}-${String(nextKey)}`;
 }
 
-/** A row ready to fill: today's date and the clock now, in the JOB's zone. */
+/** A row ready to fill: today's date in the JOB's zone, Start and Finish empty (hh : mm, AM) until he sets them. */
 export function newEntryRow(zone: string): TimeEntryRow {
-  const now = nowInZone(zone);
-  return { key: freshKey("entry"), date: now.date, start: "", end: now.time, note: "", endIsDefault: true };
+  return { key: freshKey("entry"), date: nowInZone(zone).date, start: "", end: "", note: "", endIsDefault: false };
 }
 
 export function rowsFromEntries(entries: { date: string; start: string; end: string; note: string }[], zone: string): TimeEntryRow[] {
