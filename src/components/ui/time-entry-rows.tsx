@@ -7,7 +7,7 @@
 // "+ Add a visit" under the last. On Mobile the Date sits on its own line and
 // Start and Finish share the next. Finish shows the current time as its
 // computed default - muted italic until the person picks their own. The Time
-// box is our own hour / minute / am-pm control (components/ui/time-box.tsx).
+// box is our own typed-digits box with AM / PM buttons (components/ui/time-box.tsx).
 //
 // Used by Bob's job screen and by the ops job page's "Time on site" card, so
 // the row looks and behaves the same in both. Three modes: `edit`, `frozen`
@@ -103,7 +103,7 @@ function FactBox({ label, value }: { label: string; value: string }) {
   );
 }
 
-const rowGrid = "grid grid-cols-2 gap-x-3.5 gap-y-3.5 md:grid-cols-[1.2fr_1fr_1fr_2fr]";
+const rowGrid = "grid grid-cols-1 gap-x-3.5 gap-y-3.5 md:grid-cols-[minmax(0,1fr)_auto_auto]";
 
 export function TimeEntryRows({
   rows,
@@ -133,7 +133,7 @@ export function TimeEntryRows({
                   <LockedBox label="Date" value={formatVisitDate(row.date)} />
                   <LockedBox label="Start" value={formatClock(row.start)} />
                   <LockedBox label="Finish" value={formatClock(row.end)} />
-                  <div className="col-span-2 md:col-span-1">
+                  <div className="md:col-span-3">
                     <LockedBox label="Note" value={row.note === "" ? "-" : row.note} />
                   </div>
                 </>
@@ -142,7 +142,7 @@ export function TimeEntryRows({
                   <FactBox label="Date" value={formatVisitDate(row.date)} />
                   <FactBox label="Start" value={formatClock(row.start)} />
                   <FactBox label="Finish" value={formatClock(row.end)} />
-                  <div className="col-span-2 md:col-span-1">
+                  <div className="md:col-span-3">
                     <FactBox label="Note" value={row.note === "" ? "-" : row.note} />
                   </div>
                 </>
@@ -167,7 +167,7 @@ export function TimeEntryRows({
         return (
           <div key={row.key} className={index > 0 ? "mt-3.5 border-t border-hairline pt-3.5" : undefined} data-testid="time-entry-row">
             <div className={rowGrid}>
-              <div className="col-span-2 md:col-span-1">
+              <div>
                 <Control id={`${id}-date`} label="Date" required error={at("date")}>
                   <input
                     id={`${id}-date`}
@@ -179,7 +179,7 @@ export function TimeEntryRows({
                   />
                 </Control>
               </div>
-              <Control id={`${id}-start-hour`} label="Start" required error={at("start")}>
+              <Control id={`${id}-start`} label="Start" required error={at("start")}>
                 <TimeBox
                   id={`${id}-start`}
                   label="Start"
@@ -188,7 +188,7 @@ export function TimeEntryRows({
                   onChange={(value) => update(index, { start: value })}
                 />
               </Control>
-              <Control id={`${id}-end-hour`} label="Finish" required error={at("end")}>
+              <Control id={`${id}-end`} label="Finish" required error={at("end")}>
                 <TimeBox
                   id={`${id}-end`}
                   label="Finish"
@@ -196,9 +196,10 @@ export function TimeEntryRows({
                   invalid={Boolean(at("end"))}
                   muted={row.endIsDefault}
                   onChange={(value) => update(index, { end: value, endIsDefault: false })}
+                  onNow={() => update(index, { end: nowInZone(zone).time, endIsDefault: false })}
                 />
               </Control>
-              <div className="col-span-2 md:col-span-1">
+              <div className="md:col-span-3">
                 <Control id={`${id}-note`} label="Note" error={at("note")}>
                   <textarea
                     id={`${id}-note`}

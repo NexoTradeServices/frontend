@@ -61,8 +61,13 @@ test.describe("Bob's job screen, on a phone", () => {
     await pickTime(page, "#entry-0-end", "8:07am");
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByText("Finish must be after start.")).toBeVisible();
-    await expect(page.locator("#entry-0-end-hour")).toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#entry-0-end")).toHaveAttribute("aria-invalid", "true");
 
+    // Typing 13:05 sets PM by itself; Now fills Finish with the clock.
+    await page.locator("#entry-0-start").fill("13:05");
+    await expect(page.locator("#entry-0-start-pm")).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Now" }).first().click();
+    await expect(page.locator("#entry-0-end")).not.toHaveValue("");
     await pickTime(page, "#entry-0-start", "8:07am");
     await pickTime(page, "#entry-0-end", "11:05am");
     await page.getByRole("button", { name: "+ Add a visit" }).click();
