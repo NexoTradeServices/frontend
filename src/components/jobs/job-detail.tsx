@@ -25,7 +25,7 @@ import { Toast, useToast } from "@/components/ui/toast";
 import { TimeEntryRows, isBlankRow, rowsFromEntries, type TimeEntryRow } from "@/components/ui/time-entry-rows";
 import { formatHours } from "@/lib/billed-hours";
 import { formatDollars } from "@/components/request-a-job/money";
-import type { ApiError, EarlierBooking, JobDetail, MessageView, NoteView, VisitView } from "./types";
+import type { ApiError, EarlierBooking, InvoiceView, JobDetail, MessageView, NoteView, VisitView } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -744,6 +744,166 @@ function MessageTag({ message }: { message: MessageView }) {
   );
 }
 
+const INVOICE_TAGS: Record<InvoiceView["status"] | "waiting", { label: string; pair: string }> = {
+  sent: { label: "Sent", pair: "bg-status-cancelled-bg text-status-cancelled" },
+  paid: { label: "Paid", pair: "bg-success-bg text-brand-success" },
+  void: { label: "Void", pair: "bg-status-cancelled-bg text-status-cancelled" },
+  waiting: { label: "Waiting for pay link", pair: "bg-warning-bg text-brand-warning" },
+};
+
+/** "Rossi's Cafe / Attn: Nina Rossi", or the name alone. */
+function BilledTo({ billedTo }: { billedTo: InvoiceView["billedTo"] }) {
+  if (billedTo.businessName === null) return <>{billedTo.name}</>;
+  return (
+    <>
+      {billedTo.businessName}
+      <span className="block text-[13px] font-normal text-secondary-text">Attn: {billedTo.name}</span>
+    </>
+  );
+}
+
+/**
+ * Feature 6001: the Invoice card, straight after Time on site. Reads the invoice's
+ * frozen rows only (lines, billed-to, the GST stamp). Resend invoice and Copy pay
+ * link are the backups for a message that did not land.
+ */
+function InvoiceCard({
+  job,
+  invoice,
+  onSent,
+  onToast,
+}: {
+  job: JobDetail;
+  invoice: InvoiceView;
+  onSent: (next: JobDetail, message: string) => void;
+  onToast: (message: string) => void;
+}) {
+  const [resending, setResending] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+  const tag = INVOICE_TAGS[invoice.waitingForPayLink ? "waiting" : invoice.status];
+  const th = `${labelClass} pb-1.5 font-bold`;
+
+  async function resend() {
+    setError(undefined);
+    setResending(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(job.reference)}/invoice/resend`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const payload = (await res.json()) as JobDetail & ApiError;
+      if (!res.ok) {
+        setError(payload.error);
+        return;
+      }
+      onSent(payload, "Invoice sent again.");
+    } catch {
+      setError("Couldn't send the invoice - check your connection and try again.");
+    } finally {
+      setResending(false);
+    }
+  }
+
+  async function copyLink() {
+    if (invoice.payLinkUrl === null) return;
+    try {
+      await navigator.clipboard.writeText(invoice.payLinkUrl);
+      onToast("Pay link copied.");
+    } catch {
+      onToast("Couldn't copy - the link is in the invoice email.");
+    }
+  }
+
+  return (
+    <Card title="Invoice" aside={invoice.reference}>
+      <div className="mb-3.5">
+        <span
+          data-testid="invoice-status"
+          className={`inline-block shrink-0 rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] whitespace-nowrap uppercase ${tag.pair}`}
+        >
+          {tag.label}
+        </span>
+        {invoice.waitingForPayLink ? (
+          <p className="mt-1.5 text-[13px] text-muted-text">
+            Stripe has not answered yet. The invoice goes out by email and text as soon as it does.
+          </p>
+        ) : null}
+      </div>
+      {error ? (
+        <p role="alert" className="mb-3.5 rounded-md border border-error-border bg-error-bg px-3 py-2.5 text-[13px] text-brand-destructive">
+          {error}
+        </p>
+      ) : null}
+      <div className="grid grid-cols-2 gap-x-4.5 gap-y-3.5 sm:grid-cols-4">
+        <Fact label="Billed to">
+          <BilledTo billedTo={invoice.billedTo} />
+        </Fact>
+        <Fact label="Issued">{invoice.issuedLabel}</Fact>
+        <Fact label="Due">{invoice.dueLabel}</Fact>
+        <Fact label="Total">{formatDollars(invoice.amount)}</Fact>
+      </div>
+      <table className="mt-3.5 w-full text-sm" data-testid="invoice-lines">
+        <thead>
+          <tr className="text-left">
+            <th className={th}>Item</th>
+            <th className={`${th} text-right`}>Qty</th>
+            <th className={`${th} text-right`}>Price</th>
+            <th className={`${th} text-right`}>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {invoice.lines.map((line, index) => (
+            <tr key={index} className="border-t border-hairline">
+              <td className="py-2 pr-2 text-ink">{line.description}</td>
+              <td className="py-2 text-right tabular-nums text-ink">{line.qty}</td>
+              <td className="py-2 text-right tabular-nums text-ink">{formatDollars(line.unitPrice)}</td>
+              <td className="py-2 text-right tabular-nums text-ink">{formatDollars(line.lineTotal)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          {invoice.gstApplied ? (
+            <>
+              <tr className="border-t-2 border-ink">
+                <td colSpan={3} className="pt-2 pr-2 text-right text-secondary-text">Subtotal</td>
+                <td className="pt-2 text-right tabular-nums text-ink">{formatDollars(invoice.amount - invoice.gstAmount)}</td>
+              </tr>
+              <tr>
+                <td colSpan={3} className="pr-2 text-right text-secondary-text">Includes GST</td>
+                <td className="text-right tabular-nums text-ink">{formatDollars(invoice.gstAmount)}</td>
+              </tr>
+              <tr>
+                <td colSpan={3} className="pt-1 pr-2 text-right font-bold text-ink">Total</td>
+                <td className="pt-1 text-right font-bold tabular-nums text-ink">{formatDollars(invoice.amount)}</td>
+              </tr>
+            </>
+          ) : (
+            <tr className="border-t-2 border-ink">
+              <td colSpan={3} className="pt-2 pr-2 text-right font-bold text-ink">Total</td>
+              <td className="pt-2 text-right font-bold tabular-nums text-ink">{formatDollars(invoice.amount)}</td>
+            </tr>
+          )}
+        </tfoot>
+      </table>
+      {invoice.canResend ? (
+        <div className="mt-3.5 flex flex-wrap gap-x-4 border-t border-hairline pt-3">
+          <button
+            type="button"
+            onClick={() => void resend()}
+            disabled={resending}
+            className="min-h-11 text-sm font-semibold text-ink underline underline-offset-2 disabled:opacity-60"
+          >
+            {resending ? "Sending..." : "Resend invoice"}
+          </button>
+          <button type="button" onClick={() => void copyLink()} className="min-h-11 text-sm font-semibold text-ink underline underline-offset-2">
+            Copy pay link
+          </button>
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
 /** Feature 4008: every message sent about the job, newest first -- a table from 768px, cards below (Patterns / Table to cards). */
 function MessagesCard({ job }: { job: JobDetail }) {
   const th = "border-b border-hairline px-2 py-2.5 text-left align-bottom text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
@@ -1047,7 +1207,7 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
 
   return (
     <>
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] xl:grid-rows-[auto_auto_auto_auto_1fr]">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] xl:grid-rows-[auto_auto_auto_auto_auto_1fr]">
         {/* Mobile stack order: Request, Customer, Addresses, Contractor/Dispatch,
             Messages, Operator notes -- Addresses before Dispatch mirrors the
             actual dependency (no address, no dispatch). Desktop's two-column
@@ -1059,7 +1219,7 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
         <div className="order-2 min-w-0 xl:order-none xl:col-start-2 xl:row-start-1">
           <CustomerCard job={job} />
         </div>
-        <div className="order-3 min-w-0 xl:order-none xl:col-start-2 xl:row-span-4 xl:row-start-2">
+        <div className="order-3 min-w-0 xl:order-none xl:col-start-2 xl:row-span-5 xl:row-start-2">
           <AddressesCard
             key={`addresses-${String(addressesVersion)}`}
             job={job}
@@ -1089,10 +1249,23 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
             />
           </div>
         ) : null}
-        <div className="order-6 min-w-0 xl:order-none xl:col-start-1 xl:row-start-4">
+        {job.invoice ? (
+          <div className="order-6 min-w-0 xl:order-none xl:col-start-1 xl:row-start-4">
+            <InvoiceCard
+              job={job}
+              invoice={job.invoice}
+              onToast={showToast}
+              onSent={(next, message) => {
+                setJob(next);
+                showToast(message);
+              }}
+            />
+          </div>
+        ) : null}
+        <div className="order-7 min-w-0 xl:order-none xl:col-start-1 xl:row-start-5">
           <MessagesCard job={job} />
         </div>
-        <div className="order-7 min-w-0 xl:order-none xl:col-start-1 xl:row-start-5">
+        <div className="order-8 min-w-0 xl:order-none xl:col-start-1 xl:row-start-6">
           <NotesCard
             key={`notes-${String(notesVersion)}`}
             job={job}

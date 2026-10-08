@@ -16,6 +16,9 @@
 //      shared tag -- on the queue and on Bob's dashboard card for JOB-1042
 // 3003 AC11 Sarah's enquiry photos in "The request" card with their file names;
 //      tapping one opens the full photo in a new tab; "No photos" without
+// 6001 AC13-AC15 Mike's Invoice card on a completed job: facts, lines, status tag (or the
+//      waiting state); Resend invoice shows its Toast and two new rows in Messages; Copy pay
+//      link puts the link on the clipboard, and says so when the browser refuses
 // AC29 at 390px: every action reachable, no sideways scroll, every tap
 //      target at least 44px -- on the queue and on the job page
 // AC30 at 390px the status chips stay one row that scrolls sideways
@@ -26,6 +29,7 @@
 // throwaway e2e-4001-... email so it never touches the cast. No test here
 // saves an address on, or adds a note to, a job it did not create.
 import { test, expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
+import { acceptedJobForBob, completeJobAsBob, giveInvoiceItsPayLink } from "./helpers/accepted-job";
 import { login } from "./helpers/login";
 import { MOCKS_GOOGLE_PLACES, installMockGooglePlaces } from "./helpers/mock-google-places";
 import { installMockPhotoImages } from "./helpers/mock-cloudinary";
@@ -372,4 +376,68 @@ test("3003 AC11: Mike sees the customer's photos in The request card; tapping on
   await page.goto(`/ops/jobs/${bare}`);
   const bareCard = page.locator("section").filter({ has: page.getByRole("heading", { name: "The request" }) });
   await expect(bareCard.getByText("No photos")).toBeVisible();
+});
+
+test("6001 AC13-AC15: the Invoice card shows the invoice; Resend sends it again; Copy puts the pay link on the clipboard", async ({
+  page,
+  browser,
+  request,
+}) => {
+  const job = await acceptedJobForBob(browser, request, "inv");
+  await completeJobAsBob(browser, job);
+
+  await page.goto(`/ops/jobs/${job.reference}`);
+  await login(page, "mike@idelta.com.au");
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: /^InvoiceINV-\d+$/ }) });
+
+  // AC13: the facts, the lines and the total, read from the invoice's own rows.
+  await expect(card).toBeVisible();
+  await expect(card.getByText("E2E 4003 inv")).toBeVisible();
+  await expect(card.getByText("Billed to")).toBeVisible();
+  await expect(card.getByText("Issued")).toBeVisible();
+  await expect(card.getByText("Due", { exact: true })).toBeVisible();
+  const lines = card.getByTestId("invoice-lines");
+  await expect(lines.getByRole("row", { name: /Call-out \+ first hour - Plumbing, normal.*\$250.*\$250/ })).toBeVisible();
+  await expect(lines.getByRole("row", { name: /Additional 2\.0h @ \$180\/h.*\$360/ })).toBeVisible();
+  await expect(lines.getByRole("row", { name: /^Total.*\$610$/ })).toBeVisible();
+  // GST is not registered on the dev settings: a plain Total, no GST line.
+  await expect(card.getByText("Includes GST")).toHaveCount(0);
+
+  // Waiting for the pay link (Stripe has not answered) or already sent (it has): either way the
+  // card is honest about it, and the backups are offered only once there is a link.
+  const tag = card.getByTestId("invoice-status");
+  await expect(tag).toHaveText(/^(Sent|Waiting for pay link)$/i);
+  if (((await tag.textContent()) ?? "").toLowerCase().startsWith("waiting")) {
+    await expect(card.getByText("Stripe has not answered yet. The invoice goes out by email and text as soon as it does.")).toBeVisible();
+    await expect(card.getByRole("button", { name: "Resend invoice" })).toHaveCount(0);
+    await expect(card.getByRole("button", { name: "Copy pay link" })).toHaveCount(0);
+  }
+
+  // Once the link exists the tag reads Sent and both backups appear.
+  await giveInvoiceItsPayLink(request, job);
+  await page.reload();
+  await expect(card.getByTestId("invoice-status")).toHaveText(/^sent$/i);
+  await expect(card.getByText("Stripe has not answered yet.")).toHaveCount(0);
+
+  // AC14: Resend shows its Toast, and its email and text join the Messages card.
+  const invoiceRows = page.getByTestId("message-row").filter({ hasText: "Invoice" });
+  await expect(invoiceRows).toHaveCount(2);
+  await card.getByRole("button", { name: "Resend invoice" }).click();
+  await expect(page.getByText("Invoice sent again.")).toBeVisible();
+  await expect(invoiceRows).toHaveCount(4);
+
+  // AC15: Copy pay link puts the invoice's link on the clipboard.
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  const read = await page.request.get(`${apiUrl}/api/jobs/${job.reference}`);
+  const { invoice } = (await read.json()) as { invoice: { payLinkUrl: string } };
+  await card.getByRole("button", { name: "Copy pay link" }).click();
+  await expect(page.getByText("Pay link copied.")).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(invoice.payLinkUrl);
+
+  // ... and when the browser refuses, the Toast says where the link is instead.
+  await page.evaluate(() => {
+    navigator.clipboard.writeText = () => Promise.reject(new Error("denied"));
+  });
+  await card.getByRole("button", { name: "Copy pay link" }).click();
+  await expect(page.getByText("Couldn't copy - the link is in the invoice email.")).toBeVisible();
 });

@@ -7,6 +7,8 @@
 // AC7  Complete with nothing entered is refused on those fields; otherwise the dialog asks
 //      once, then the screen is locked and the job has left his dashboard
 // AC1  (UI) the dashboard card opens the job screen -- every test here gets in that way
+// 6001 AC12 the Payment card after Complete: a QR code that decodes to the pay link and no
+//      price; "on its way" while the invoice waits for its link
 //
 // AC1-AC3, AC5, AC8 and AC9 are proven in the backend (tests/contractor-job.test.ts,
 // tests/billed-hours.test.ts, tests/ops-jobs.test.ts); the browser proves what needs one.
@@ -14,7 +16,8 @@
 // Phone width: Bob's screen is designed Mobile first. Every test dispatches a throwaway job
 // of its own (helpers/accepted-job.ts), labelled `e2e` and swept by the suite.
 import { test, expect, type Page } from "@playwright/test";
-import { acceptedJobForBob, openJobScreen } from "./helpers/accepted-job";
+import { acceptedJobForBob, giveInvoiceItsPayLink, openJobScreen } from "./helpers/accepted-job";
+import { decodeQr } from "./helpers/qr";
 import { installMockCloudinary } from "./helpers/mock-cloudinary";
 import { expectTime, pickTime } from "./helpers/time-box";
 import { MOBILE_VIEWPORT } from "../playwright.config";
@@ -153,6 +156,64 @@ test.describe("Bob's job screen, on a phone", () => {
     await page.goto("/contractor");
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
     await expect(page.getByText(job.reference)).toHaveCount(0);
+  });
+
+  /** Bob fills the one visit and completes it through the screen. */
+  async function completeOnScreen(page: Page) {
+    await pickTime(page, "#entry-0-start", "8:07am");
+    await pickTime(page, "#entry-0-end", "11:05am");
+    await page.locator("#completion-notes").fill("Replaced the cartridge.");
+    await page.getByRole("button", { name: "Complete job" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Complete", exact: true }).click();
+    await expect(page.getByText("Locked when the job was completed").first()).toBeVisible();
+  }
+
+  test("6001 AC12: after Complete the Payment card shows a QR code that opens the invoice's pay link, and no price", async ({
+    page,
+    browser,
+    request,
+  }) => {
+    const job = await acceptedJobForBob(browser, request, "pay-qr");
+    await openJobScreen(page, job);
+    await completeOnScreen(page);
+
+    // The invoice is waiting or already linked; a fake link is made if Stripe has not given one.
+    await giveInvoiceItsPayLink(request, job);
+    await page.reload();
+
+    const payment = page.locator("section").filter({ has: page.getByRole("heading", { name: "Payment" }) });
+    const qr = payment.getByTestId("qr-code");
+    await expect(qr).toBeVisible();
+    await expect(payment.getByText("Customer scans this with their phone camera to pay.")).toBeVisible();
+    // The code says what the invoice's pay link says -- decoded from a photo of it.
+    const read = await page.request.get(`${process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au"}/api/contractor/jobs/${job.reference}`);
+    const { payment: paid } = (await read.json()) as { payment: { payLinkUrl: string } };
+    expect(decodeQr(await qr.screenshot())).toBe(paid.payLinkUrl);
+    // 200px square at every size, and Bob never sees a price.
+    expect((await qr.boundingBox())?.width).toBe(200);
+    await expect(payment.getByText(/\$\d/)).toHaveCount(0);
+    // The Payment card is first in the column, above The job.
+    const headings = await page.getByRole("heading", { level: 2 }).allTextContents();
+    expect(headings.indexOf("Payment")).toBeGreaterThanOrEqual(0);
+    expect(headings.indexOf("Payment")).toBeLessThan(headings.indexOf("The job"));
+  });
+
+  test("6001 AC12: while the invoice waits for its pay link the card says it is on its way", async ({ page, browser, request }) => {
+    const job = await acceptedJobForBob(browser, request, "pay-wait");
+    await openJobScreen(page, job);
+    // Stripe may or may not have answered by the time Complete returns; this test is about
+    // the waiting wording, so the screen is handed the waiting state.
+    await page.route("**/api/contractor/jobs/*/complete", async (route) => {
+      const response = await route.fetch();
+      const body = (await response.json()) as object;
+      await route.fulfill({ response, json: { ...body, payment: { waiting: true } } });
+    });
+    await completeOnScreen(page);
+
+    const payment = page.locator("section").filter({ has: page.getByRole("heading", { name: "Payment" }) });
+    await expect(payment.getByText("The pay link is on its way to the customer by email and text.")).toBeVisible();
+    await expect(payment.getByTestId("qr-code")).toHaveCount(0);
+    await expect(payment.getByText(/\$\d/)).toHaveCount(0);
   });
 
   test("AC4: I've arrived shows him in progress, and the job's receipt upload not being set up leaves the rest of the screen saving", async ({

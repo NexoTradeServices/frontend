@@ -14,6 +14,9 @@
   --ground: #faf9f7;
   --surface: #ffffff;
   --hairline: #e6e2db;
+  /* Feature 6001 -- the QR code keeps its surface square and ink squares in every theme (Atoms / Small visuals), so any phone camera reads it. Never overridden under .dark. */
+  --qr-surface: #ffffff;
+  --qr-ink: #1c2b3a;
   --ink: #1c2b3a;
   --secondary-text: #4a5561;
   --muted-text: #7a828c;

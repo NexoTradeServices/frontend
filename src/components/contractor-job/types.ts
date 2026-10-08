@@ -40,6 +40,11 @@ export interface ContractorJobDto {
   timeEntries: EntryDto[];
   completionNotes: string;
   parts: PartDto[];
+  /**
+   * Feature 6001: the pay link as a QR code, or "on its way" while Stripe has not answered;
+   * null when there is nothing to pay. Never an amount.
+   */
+  payment: { payLinkUrl: string } | { waiting: true } | null;
   billedHours: number;
   returnVisitMinimumMinutes: number;
   /** Whole cents -- the cap per part line. */

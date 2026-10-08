@@ -93,6 +93,24 @@ export interface VisitView {
   parts: { name: string; qty: number; unitPrice: number; lineTotal: number }[];
 }
 
+/** Feature 6001: the invoice Complete issued, read from its frozen rows. Money is whole cents. */
+export interface InvoiceView {
+  reference: string;
+  status: "sent" | "paid" | "void";
+  /** Sent, not zero-dollar, and Stripe has not answered yet. */
+  waitingForPayLink: boolean;
+  payLinkUrl: string | null;
+  /** Resend invoice and Copy pay link are shown only when this is true. */
+  canResend: boolean;
+  billedTo: { name: string; businessName: string | null; address: PickedAddress | null };
+  issuedLabel: string;
+  dueLabel: string;
+  lines: { kind: "labour" | "part" | "callout"; description: string; qty: number; unitPrice: number; lineTotal: number }[];
+  amount: number;
+  gstApplied: boolean;
+  gstAmount: number;
+}
+
 export interface JobDetail {
   reference: string;
   status: JobStatus;
@@ -125,6 +143,8 @@ export interface JobDetail {
   contractor: ContractorView | null;
   /** Feature 5001: null until the contractor has accepted. */
   visit: VisitView | null;
+  /** Feature 6001: null until Complete has issued one. */
+  invoice: InvoiceView | null;
   /** Feature 4003: every booking on the job but the one in play, newest first. */
   earlierBookings: EarlierBooking[];
   /** Feature 4002, AC29: the level and its price, once the job is dispatched. */

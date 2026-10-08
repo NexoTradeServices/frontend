@@ -16,6 +16,7 @@ import { Lock } from "lucide-react";
 import { Field } from "@/components/auth/field";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PhotoGallery, type GalleryPhoto } from "@/components/ui/photo-gallery";
+import { QrCode } from "@/components/ui/qr-code";
 import { Toast, useToast } from "@/components/ui/toast";
 import {
   FROZEN_MESSAGE,
@@ -446,7 +447,16 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
           </p>
         ) : null}
 
-        <div className="order-1 min-w-0 xl:col-start-2 xl:row-start-1 xl:row-span-3">
+        <div className="order-1 flex min-w-0 flex-col gap-4 xl:col-start-2 xl:row-start-1 xl:row-span-3">
+          {job.payment === null ? null : (
+            <Card title="Payment">
+              {"payLinkUrl" in job.payment ? (
+                <QrCode value={job.payment.payLinkUrl} caption="Customer scans this with their phone camera to pay." />
+              ) : (
+                <p className="text-[13px] text-muted-text">The pay link is on its way to the customer by email and text.</p>
+              )}
+            </Card>
+          )}
           <Card title="The job">
             <div className="grid grid-cols-2 gap-x-4.5 gap-y-3.5">
               <Fact label="Appointment">{job.slotLabel ?? "No date yet"}</Fact>

@@ -38,3 +38,47 @@ export async function openJobScreen(page: Page, job: DispatchedJob): Promise<voi
   await expect(page).toHaveURL(new RegExp(`/contractor/jobs/${job.reference}$`));
   await expect(page.getByRole("heading", { name: job.reference, exact: true })).toBeVisible();
 }
+
+/**
+ * Feature 6001: Bob completes the job through the API, in a context of his own, so the page
+ * under test stays free. 3.0h on the books (8:07 - 11:05 bills 3.0h), work notes, no parts:
+ * the invoice is $250 + 2.0h @ $180/h = $610, and the pay link is asked for straight after.
+ */
+export async function completeJobAsBob(browser: Browser, job: DispatchedJob): Promise<void> {
+  const context = await browser.newContext({ baseURL: BASE_URL, storageState: testRunStorageState() });
+  try {
+    const page = await context.newPage();
+    await page.goto("/contractor");
+    await login(page, "bob@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+    const completed = await page.request.post(`${apiUrl}/api/contractor/jobs/${job.reference}/complete`, {
+      data: {
+        timeEntries: [{ date: "2026-10-07", start: "08:07", end: "11:05", note: "" }],
+        completionNotes: "Replaced the cartridge.",
+        parts: [],
+      },
+    });
+    expect(completed.status()).toBe(200);
+  } finally {
+    await context.close();
+  }
+}
+
+/**
+ * Feature 6001: give the job's invoice, if it is still waiting, a fake pay link and send its
+ * messages -- so a browser test reaches "an invoice with a link" with no Stripe key (CI) and
+ * never depends on Stripe being reachable. A link Stripe already made is left alone; while
+ * Complete's own try is still talking to Stripe the hook says "not yet" and is asked again.
+ */
+export async function giveInvoiceItsPayLink(request: APIRequestContext, job: DispatchedJob): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const res = await request.post(`${apiUrl}/api/test-data/jobs/${job.reference}/pay-link`);
+        expect(res.status()).toBe(200);
+        return ((await res.json()) as { linked: boolean }).linked;
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true);
+}
