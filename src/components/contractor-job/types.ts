@@ -21,6 +21,14 @@ export interface PartDto {
   receipt: { fileName: string; thumbnailUrl: string; fullUrl: string } | null;
 }
 
+export interface PaymentDto {
+  /** Whole cents, GST-inclusive: the customer's total. */
+  amount: number;
+  /** Null while Stripe has not answered. */
+  payLinkUrl: string | null;
+  messages: "sent" | "sending" | "failed";
+}
+
 export interface ContractorJobDto {
   reference: string;
   jobStatus: JobStatus;
@@ -41,10 +49,11 @@ export interface ContractorJobDto {
   completionNotes: string;
   parts: PartDto[];
   /**
-   * Feature 6001: the pay link as a QR code, or "on its way" while Stripe has not answered;
-   * null when there is nothing to pay. Never an amount.
+   * Feature 6001: what Bob can tell the customer in front of him -- the total she pays, whether
+   * the invoice email and text have gone, and the pay link as a QR. Never his own pay. Null when
+   * there is nothing to pay.
    */
-  payment: { payLinkUrl: string } | { waiting: true } | null;
+  payment: PaymentDto | null;
   billedHours: number;
   returnVisitMinimumMinutes: number;
   /** Whole cents -- the cap per part line. */
