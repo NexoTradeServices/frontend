@@ -115,9 +115,6 @@ function PaymentBody({ payment, customerName }: { payment: PaymentDto; customerN
           <p className="text-[13px] text-muted-text">The pay link is on its way - you can collect payment with a QR code here in a moment.</p>
         ) : (
           <>
-            <p className="mb-3 text-[13px] text-secondary-text">
-              {who} can pay on the spot. Tap below, then have {who} scan the code with a phone camera.
-            </p>
             <button
               type="button"
               onClick={() => setShowQr((open) => !open)}

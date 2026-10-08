@@ -189,7 +189,7 @@ test.describe("Bob's job screen, on a phone", () => {
     await expect(show).toBeVisible({ timeout: 15_000 });
     const qr = payment.getByTestId("qr-code");
     await expect(qr).toHaveCount(0);
-    await expect(payment.getByText("E2E can pay on the spot. Tap below, then have E2E scan the code with a phone camera.")).toBeVisible();
+    await expect(payment.getByText(/can pay on the spot/)).toHaveCount(0);
     await show.click();
     await expect(qr).toBeVisible();
     await expect(payment.getByText("Customer scans this with their phone camera to pay.")).toBeVisible();
