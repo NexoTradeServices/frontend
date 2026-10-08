@@ -112,9 +112,12 @@ function PaymentBody({ payment, customerName }: { payment: PaymentDto; customerN
       )}
       <div className="mt-4">
         {payment.payLinkUrl === null ? (
-          <p className="text-[13px] text-muted-text">The pay link is on its way - the QR code is available here in a moment.</p>
+          <p className="text-[13px] text-muted-text">The pay link is on its way - you can collect payment with a QR code here in a moment.</p>
         ) : (
           <>
+            <p className="mb-3 text-[13px] text-secondary-text">
+              {who} can pay on the spot. Tap below, then have {who} scan the code with a phone camera.
+            </p>
             <button
               type="button"
               onClick={() => setShowQr((open) => !open)}
@@ -122,7 +125,7 @@ function PaymentBody({ payment, customerName }: { payment: PaymentDto; customerN
               className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline bg-surface px-4 text-sm font-bold text-ink"
             >
               <QrCodeIcon aria-hidden className="size-4" />
-              {showQr ? "Hide QR code" : "Show QR code"}
+              {showQr ? "Hide QR code" : "Collect payment with QR code"}
             </button>
             {showQr ? (
               <div className="mt-3.5">

@@ -185,10 +185,11 @@ test.describe("Bob's job screen, on a phone", () => {
     // A fake link is made if Stripe has not given one; the card finds it by itself (no reload).
     await giveInvoiceItsPayLink(request, job);
     // The code is behind a button with a QR icon, closed to begin with.
-    const show = payment.getByRole("button", { name: "Show QR code" });
+    const show = payment.getByRole("button", { name: "Collect payment with QR code" });
     await expect(show).toBeVisible({ timeout: 15_000 });
     const qr = payment.getByTestId("qr-code");
     await expect(qr).toHaveCount(0);
+    await expect(payment.getByText("E2E can pay on the spot. Tap below, then have E2E scan the code with a phone camera.")).toBeVisible();
     await show.click();
     await expect(qr).toBeVisible();
     await expect(payment.getByText("Customer scans this with their phone camera to pay.")).toBeVisible();
@@ -212,8 +213,8 @@ test.describe("Bob's job screen, on a phone", () => {
     // Still there after a reload.
     await page.reload();
     await expect(payment.getByTestId("payment-total")).toHaveText("$610");
-    await expect(payment.getByRole("button", { name: "Show QR code" })).toBeVisible();
-    await payment.getByRole("button", { name: "Show QR code" }).click();
+    await expect(payment.getByRole("button", { name: "Collect payment with QR code" })).toBeVisible();
+    await payment.getByRole("button", { name: "Collect payment with QR code" }).click();
     await expect(payment.getByTestId("qr-code")).toBeVisible();
     await payment.getByRole("button", { name: "Hide QR code" }).click();
     await expect(payment.getByTestId("qr-code")).toHaveCount(0);
@@ -242,7 +243,7 @@ test.describe("Bob's job screen, on a phone", () => {
     const payment = page.locator("section").filter({ has: page.getByRole("heading", { name: "Payment" }) });
     await expect(payment.getByTestId("payment-total")).toHaveText("$610");
     await expect(payment.getByTestId("payment-sending")).toHaveText("Sending the invoice to E2E by email and text...");
-    await expect(payment.getByText("The pay link is on its way - the QR code is available here in a moment.")).toBeVisible();
+    await expect(payment.getByText("The pay link is on its way - you can collect payment with a QR code here in a moment.")).toBeVisible();
     await expect(payment.getByTestId("qr-code")).toHaveCount(0);
   });
 
