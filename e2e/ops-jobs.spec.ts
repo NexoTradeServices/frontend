@@ -22,6 +22,9 @@
 // AC29 at 390px: every action reachable, no sideways scroll, every tap
 //      target at least 44px -- on the queue and on the job page
 // AC30 at 390px the status chips stay one row that scrolls sideways
+// 6002 AC6  Check payment with Stripe: "No payment yet." while nobody has paid, the error Toast
+//      when Stripe cannot be reached
+// 6002 AC9  once paid, the Invoice card shows Paid with its Fact, and Resend, Copy and Check payment are gone
 //
 // Runs against the seeded dev database. The seeded jobs are only read.
 // Every enquiry this file posts is a genuine, permanent Customer + Job row
@@ -440,4 +443,52 @@ test("6001 AC13-AC15: the Invoice card shows the invoice; Resend sends it again;
   });
   await card.getByRole("button", { name: "Copy pay link" }).click();
   await expect(page.getByText("Couldn't copy - the link is in the invoice email.")).toBeVisible();
+});
+
+test("6002 AC6 / AC9: Check payment with Stripe says 'No payment yet.'; once paid the card shows Paid with when and how, and its actions are gone", async ({
+  page,
+  browser,
+  request,
+}) => {
+  const job = await acceptedJobForBob(browser, request, "chk");
+  await completeJobAsBob(browser, job);
+  await giveInvoiceItsPayLink(request, job);
+
+  await page.goto(`/ops/jobs/${job.reference}`);
+  await login(page, "mike@idelta.com.au");
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: /^InvoiceINV-\d+$/ }) });
+  await expect(card.getByTestId("invoice-status")).toHaveText(/^sent$/i);
+
+  // AC6: nobody has paid at Stripe (dev's sandbox, or the test hook's pretend link) -- the Toast says so.
+  const check = card.getByRole("button", { name: "Check payment with Stripe" });
+  await check.click();
+  await expect(page.getByText("No payment yet.")).toBeVisible();
+  await expect(card.getByTestId("invoice-status")).toHaveText(/^sent$/i);
+
+  // AC6: Stripe out of reach -- an error Toast that stays until it is closed.
+  await page.route("**/invoice/check-payment", (route) =>
+    route.fulfill({ status: 502, json: { error: "Couldn't reach Stripe - try again in a minute." } }),
+  );
+  await check.click();
+  const error = page.getByRole("alert").filter({ hasText: "Couldn't reach Stripe - try again in a minute." });
+  await expect(error).toBeVisible();
+  await page.waitForTimeout(5_000);
+  await expect(error).toBeVisible();
+  await error.getByRole("button", { name: "Close" }).click();
+  await expect(error).toHaveCount(0);
+  await page.unroute("**/invoice/check-payment");
+
+  // AC9: paid (the test hook runs the one paid step with a card payment).
+  const paid = await request.post(`${apiUrl}/api/test-data/jobs/${job.reference}/paid`);
+  expect(paid.status()).toBe(200);
+  await page.reload();
+  await expect(card.getByTestId("invoice-status")).toHaveText(/^paid$/i);
+  await expect(card.getByText("Paid", { exact: true }).last()).toBeVisible();
+  await expect(card.getByText(/^\d{1,2} \w{3} \d{4}, card$/)).toBeVisible();
+  for (const name of ["Resend invoice", "Copy pay link", "Check payment with Stripe"]) {
+    await expect(card.getByRole("button", { name })).toHaveCount(0);
+  }
+  // The receipt and the office's notice are listed with the job's messages.
+  await expect(page.getByTestId("message-row").filter({ hasText: "Payment receipt" })).toHaveCount(1);
+  await expect(page.getByTestId("message-row").filter({ hasText: "Payment received" })).toHaveCount(1);
 });

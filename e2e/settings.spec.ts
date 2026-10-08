@@ -142,9 +142,9 @@ test.describe(() => {
     await expect(menu.getByRole("link", { name: "Settings" })).toHaveCount(0);
     await expect(menu.getByRole("link", { name: "Pricing" })).toHaveCount(0);
     // Same order as the sidebar's own list (frontend/src/lib/ops-nav.ts) --
-    // Jobs (feature 4001) and Contractors are Mike's built, non-owner
-    // entries, so they are the only links the menu carries.
-    await expect(menu.getByRole("link")).toHaveText(["Jobs", "Contractors"]);
+    // Jobs (feature 4001), Contractors and Receivables (feature 6002) are
+    // Mike's built, non-owner entries, so they are the only links the menu carries.
+    await expect(menu.getByRole("link")).toHaveText(["Jobs", "Contractors", "Receivables"]);
 
     await page.getByRole("button", { name: "Close menu" }).click();
   });

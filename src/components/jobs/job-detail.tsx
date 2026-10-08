@@ -21,7 +21,7 @@ import { SelectField } from "@/components/ui/select-field";
 import { PrimaryButton, PrimaryLink } from "@/components/auth/buttons";
 import { Field } from "@/components/auth/field";
 import { ReadOnlyPhotoGallery } from "@/components/ui/photo-gallery";
-import { Toast, useToast } from "@/components/ui/toast";
+import { ErrorToast, Toast, useToast } from "@/components/ui/toast";
 import { TimeEntryRows, isBlankRow, rowsFromEntries, type TimeEntryRow } from "@/components/ui/time-entry-rows";
 import { formatHours } from "@/lib/billed-hours";
 import { formatDollars } from "@/components/request-a-job/money";
@@ -765,20 +765,25 @@ function BilledTo({ billedTo }: { billedTo: InvoiceView["billedTo"] }) {
 /**
  * Feature 6001: the Invoice card, straight after Time on site. Reads the invoice's
  * frozen rows only (lines, billed-to, the GST stamp). Resend invoice and Copy pay
- * link are the backups for a message that did not land.
+ * link are the backups for a message that did not land. Feature 6002: Check payment
+ * with Stripe is the backup for Stripe's own message not arriving; once paid the card
+ * shows when and how, and the backups go.
  */
 function InvoiceCard({
   job,
   invoice,
   onSent,
   onToast,
+  onErrorToast,
 }: {
   job: JobDetail;
   invoice: InvoiceView;
   onSent: (next: JobDetail, message: string) => void;
   onToast: (message: string) => void;
+  onErrorToast: (message: string) => void;
 }) {
   const [resending, setResending] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const tag = INVOICE_TAGS[invoice.waitingForPayLink ? "waiting" : invoice.status];
   const th = `${labelClass} pb-1.5 font-bold`;
@@ -801,6 +806,28 @@ function InvoiceCard({
       setError("Couldn't send the invoice - check your connection and try again.");
     } finally {
       setResending(false);
+    }
+  }
+
+  async function checkPayment() {
+    setChecking(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(job.reference)}/invoice/check-payment`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => ({}))) as Partial<ApiError>;
+        onErrorToast(res.status === 502 ? "Couldn't reach Stripe - try again in a minute." : (payload.error ?? "Couldn't check the payment - try again."));
+        return;
+      }
+      const payload = (await res.json()) as { paid: boolean; job: JobDetail };
+      if (payload.paid) onSent(payload.job, `Paid - ${invoice.reference} is marked paid.`);
+      else onToast("No payment yet.");
+    } catch {
+      onErrorToast("Couldn't reach Stripe - try again in a minute.");
+    } finally {
+      setChecking(false);
     }
   }
 
@@ -841,6 +868,7 @@ function InvoiceCard({
         <Fact label="Issued">{invoice.issuedLabel}</Fact>
         <Fact label="Due">{invoice.dueLabel}</Fact>
         <Fact label="Total">{formatDollars(invoice.amount)}</Fact>
+        {invoice.paidLabel ? <Fact label="Paid">{invoice.paidLabel}</Fact> : null}
       </div>
       <table className="mt-3.5 w-full text-sm" data-testid="invoice-lines">
         <thead>
@@ -885,7 +913,7 @@ function InvoiceCard({
           )}
         </tfoot>
       </table>
-      {invoice.canResend ? (
+      {invoice.canResend || invoice.canCheckPayment ? (
         <div className="mt-3.5 flex flex-wrap gap-x-4 border-t border-hairline pt-3">
           <button
             type="button"
@@ -898,6 +926,16 @@ function InvoiceCard({
           <button type="button" onClick={() => void copyLink()} className="min-h-11 text-sm font-semibold text-ink underline underline-offset-2">
             Copy pay link
           </button>
+          {invoice.canCheckPayment ? (
+            <button
+              type="button"
+              onClick={() => void checkPayment()}
+              disabled={checking}
+              className="min-h-11 text-sm font-semibold text-ink underline underline-offset-2 disabled:opacity-60"
+            >
+              {checking ? "Checking..." : "Check payment with Stripe"}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </Card>
@@ -1192,6 +1230,7 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
   const [notesVersion, setNotesVersion] = useState(0);
   const [visitVersion, setVisitVersion] = useState(0);
   const [toastMessage, showToast] = useToast();
+  const [errorToast, setErrorToast] = useState<string | null>(null);
 
   useEffect(() => {
     // Feature 4002, plan decision 15: after Dispatch the page returns here
@@ -1255,6 +1294,7 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
               job={job}
               invoice={job.invoice}
               onToast={showToast}
+              onErrorToast={setErrorToast}
               onSent={(next, message) => {
                 setJob(next);
                 showToast(message);
@@ -1278,6 +1318,7 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
         </div>
       </div>
       <Toast message={toastMessage} />
+      <ErrorToast message={errorToast} onClose={() => setErrorToast(null)} />
     </>
   );
 }

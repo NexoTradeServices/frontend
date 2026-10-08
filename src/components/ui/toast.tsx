@@ -29,3 +29,24 @@ export function Toast({ message }: { message: string | null }) {
     </div>
   );
 }
+
+/**
+ * Feature 6002: the error Toast (Molecules / Messages to the person - Toast): the same
+ * ink box, but it stays until the person closes it.
+ */
+export function ErrorToast({ message, onClose }: { message: string | null; onClose: () => void }) {
+  if (!message) return null;
+  return (
+    <div
+      role="alert"
+      className="fixed right-5 bottom-5 z-50 flex max-w-[360px] items-start gap-3 rounded-lg bg-ink py-3 pr-2 pl-4 text-[13px] text-white shadow-lg"
+    >
+      <span className="pt-0.5">{message}</span>
+      <button type="button" onClick={onClose} aria-label="Close" className="-my-2 flex size-11 shrink-0 items-center justify-center">
+        <svg aria-hidden viewBox="0 0 24 24" className="size-4" fill="none">
+          <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      </button>
+    </div>
+  );
+}
