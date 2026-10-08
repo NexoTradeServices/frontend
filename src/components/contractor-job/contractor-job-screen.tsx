@@ -9,13 +9,14 @@
 // the Bottom action bar fixed to the bottom of the phone.
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Lock } from "lucide-react";
+import { Lock, QrCode as QrCodeIcon } from "lucide-react";
 import { Field } from "@/components/auth/field";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PhotoGallery, type GalleryPhoto } from "@/components/ui/photo-gallery";
+import { QrCode } from "@/components/ui/qr-code";
 import { Toast, useToast } from "@/components/ui/toast";
 import {
   FROZEN_MESSAGE,
@@ -29,7 +30,7 @@ import { PHOTO_TOO_BIG, PHOTO_WRONG_TYPE } from "@/components/request-a-job/use-
 import { billedHoursOf, formatHours } from "@/lib/billed-hours";
 import { centsToDollarsText, dollarsTextToCents } from "@/lib/visit-format";
 import { formatDollars } from "@/components/request-a-job/money";
-import type { ApiError, ContractorJobDto } from "./types";
+import type { ApiError, ContractorJobDto, PaymentDto } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -80,6 +81,58 @@ function Card({ title, aside, children }: { title: string; aside?: string; child
       </h2>
       <div className="mt-3.5">{children}</div>
     </section>
+  );
+}
+
+/**
+ * Feature 6001: the Payment card's content, in the order the customer asks: how much, has it
+ * been sent to me, and how do I pay now (the QR code opens on a tap, closed to begin with). Bob sees the customer's total, never his own pay.
+ */
+function PaymentBody({ payment, customerName }: { payment: PaymentDto; customerName: string }) {
+  const [showQr, setShowQr] = useState(false);
+  const who = customerName.split(" ")[0] ?? customerName;
+  return (
+    <div>
+      <span className={labelClass}>Customer pays</span>
+      <p data-testid="payment-total" className="mt-[5px] font-heading text-[28px] leading-none font-extrabold text-ink">
+        {formatDollars(payment.amount)}
+      </p>
+      {payment.messages === "sent" ? (
+        <p data-testid="payment-sent" className="mt-3 rounded-md border border-success-border bg-success-bg px-3 py-2.5 text-[13px] text-brand-success">
+          Invoice sent to {who} by email and text.
+        </p>
+      ) : payment.messages === "failed" ? (
+        <p role="alert" className="mt-3 rounded-md border border-error-border bg-error-bg px-3 py-2.5 text-[13px] text-brand-destructive">
+          The invoice could not be sent to {who}. {who} can still pay with the code below.
+        </p>
+      ) : (
+        <p data-testid="payment-sending" className="mt-3 rounded-md border border-brand-warning/30 bg-warning-bg px-3 py-2.5 text-[13px] text-brand-warning">
+          Sending the invoice to {who} by email and text...
+        </p>
+      )}
+      <div className="mt-4">
+        {payment.payLinkUrl === null ? (
+          <p className="text-[13px] text-muted-text">The pay link is on its way - you can collect payment with a QR code here in a moment.</p>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowQr((open) => !open)}
+              aria-expanded={showQr}
+              className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline bg-surface px-4 text-sm font-bold text-ink"
+            >
+              <QrCodeIcon aria-hidden className="size-4" />
+              {showQr ? "Hide QR code" : "Collect payment with QR code"}
+            </button>
+            {showQr ? (
+              <div className="mt-3.5">
+                <QrCode value={payment.payLinkUrl} caption="Customer scans this with their phone camera to pay." />
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -239,6 +292,8 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
   const [busy, setBusy] = useState<"save" | "complete" | "onsite" | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [toastMessage, showToast] = useToast();
+  const paymentRef = useRef<HTMLDivElement>(null);
+  const [scrollToPayment, setScrollToPayment] = useState(false);
 
   const frozen = job.frozen;
   const changed = snapshotOf(rows, notes, parts) !== saved;
@@ -300,6 +355,35 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
     return found;
   }
 
+  // Right after Complete the screen is scrolled down to the buttons: bring the Payment card into view.
+  useEffect(() => {
+    if (!scrollToPayment || paymentRef.current === null) return;
+    paymentRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    setScrollToPayment(false);
+  }, [scrollToPayment, job.payment]);
+
+  // The pay link and the messages take a few seconds: keep looking, so the code and the
+  // confirmation appear by themselves. Gives up after about two minutes.
+  const paymentSettled = job.payment === null || (job.payment.payLinkUrl !== null && job.payment.messages !== "sending");
+  useEffect(() => {
+    if (paymentSettled) return;
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      if (tries > 40) {
+        clearInterval(timer);
+        return;
+      }
+      void fetch(`${apiUrl}/api/contractor/jobs/${encodeURIComponent(job.reference)}`, { credentials: "include" })
+        .then((res) => (res.ok ? (res.json() as Promise<ContractorJobDto>) : null))
+        .then((fresh) => {
+          if (fresh !== null) setJob((current) => ({ ...current, payment: fresh.payment }));
+        })
+        .catch(() => undefined);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [paymentSettled, job.reference]);
+
   function adopt(next: ContractorJobDto) {
     setJob(next);
     const nextRows = rowsFromEntries(next.timeEntries, next.timezone);
@@ -351,7 +435,10 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
       adopt(payload);
       setConfirming(false);
       showToast(complete ? `Completed ${job.reference}.` : `Saved ${job.reference}.`);
-      if (complete) router.refresh();
+      if (complete) {
+        setScrollToPayment(true);
+        router.refresh();
+      }
     } catch {
       setConfirming(false);
       setBanner("Save failed - check your connection and try again.");
@@ -446,7 +533,14 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
           </p>
         ) : null}
 
-        <div className="order-1 min-w-0 xl:col-start-2 xl:row-start-1 xl:row-span-3">
+        <div className="order-1 flex min-w-0 flex-col gap-4 xl:col-start-2 xl:row-start-1 xl:row-span-3">
+          {job.payment === null ? null : (
+            <div ref={paymentRef} className="scroll-mt-4">
+              <Card title="Payment">
+                <PaymentBody payment={job.payment} customerName={job.customerName} />
+              </Card>
+            </div>
+          )}
           <Card title="The job">
             <div className="grid grid-cols-2 gap-x-4.5 gap-y-3.5">
               <Fact label="Appointment">{job.slotLabel ?? "No date yet"}</Fact>
