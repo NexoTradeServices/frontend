@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Lock } from "lucide-react";
+import { Lock, QrCode as QrCodeIcon } from "lucide-react";
 import { Field } from "@/components/auth/field";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PhotoGallery, type GalleryPhoto } from "@/components/ui/photo-gallery";
@@ -86,9 +86,10 @@ function Card({ title, aside, children }: { title: string; aside?: string; child
 
 /**
  * Feature 6001: the Payment card's content, in the order the customer asks: how much, has it
- * been sent to me, and how do I pay now. Bob sees the customer's total, never his own pay.
+ * been sent to me, and how do I pay now (the QR code opens on a tap, closed to begin with). Bob sees the customer's total, never his own pay.
  */
 function PaymentBody({ payment, customerName }: { payment: PaymentDto; customerName: string }) {
+  const [showQr, setShowQr] = useState(false);
   const who = customerName.split(" ")[0] ?? customerName;
   return (
     <div>
@@ -105,15 +106,30 @@ function PaymentBody({ payment, customerName }: { payment: PaymentDto; customerN
           The invoice could not be sent to {who}. {who} can still pay with the code below.
         </p>
       ) : (
-        <p data-testid="payment-sending" className="mt-3 text-[13px] text-muted-text">
+        <p data-testid="payment-sending" className="mt-3 rounded-md border border-brand-warning/30 bg-warning-bg px-3 py-2.5 text-[13px] text-brand-warning">
           Sending the invoice to {who} by email and text...
         </p>
       )}
       <div className="mt-4">
         {payment.payLinkUrl === null ? (
-          <p className="text-[13px] text-muted-text">The pay link is on its way - the code appears here in a moment.</p>
+          <p className="text-[13px] text-muted-text">The pay link is on its way - the QR code is available here in a moment.</p>
         ) : (
-          <QrCode value={payment.payLinkUrl} caption="Customer scans this with their phone camera to pay." />
+          <>
+            <button
+              type="button"
+              onClick={() => setShowQr((open) => !open)}
+              aria-expanded={showQr}
+              className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline bg-surface px-4 text-sm font-bold text-ink"
+            >
+              <QrCodeIcon aria-hidden className="size-4" />
+              {showQr ? "Hide QR code" : "Show QR code"}
+            </button>
+            {showQr ? (
+              <div className="mt-3.5">
+                <QrCode value={payment.payLinkUrl} caption="Customer scans this with their phone camera to pay." />
+              </div>
+            ) : null}
+          </>
         )}
       </div>
     </div>
