@@ -18,6 +18,7 @@ export function ConfirmDialog({
   tone = "accent",
   loading = false,
   loadingLabel = "Saving...",
+  fields,
   onConfirm,
   onCancel,
 }: {
@@ -32,6 +33,8 @@ export function ConfirmDialog({
   loading?: boolean;
   /** the confirm button's label while it works */
   loadingLabel?: string;
+  /** Up to two Fields, one column, between the body and the buttons (Organisms / Dialogs and bars). */
+  fields?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -49,6 +52,7 @@ export function ConfirmDialog({
           {title}
         </h4>
         <div className="mb-4 text-[13px] text-secondary-text">{children}</div>
+        {fields ? <div className="mb-4">{fields}</div> : null}
         <div className="flex justify-end gap-2.5">
           <button
             type="button"
