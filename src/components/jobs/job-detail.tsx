@@ -768,7 +768,7 @@ function BilledTo({ billedTo }: { billedTo: InvoiceView["billedTo"] }) {
  * link are the backups for a message that did not land. Feature 6002: Check payment
  * with Stripe is the backup for Stripe's own message not arriving. Its answer shows in
  * this card, never as a Toast: paid turns the card Paid (when and how, the backups gone);
- * not paid is one muted line saying when it was checked; Stripe out of reach is the
+ * not paid is a warning Banner saying when it was checked; Stripe out of reach is the
  * card's error Banner.
  */
 function InvoiceCard({
@@ -867,7 +867,11 @@ function InvoiceCard({
           </p>
         ) : null}
         {checkedLine !== null && invoice.status === "sent" ? (
-          <p data-testid="payment-check" className="mt-1.5 text-[13px] text-muted-text">
+          <p
+            data-testid="payment-check"
+            role="status"
+            className="mt-2.5 rounded-md border border-brand-warning/30 bg-warning-bg px-3 py-2.5 text-[13px] text-brand-warning"
+          >
             {checkedLine}
           </p>
         ) : null}

@@ -464,6 +464,8 @@ test("6002 AC6 / AC9: Check payment with Stripe answers in the Invoice card; onc
   const check = card.getByRole("button", { name: "Check payment with Stripe" });
   await check.click();
   await expect(card.getByTestId("payment-check")).toHaveText(/^Checked with Stripe at \d{1,2}:\d{2}(am|pm) AWST - no payment yet\.$/);
+  // A warning Banner: the warning pair, so it stands out.
+  await expect(card.getByTestId("payment-check")).toHaveCSS("color", await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--brand-warning").trim()).then(hexToRgb));
   await expect(card.getByTestId("invoice-status")).toHaveText(/^sent$/i);
   await expect(page.getByText("No payment yet.", { exact: true })).toHaveCount(0);
   // The line is true only when it was checked: a reload drops it.
@@ -493,3 +495,10 @@ test("6002 AC6 / AC9: Check payment with Stripe answers in the Invoice card; onc
   await expect(page.getByTestId("message-row").filter({ hasText: "Payment receipt" })).toHaveCount(1);
   await expect(page.getByTestId("message-row").filter({ hasText: "Payment received" })).toHaveCount(1);
 });
+
+/** "#b4531a" -> "rgb(180, 83, 26)", as getComputedStyle reports a color. */
+function hexToRgb(hex: string): string {
+  const value = hex.replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((at) => Number.parseInt(value.slice(at, at + 2), 16));
+  return `rgb(${String(r)}, ${String(g)}, ${String(b)})`;
+}
