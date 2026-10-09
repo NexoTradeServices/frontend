@@ -10,7 +10,7 @@
 // invoices: this file checks its own three rows and their order among the rest. Each is a
 // throwaway job of its own (helpers/accepted-job.ts), labelled `e2e` and swept by the suite.
 import { test, expect, type APIRequestContext, type Browser, type Page } from "@playwright/test";
-import { acceptedJobForBob, completeJobAsBob } from "./helpers/accepted-job";
+import { acceptedJobForBob, completeJobAsBob, giveInvoiceItsPayLink } from "./helpers/accepted-job";
 import { login } from "./helpers/login";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
@@ -19,6 +19,8 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
 async function owedJob(browser: Browser, request: APIRequestContext, tag: string, days: number): Promise<string> {
   const job = await acceptedJobForBob(browser, request, tag);
   await completeJobAsBob(browser, job);
+  // CI has no Stripe key: without its (pretend) link the row would also say "Waiting for pay link".
+  await giveInvoiceItsPayLink(request, job);
   const moved = await request.post(`${apiUrl}/api/test-data/jobs/${job.reference}/due`, { data: { days } });
   expect(moved.status()).toBe(200);
   return job.reference;
