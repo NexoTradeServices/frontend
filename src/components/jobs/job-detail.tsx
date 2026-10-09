@@ -765,23 +765,34 @@ function BilledTo({ billedTo }: { billedTo: InvoiceView["billedTo"] }) {
 /**
  * Feature 6001: the Invoice card, straight after Time on site. Reads the invoice's
  * frozen rows only (lines, billed-to, the GST stamp). Resend invoice and Copy pay
- * link are the backups for a message that did not land.
+ * link are the backups for a message that did not land. Feature 6002: Check payment
+ * with Stripe is the backup for Stripe's own message not arriving. Its answer shows in
+ * this card, never as a Toast: paid turns the card Paid (when and how, the backups gone);
+ * not paid is a warning Banner saying when it was checked; Stripe out of reach an error
+ * Banner -- both right above the row of buttons, by the button pressed.
  */
 function InvoiceCard({
   job,
   invoice,
   onSent,
+  onPaid,
   onToast,
 }: {
   job: JobDetail;
   invoice: InvoiceView;
   onSent: (next: JobDetail, message: string) => void;
+  onPaid: (next: JobDetail) => void;
   onToast: (message: string) => void;
 }) {
   const [resending, setResending] = useState(false);
+  const [checking, setChecking] = useState(false);
+  /** "Checked with Stripe at 2:15pm AWST - no payment yet." -- true only at that moment, so never kept past a reload. */
+  const [checkedLine, setCheckedLine] = useState<string | null>(null);
+  const [checkError, setCheckError] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();
   const tag = INVOICE_TAGS[invoice.waitingForPayLink ? "waiting" : invoice.status];
-  const th = `${labelClass} pb-1.5 font-bold`;
+  // A table header cell: the Field label look without its `block`, which would take the cell out of the row.
+  const th = "pb-1.5 text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
 
   async function resend() {
     setError(undefined);
@@ -801,6 +812,35 @@ function InvoiceCard({
       setError("Couldn't send the invoice - check your connection and try again.");
     } finally {
       setResending(false);
+    }
+  }
+
+  async function checkPayment() {
+    setCheckError(undefined);
+    setChecking(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(job.reference)}/invoice/check-payment`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => ({}))) as Partial<ApiError>;
+        setCheckedLine(null);
+        setCheckError(res.status === 502 ? "Couldn't reach Stripe - try again in a minute." : (payload.error ?? "Couldn't check the payment - try again."));
+        return;
+      }
+      const payload = (await res.json()) as { paid: boolean; checkedLabel: string; job: JobDetail };
+      if (payload.paid) {
+        setCheckedLine(null);
+        onPaid(payload.job);
+      } else {
+        setCheckedLine(`Checked with Stripe at ${payload.checkedLabel} - no payment yet.`);
+      }
+    } catch {
+      setCheckedLine(null);
+      setCheckError("Couldn't reach Stripe - try again in a minute.");
+    } finally {
+      setChecking(false);
     }
   }
 
@@ -828,6 +868,7 @@ function InvoiceCard({
             Stripe has not answered yet. The invoice goes out by email and text as soon as it does.
           </p>
         ) : null}
+
       </div>
       {error ? (
         <p role="alert" className="mb-3.5 rounded-md border border-error-border bg-error-bg px-3 py-2.5 text-[13px] text-brand-destructive">
@@ -841,6 +882,7 @@ function InvoiceCard({
         <Fact label="Issued">{invoice.issuedLabel}</Fact>
         <Fact label="Due">{invoice.dueLabel}</Fact>
         <Fact label="Total">{formatDollars(invoice.amount)}</Fact>
+        {invoice.paidLabel ? <Fact label="Paid">{invoice.paidLabel}</Fact> : null}
       </div>
       <table className="mt-3.5 w-full text-sm" data-testid="invoice-lines">
         <thead>
@@ -885,8 +927,19 @@ function InvoiceCard({
           )}
         </tfoot>
       </table>
-      {invoice.canResend ? (
-        <div className="mt-3.5 flex flex-wrap gap-x-4 border-t border-hairline pt-3">
+      {invoice.canResend || invoice.canCheckPayment ? (
+        <div className="mt-3.5 border-t border-hairline pt-3">
+          {/* Check payment's answer sits right above its button (the owner's call at UAT). */}
+          {checkError ? (
+            <p role="alert" data-testid="payment-check-error" className="mb-1 rounded-md border border-error-border bg-error-bg px-3 py-2.5 text-[13px] text-brand-destructive">
+              {checkError}
+            </p>
+          ) : checkedLine !== null ? (
+            <p data-testid="payment-check" role="status" className="mb-1 rounded-md border border-brand-warning/30 bg-warning-bg px-3 py-2.5 text-[13px] text-brand-warning">
+              {checkedLine}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-x-4">
           <button
             type="button"
             onClick={() => void resend()}
@@ -898,6 +951,17 @@ function InvoiceCard({
           <button type="button" onClick={() => void copyLink()} className="min-h-11 text-sm font-semibold text-ink underline underline-offset-2">
             Copy pay link
           </button>
+          {invoice.canCheckPayment ? (
+            <button
+              type="button"
+              onClick={() => void checkPayment()}
+              disabled={checking}
+              className="min-h-11 text-sm font-semibold text-ink underline underline-offset-2 disabled:opacity-60"
+            >
+              {checking ? "Checking..." : "Check payment with Stripe"}
+            </button>
+          ) : null}
+          </div>
         </div>
       ) : null}
     </Card>
@@ -1259,6 +1323,7 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
                 setJob(next);
                 showToast(message);
               }}
+              onPaid={setJob}
             />
           </div>
         ) : null}

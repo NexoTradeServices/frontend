@@ -22,6 +22,10 @@
 // AC29 at 390px: every action reachable, no sideways scroll, every tap
 //      target at least 44px -- on the queue and on the job page
 // AC30 at 390px the status chips stay one row that scrolls sideways
+// 6002 AC6  Check payment with Stripe answers inside the Invoice card, never as a Toast: "Checked
+//      with Stripe at ... - no payment yet." while nobody has paid; the card's error Banner when
+//      Stripe cannot be reached
+// 6002 AC9  once paid, the Invoice card shows Paid with its Fact, and Resend, Copy and Check payment are gone
 //
 // Runs against the seeded dev database. The seeded jobs are only read.
 // Every enquiry this file posts is a genuine, permanent Customer + Job row
@@ -397,6 +401,11 @@ test("6001 AC13-AC15: the Invoice card shows the invoice; Resend sends it again;
   await expect(card.getByText("Issued")).toBeVisible();
   await expect(card.getByText("Due", { exact: true })).toBeVisible();
   const lines = card.getByTestId("invoice-lines");
+  // The Line items table: one header row, Item / Qty / Price / Amount side by side, over their columns.
+  const headers = lines.locator("thead th");
+  await expect(headers).toHaveText([/^item$/i, /^qty$/i, /^price$/i, /^amount$/i]);
+  const tops = await headers.evaluateAll((cells) => cells.map((cell) => Math.round(cell.getBoundingClientRect().top)));
+  expect(new Set(tops).size).toBe(1);
   await expect(lines.getByRole("row", { name: /Call-out \+ first hour - Plumbing, normal.*\$250.*\$250/ })).toBeVisible();
   await expect(lines.getByRole("row", { name: /Additional 2\.0h @ \$180\/h.*\$360/ })).toBeVisible();
   await expect(lines.getByRole("row", { name: /^Total.*\$610$/ })).toBeVisible();
@@ -441,3 +450,66 @@ test("6001 AC13-AC15: the Invoice card shows the invoice; Resend sends it again;
   await card.getByRole("button", { name: "Copy pay link" }).click();
   await expect(page.getByText("Couldn't copy - the link is in the invoice email.")).toBeVisible();
 });
+
+test("6002 AC6 / AC9: Check payment with Stripe answers in the Invoice card; once paid the card shows Paid with when and how, and its actions are gone", async ({
+  page,
+  browser,
+  request,
+}) => {
+  const job = await acceptedJobForBob(browser, request, "chk");
+  await completeJobAsBob(browser, job);
+  await giveInvoiceItsPayLink(request, job);
+
+  await page.goto(`/ops/jobs/${job.reference}`);
+  await login(page, "mike@idelta.com.au");
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: /^InvoiceINV-\d+$/ }) });
+  await expect(card.getByTestId("invoice-status")).toHaveText(/^sent$/i);
+
+  // AC6: nobody has paid at Stripe (dev's sandbox, or the test hook's pretend link) -- the card says so, with when.
+  const check = card.getByRole("button", { name: "Check payment with Stripe" });
+  await check.click();
+  await expect(card.getByTestId("payment-check")).toHaveText(/^Checked with Stripe at \d{1,2}:\d{2}(am|pm) AWST - no payment yet\.$/);
+  // Right above the row of buttons, by the one pressed.
+  const banner = await card.getByTestId("payment-check").boundingBox();
+  const button = await check.boundingBox();
+  const lastLine = await card.getByTestId("invoice-lines").boundingBox();
+  expect(banner!.y).toBeGreaterThan(lastLine!.y + lastLine!.height);
+  expect(banner!.y + banner!.height).toBeLessThanOrEqual(button!.y);
+  // A warning Banner: the warning pair, so it stands out.
+  await expect(card.getByTestId("payment-check")).toHaveCSS("color", await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--brand-warning").trim()).then(hexToRgb));
+  await expect(card.getByTestId("invoice-status")).toHaveText(/^sent$/i);
+  await expect(page.getByText("No payment yet.", { exact: true })).toHaveCount(0);
+  // The line is true only when it was checked: a reload drops it.
+  await page.reload();
+  await expect(card.getByTestId("payment-check")).toHaveCount(0);
+
+  // AC6: Stripe out of reach -- the card's error Banner, and the check line is not left behind.
+  await page.route("**/invoice/check-payment", (route) =>
+    route.fulfill({ status: 502, json: { error: "Couldn't reach Stripe - try again in a minute." } }),
+  );
+  await check.click();
+  await expect(card.getByTestId("payment-check-error")).toHaveText("Couldn't reach Stripe - try again in a minute.");
+  await expect(card.getByTestId("payment-check")).toHaveCount(0);
+  await page.unroute("**/invoice/check-payment");
+
+  // AC9: paid (the test hook runs the one paid step with a card payment).
+  const paid = await request.post(`${apiUrl}/api/test-data/jobs/${job.reference}/paid`);
+  expect(paid.status()).toBe(200);
+  await page.reload();
+  await expect(card.getByTestId("invoice-status")).toHaveText(/^paid$/i);
+  await expect(card.getByText("Paid", { exact: true }).last()).toBeVisible();
+  await expect(card.getByText(/^\d{1,2} \w{3} \d{4}, card$/)).toBeVisible();
+  for (const name of ["Resend invoice", "Copy pay link", "Check payment with Stripe"]) {
+    await expect(card.getByRole("button", { name })).toHaveCount(0);
+  }
+  // The receipt and the office's notice are listed with the job's messages.
+  await expect(page.getByTestId("message-row").filter({ hasText: "Payment receipt" })).toHaveCount(1);
+  await expect(page.getByTestId("message-row").filter({ hasText: "Payment received" })).toHaveCount(1);
+});
+
+/** "#b4531a" -> "rgb(180, 83, 26)", as getComputedStyle reports a color. */
+function hexToRgb(hex: string): string {
+  const value = hex.replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((at) => Number.parseInt(value.slice(at, at + 2), 16));
+  return `rgb(${String(r)}, ${String(g)}, ${String(b)})`;
+}

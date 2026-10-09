@@ -21,13 +21,22 @@ export interface PartDto {
   receipt: { fileName: string; thumbnailUrl: string; fullUrl: string } | null;
 }
 
-export interface PaymentDto {
+export interface UnpaidPaymentDto {
   /** Whole cents, GST-inclusive: the customer's total. */
   amount: number;
+  paid: false;
   /** Null while Stripe has not answered. */
   payLinkUrl: string | null;
   messages: "sent" | "sending" | "failed";
 }
+
+/** Feature 6002: once paid the card stays, with the total and nothing more to collect. */
+export interface PaidPaymentDto {
+  amount: number;
+  paid: true;
+}
+
+export type PaymentDto = UnpaidPaymentDto | PaidPaymentDto;
 
 export interface ContractorJobDto {
   reference: string;

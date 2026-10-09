@@ -37,6 +37,10 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
 const RECEIPT_UNAVAILABLE = "Photo upload isn't working right now - try again shortly";
 
+/** Bob's Payment card re-reads every 5 seconds while unpaid, for up to 30 minutes (Feature 6002). */
+const PAYMENT_POLL_MS = 5_000;
+const PAYMENT_POLL_TRIES = (30 * 60_000) / PAYMENT_POLL_MS;
+
 const labelClass = "block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
 const starClass = "after:ml-0.5 after:text-brand-destructive after:content-['*']";
 
@@ -91,12 +95,28 @@ function Card({ title, aside, children }: { title: string; aside?: string; child
 function PaymentBody({ payment, customerName }: { payment: PaymentDto; customerName: string }) {
   const [showQr, setShowQr] = useState(false);
   const who = customerName.split(" ")[0] ?? customerName;
-  return (
-    <div>
+  const total = (
+    <>
       <span className={labelClass}>Customer pays</span>
       <p data-testid="payment-total" className="mt-[5px] font-heading text-[28px] leading-none font-extrabold text-ink">
         {formatDollars(payment.amount)}
       </p>
+    </>
+  );
+  // Feature 6002: paid -- the card stays, so Bob knows he can leave.
+  if (payment.paid) {
+    return (
+      <div>
+        {total}
+        <p data-testid="payment-paid" className="mt-3 rounded-md border border-success-border bg-success-bg px-3 py-2.5 text-[13px] text-brand-success">
+          Paid - nothing more to collect.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div>
+      {total}
       {payment.messages === "sent" ? (
         <p data-testid="payment-sent" className="mt-3 rounded-md border border-success-border bg-success-bg px-3 py-2.5 text-[13px] text-brand-success">
           Invoice sent to {who} by email and text.
@@ -362,15 +382,17 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
     setScrollToPayment(false);
   }, [scrollToPayment, job.payment]);
 
-  // The pay link and the messages take a few seconds: keep looking, so the code and the
-  // confirmation appear by themselves. Gives up after about two minutes.
-  const paymentSettled = job.payment === null || (job.payment.payLinkUrl !== null && job.payment.messages !== "sending");
+  // The pay link and the messages take a few seconds, and the customer may pay while Bob
+  // stands there: while the card is unpaid and the screen is open, keep looking every 5
+  // seconds, so the code, the confirmation and Paid appear by themselves (Feature 6002).
+  // Stops once paid, or after 30 minutes.
+  const paymentSettled = job.payment === null || job.payment.paid;
   useEffect(() => {
     if (paymentSettled) return;
     let tries = 0;
     const timer = setInterval(() => {
       tries += 1;
-      if (tries > 40) {
+      if (tries > PAYMENT_POLL_TRIES) {
         clearInterval(timer);
         return;
       }
@@ -380,7 +402,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
           if (fresh !== null) setJob((current) => ({ ...current, payment: fresh.payment }));
         })
         .catch(() => undefined);
-    }, 3000);
+    }, PAYMENT_POLL_MS);
     return () => clearInterval(timer);
   }, [paymentSettled, job.reference]);
 

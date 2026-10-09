@@ -10,6 +10,8 @@
 // 6001 AC12 the Payment card after Complete: scrolled into view, the customer's total, the
 //      "invoice sent" confirmation, a QR code that decodes to the pay link, never Bob's own
 //      pay; "on its way" while the invoice waits for its link
+// 6002 AC10 with the QR code open, the customer paying turns the card to "Paid - nothing more to
+//      collect." within seconds, without a reload; the QR button goes, the total stays
 //
 // AC1-AC3, AC5, AC8 and AC9 are proven in the backend (tests/contractor-job.test.ts,
 // tests/billed-hours.test.ts, tests/ops-jobs.test.ts); the browser proves what needs one.
@@ -17,8 +19,9 @@
 // Phone width: Bob's screen is designed Mobile first. Every test dispatches a throwaway job
 // of its own (helpers/accepted-job.ts), labelled `e2e` and swept by the suite.
 import { test, expect, type Page } from "@playwright/test";
-import { acceptedJobForBob, giveInvoiceItsPayLink, openJobScreen } from "./helpers/accepted-job";
+import { acceptedJobForBob, completeJobAsBob, giveInvoiceItsPayLink, openJobScreen } from "./helpers/accepted-job";
 import { decodeQr } from "./helpers/qr";
+import { login } from "./helpers/login";
 import { installMockCloudinary } from "./helpers/mock-cloudinary";
 import { expectTime, pickTime } from "./helpers/time-box";
 import { MOBILE_VIEWPORT } from "../playwright.config";
@@ -218,6 +221,34 @@ test.describe("Bob's job screen, on a phone", () => {
     await expect(payment.getByTestId("qr-code")).toBeVisible();
     await payment.getByRole("button", { name: "Hide QR code" }).click();
     await expect(payment.getByTestId("qr-code")).toHaveCount(0);
+  });
+
+  test("6002 AC10: with the QR code open, the customer paying turns Bob's card to Paid without a reload", async ({ page, browser, request }) => {
+    const job = await acceptedJobForBob(browser, request, "paid");
+    await completeJobAsBob(browser, job);
+    await giveInvoiceItsPayLink(request, job);
+    // A completed job has left his dashboard: he opens it straight from its address.
+    await page.goto(`/contractor/jobs/${job.reference}`);
+    await login(page, "bob@idelta.com.au");
+    await expect(page.getByRole("heading", { name: job.reference, exact: true })).toBeVisible();
+
+    const payment = page.locator("section").filter({ has: page.getByRole("heading", { name: "Payment" }) });
+    await payment.getByRole("button", { name: "Collect payment with QR code" }).click({ timeout: 15_000 });
+    await expect(payment.getByTestId("qr-code")).toBeVisible();
+
+    // Sarah pays (the test hook runs the one paid step with a card payment).
+    const paid = await request.post(`${process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au"}/api/test-data/jobs/${job.reference}/paid`);
+    expect(paid.status()).toBe(200);
+    // The card checks every 5 seconds: within about that, with no reload.
+    await expect(payment.getByTestId("payment-paid")).toHaveText("Paid - nothing more to collect.", { timeout: 12_000 });
+    await expect(payment.getByTestId("payment-total")).toHaveText("$610");
+    await expect(payment.getByTestId("qr-code")).toHaveCount(0);
+    await expect(payment.getByRole("button", { name: /QR code/ })).toHaveCount(0);
+    await expect(payment.getByTestId("payment-sent")).toHaveCount(0);
+
+    // Still there, still paid, after a reload.
+    await page.reload();
+    await expect(payment.getByTestId("payment-paid")).toBeVisible();
   });
 
   test("6001 AC12: while the invoice waits for its pay link the card shows the total and says the link is on its way", async ({

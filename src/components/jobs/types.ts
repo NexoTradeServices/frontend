@@ -102,6 +102,10 @@ export interface InvoiceView {
   payLinkUrl: string | null;
   /** Resend invoice and Copy pay link are shown only when this is true. */
   canResend: boolean;
+  /** Feature 6002: Check payment with Stripe is shown only when this is true. */
+  canCheckPayment: boolean;
+  /** Feature 6002: "15 Oct 2026, card" once paid; null otherwise. */
+  paidLabel: string | null;
   billedTo: { name: string; businessName: string | null; address: PickedAddress | null };
   issuedLabel: string;
   dueLabel: string;
