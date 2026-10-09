@@ -768,8 +768,8 @@ function BilledTo({ billedTo }: { billedTo: InvoiceView["billedTo"] }) {
  * link are the backups for a message that did not land. Feature 6002: Check payment
  * with Stripe is the backup for Stripe's own message not arriving. Its answer shows in
  * this card, never as a Toast: paid turns the card Paid (when and how, the backups gone);
- * not paid is a warning Banner saying when it was checked; Stripe out of reach is the
- * card's error Banner.
+ * not paid is a warning Banner saying when it was checked; Stripe out of reach an error
+ * Banner -- both right above the row of buttons, by the button pressed.
  */
 function InvoiceCard({
   job,
@@ -788,6 +788,7 @@ function InvoiceCard({
   const [checking, setChecking] = useState(false);
   /** "Checked with Stripe at 2:15pm AWST - no payment yet." -- true only at that moment, so never kept past a reload. */
   const [checkedLine, setCheckedLine] = useState<string | null>(null);
+  const [checkError, setCheckError] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();
   const tag = INVOICE_TAGS[invoice.waitingForPayLink ? "waiting" : invoice.status];
   // A table header cell: the Field label look without its `block`, which would take the cell out of the row.
@@ -815,7 +816,7 @@ function InvoiceCard({
   }
 
   async function checkPayment() {
-    setError(undefined);
+    setCheckError(undefined);
     setChecking(true);
     try {
       const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(job.reference)}/invoice/check-payment`, {
@@ -825,7 +826,7 @@ function InvoiceCard({
       if (!res.ok) {
         const payload = (await res.json().catch(() => ({}))) as Partial<ApiError>;
         setCheckedLine(null);
-        setError(res.status === 502 ? "Couldn't reach Stripe - try again in a minute." : (payload.error ?? "Couldn't check the payment - try again."));
+        setCheckError(res.status === 502 ? "Couldn't reach Stripe - try again in a minute." : (payload.error ?? "Couldn't check the payment - try again."));
         return;
       }
       const payload = (await res.json()) as { paid: boolean; checkedLabel: string; job: JobDetail };
@@ -837,7 +838,7 @@ function InvoiceCard({
       }
     } catch {
       setCheckedLine(null);
-      setError("Couldn't reach Stripe - try again in a minute.");
+      setCheckError("Couldn't reach Stripe - try again in a minute.");
     } finally {
       setChecking(false);
     }
@@ -867,15 +868,7 @@ function InvoiceCard({
             Stripe has not answered yet. The invoice goes out by email and text as soon as it does.
           </p>
         ) : null}
-        {checkedLine !== null && invoice.status === "sent" ? (
-          <p
-            data-testid="payment-check"
-            role="status"
-            className="mt-2.5 rounded-md border border-brand-warning/30 bg-warning-bg px-3 py-2.5 text-[13px] text-brand-warning"
-          >
-            {checkedLine}
-          </p>
-        ) : null}
+
       </div>
       {error ? (
         <p role="alert" className="mb-3.5 rounded-md border border-error-border bg-error-bg px-3 py-2.5 text-[13px] text-brand-destructive">
@@ -935,7 +928,18 @@ function InvoiceCard({
         </tfoot>
       </table>
       {invoice.canResend || invoice.canCheckPayment ? (
-        <div className="mt-3.5 flex flex-wrap gap-x-4 border-t border-hairline pt-3">
+        <div className="mt-3.5 border-t border-hairline pt-3">
+          {/* Check payment's answer sits right above its button (the owner's call at UAT). */}
+          {checkError ? (
+            <p role="alert" data-testid="payment-check-error" className="mb-1 rounded-md border border-error-border bg-error-bg px-3 py-2.5 text-[13px] text-brand-destructive">
+              {checkError}
+            </p>
+          ) : checkedLine !== null ? (
+            <p data-testid="payment-check" role="status" className="mb-1 rounded-md border border-brand-warning/30 bg-warning-bg px-3 py-2.5 text-[13px] text-brand-warning">
+              {checkedLine}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-x-4">
           <button
             type="button"
             onClick={() => void resend()}
@@ -957,6 +961,7 @@ function InvoiceCard({
               {checking ? "Checking..." : "Check payment with Stripe"}
             </button>
           ) : null}
+          </div>
         </div>
       ) : null}
     </Card>

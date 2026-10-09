@@ -469,6 +469,12 @@ test("6002 AC6 / AC9: Check payment with Stripe answers in the Invoice card; onc
   const check = card.getByRole("button", { name: "Check payment with Stripe" });
   await check.click();
   await expect(card.getByTestId("payment-check")).toHaveText(/^Checked with Stripe at \d{1,2}:\d{2}(am|pm) AWST - no payment yet\.$/);
+  // Right above the row of buttons, by the one pressed.
+  const banner = await card.getByTestId("payment-check").boundingBox();
+  const button = await check.boundingBox();
+  const lastLine = await card.getByTestId("invoice-lines").boundingBox();
+  expect(banner!.y).toBeGreaterThan(lastLine!.y + lastLine!.height);
+  expect(banner!.y + banner!.height).toBeLessThanOrEqual(button!.y);
   // A warning Banner: the warning pair, so it stands out.
   await expect(card.getByTestId("payment-check")).toHaveCSS("color", await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--brand-warning").trim()).then(hexToRgb));
   await expect(card.getByTestId("invoice-status")).toHaveText(/^sent$/i);
@@ -482,7 +488,7 @@ test("6002 AC6 / AC9: Check payment with Stripe answers in the Invoice card; onc
     route.fulfill({ status: 502, json: { error: "Couldn't reach Stripe - try again in a minute." } }),
   );
   await check.click();
-  await expect(card.getByRole("alert")).toHaveText("Couldn't reach Stripe - try again in a minute.");
+  await expect(card.getByTestId("payment-check-error")).toHaveText("Couldn't reach Stripe - try again in a minute.");
   await expect(card.getByTestId("payment-check")).toHaveCount(0);
   await page.unroute("**/invoice/check-payment");
 
