@@ -790,7 +790,8 @@ function InvoiceCard({
   const [checkedLine, setCheckedLine] = useState<string | null>(null);
   const [error, setError] = useState<string | undefined>();
   const tag = INVOICE_TAGS[invoice.waitingForPayLink ? "waiting" : invoice.status];
-  const th = `${labelClass} pb-1.5 font-bold`;
+  // A table header cell: the Field label look without its `block`, which would take the cell out of the row.
+  const th = "pb-1.5 text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
 
   async function resend() {
     setError(undefined);

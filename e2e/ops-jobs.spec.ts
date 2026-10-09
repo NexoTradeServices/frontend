@@ -401,6 +401,11 @@ test("6001 AC13-AC15: the Invoice card shows the invoice; Resend sends it again;
   await expect(card.getByText("Issued")).toBeVisible();
   await expect(card.getByText("Due", { exact: true })).toBeVisible();
   const lines = card.getByTestId("invoice-lines");
+  // The Line items table: one header row, Item / Qty / Price / Amount side by side, over their columns.
+  const headers = lines.locator("thead th");
+  await expect(headers).toHaveText([/^item$/i, /^qty$/i, /^price$/i, /^amount$/i]);
+  const tops = await headers.evaluateAll((cells) => cells.map((cell) => Math.round(cell.getBoundingClientRect().top)));
+  expect(new Set(tops).size).toBe(1);
   await expect(lines.getByRole("row", { name: /Call-out \+ first hour - Plumbing, normal.*\$250.*\$250/ })).toBeVisible();
   await expect(lines.getByRole("row", { name: /Additional 2\.0h @ \$180\/h.*\$360/ })).toBeVisible();
   await expect(lines.getByRole("row", { name: /^Total.*\$610$/ })).toBeVisible();
