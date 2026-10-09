@@ -21,7 +21,7 @@ import { SelectField } from "@/components/ui/select-field";
 import { PrimaryButton, PrimaryLink } from "@/components/auth/buttons";
 import { Field } from "@/components/auth/field";
 import { ReadOnlyPhotoGallery } from "@/components/ui/photo-gallery";
-import { ErrorToast, Toast, useToast } from "@/components/ui/toast";
+import { Toast, useToast } from "@/components/ui/toast";
 import { TimeEntryRows, isBlankRow, rowsFromEntries, type TimeEntryRow } from "@/components/ui/time-entry-rows";
 import { formatHours } from "@/lib/billed-hours";
 import { formatDollars } from "@/components/request-a-job/money";
@@ -766,24 +766,28 @@ function BilledTo({ billedTo }: { billedTo: InvoiceView["billedTo"] }) {
  * Feature 6001: the Invoice card, straight after Time on site. Reads the invoice's
  * frozen rows only (lines, billed-to, the GST stamp). Resend invoice and Copy pay
  * link are the backups for a message that did not land. Feature 6002: Check payment
- * with Stripe is the backup for Stripe's own message not arriving; once paid the card
- * shows when and how, and the backups go.
+ * with Stripe is the backup for Stripe's own message not arriving. Its answer shows in
+ * this card, never as a Toast: paid turns the card Paid (when and how, the backups gone);
+ * not paid is one muted line saying when it was checked; Stripe out of reach is the
+ * card's error Banner.
  */
 function InvoiceCard({
   job,
   invoice,
   onSent,
+  onPaid,
   onToast,
-  onErrorToast,
 }: {
   job: JobDetail;
   invoice: InvoiceView;
   onSent: (next: JobDetail, message: string) => void;
+  onPaid: (next: JobDetail) => void;
   onToast: (message: string) => void;
-  onErrorToast: (message: string) => void;
 }) {
   const [resending, setResending] = useState(false);
   const [checking, setChecking] = useState(false);
+  /** "Checked with Stripe at 2:15pm AWST - no payment yet." -- true only at that moment, so never kept past a reload. */
+  const [checkedLine, setCheckedLine] = useState<string | null>(null);
   const [error, setError] = useState<string | undefined>();
   const tag = INVOICE_TAGS[invoice.waitingForPayLink ? "waiting" : invoice.status];
   const th = `${labelClass} pb-1.5 font-bold`;
@@ -810,6 +814,7 @@ function InvoiceCard({
   }
 
   async function checkPayment() {
+    setError(undefined);
     setChecking(true);
     try {
       const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(job.reference)}/invoice/check-payment`, {
@@ -818,14 +823,20 @@ function InvoiceCard({
       });
       if (!res.ok) {
         const payload = (await res.json().catch(() => ({}))) as Partial<ApiError>;
-        onErrorToast(res.status === 502 ? "Couldn't reach Stripe - try again in a minute." : (payload.error ?? "Couldn't check the payment - try again."));
+        setCheckedLine(null);
+        setError(res.status === 502 ? "Couldn't reach Stripe - try again in a minute." : (payload.error ?? "Couldn't check the payment - try again."));
         return;
       }
-      const payload = (await res.json()) as { paid: boolean; job: JobDetail };
-      if (payload.paid) onSent(payload.job, `Paid - ${invoice.reference} is marked paid.`);
-      else onToast("No payment yet.");
+      const payload = (await res.json()) as { paid: boolean; checkedLabel: string; job: JobDetail };
+      if (payload.paid) {
+        setCheckedLine(null);
+        onPaid(payload.job);
+      } else {
+        setCheckedLine(`Checked with Stripe at ${payload.checkedLabel} - no payment yet.`);
+      }
     } catch {
-      onErrorToast("Couldn't reach Stripe - try again in a minute.");
+      setCheckedLine(null);
+      setError("Couldn't reach Stripe - try again in a minute.");
     } finally {
       setChecking(false);
     }
@@ -853,6 +864,11 @@ function InvoiceCard({
         {invoice.waitingForPayLink ? (
           <p className="mt-1.5 text-[13px] text-muted-text">
             Stripe has not answered yet. The invoice goes out by email and text as soon as it does.
+          </p>
+        ) : null}
+        {checkedLine !== null && invoice.status === "sent" ? (
+          <p data-testid="payment-check" className="mt-1.5 text-[13px] text-muted-text">
+            {checkedLine}
           </p>
         ) : null}
       </div>
@@ -1230,7 +1246,6 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
   const [notesVersion, setNotesVersion] = useState(0);
   const [visitVersion, setVisitVersion] = useState(0);
   const [toastMessage, showToast] = useToast();
-  const [errorToast, setErrorToast] = useState<string | null>(null);
 
   useEffect(() => {
     // Feature 4002, plan decision 15: after Dispatch the page returns here
@@ -1294,11 +1309,11 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
               job={job}
               invoice={job.invoice}
               onToast={showToast}
-              onErrorToast={setErrorToast}
               onSent={(next, message) => {
                 setJob(next);
                 showToast(message);
               }}
+              onPaid={setJob}
             />
           </div>
         ) : null}
@@ -1318,7 +1333,6 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
         </div>
       </div>
       <Toast message={toastMessage} />
-      <ErrorToast message={errorToast} onClose={() => setErrorToast(null)} />
     </>
   );
 }
