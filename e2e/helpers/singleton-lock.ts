@@ -56,3 +56,8 @@ async function withLock<T>(name: string, fn: () => Promise<T>): Promise<T> {
  * patch), each unaware the other exists. */
 export const withPlatformSettingsLock = <T>(fn: () => Promise<T>): Promise<T> =>
   withLock(".platform-settings.lock", fn);
+
+/** Runs `fn` with exclusive access to Bob's settlements -- Feature 6003. A contractor has ONE
+ * draft invoice at a time, and every Monday run sweeps all of his unswept work into it, so two
+ * spec files making drafts for Bob at the same moment would swallow each other's jobs. */
+export const withSettlementsLock = <T>(fn: () => Promise<T>): Promise<T> => withLock(".settlements.lock", fn);

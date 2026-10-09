@@ -22,7 +22,7 @@ export const OPS_NAV_ITEMS: readonly PortalNavItem[] = [
   { key: "contractors", label: "Contractors", href: "/ops/contractors", built: true },
   { key: "receivables", label: "Receivables", href: "/ops/receivables", built: true },
   { key: "refunds", label: "Refunds", href: "/ops/refunds", built: false },
-  { key: "settlements", label: "Settlements", href: "/ops/settlements", built: false },
+  { key: "settlements", label: "Payouts", href: "/ops/payouts", built: true },
   { key: "status", label: "Service status", href: "/ops/status", built: false },
   { key: "settings", label: "Settings", href: "/ops/settings", owner: true, built: true },
   { key: "pricing", label: "Pricing", href: "/ops/pricing", owner: true, built: true },

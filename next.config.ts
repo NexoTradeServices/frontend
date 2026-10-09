@@ -18,6 +18,15 @@ const devOrigins = (process.env.DEV_ORIGINS ?? "")
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: devOrigins,
+  // The pages were called Settlements before the owner chose Payouts (Feature 6003): old
+  // addresses, in bookmarks and earlier emails, still arrive.
+  async redirects() {
+    return [
+      { source: "/ops/settlements", destination: "/ops/payouts", permanent: false },
+      { source: "/contractor/settlements", destination: "/contractor/payouts", permanent: false },
+      { source: "/contractor/settlements/:ref", destination: "/contractor/payouts/:ref", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -164,7 +164,7 @@ export function PortalShell({
               <h1 className="font-heading text-xl font-black text-ink md:text-[22px]">{title}</h1>
               {titleAside}
             </div>
-            <p className="mb-5 text-[13px] text-muted-text">{subtitle}</p>
+            {subtitle === "" ? <div className="mb-5" /> : <p className="mb-5 text-[13px] text-muted-text">{subtitle}</p>}
             {children}
           </div>
         </div>

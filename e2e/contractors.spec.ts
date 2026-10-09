@@ -16,6 +16,8 @@
 // AC8/9 the status switch, its confirm dialog and toasts, on a throwaway contractor
 // AC11 the Google Places pick, and the field degrading when the script is blocked
 // AC14 the 390px responsive floor on the list, the form and the deactivate dialog
+// 6003 AC1 GST registered is Not asked yet / Yes / No: not asked is a missing item on the list and the
+//      record, and once answered the option is gone
 //
 // Every contractor a test adds carries the `e2e` test-data label (the test-run
 // cookie, playwright.config.ts) and is swept by the run's global setup and
@@ -135,6 +137,46 @@ test("AC6: a blank licence expiry stops the form with Required.; a past expiry s
   await page.getByRole("link").filter({ hasText: name }).click();
   await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText("Already expired -- this trade cannot be dispatched until renewed.")).toBeVisible();
+});
+
+test("6003 AC1: GST registered offers Not asked yet, Yes and No; not asked is a missing item on the list and the record; once answered it is gone for good", async ({
+  page,
+}) => {
+  await page.goto("/ops/contractors/new");
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+
+  // The blank add form starts on Not asked yet, with all three answers on offer.
+  const gst = page.getByLabel("GST registered");
+  await expect(gst).toHaveValue("");
+  await expect(gst.locator("option")).toHaveText(["Not asked yet", "Yes", "No"]);
+
+  const name = `E2E Gst Case ${uniqueTag("gst")}`;
+  await page.getByLabel("Name", { exact: true }).fill(name);
+  await page.getByLabel("Phone", { exact: true }).fill("0412 000 555");
+  await page.getByLabel("Email", { exact: true }).fill(uniqueEmail("gst"));
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page).toHaveURL(/\/ops\/contractors$/, { timeout: 10_000 });
+
+  // Not asked counts as missing: on the list row ...
+  const row = page.getByRole("link").filter({ hasText: name });
+  await expect(row).toContainText("GST registration (not asked)");
+  await row.click();
+  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+  // ... and in the record's Not ready banner.
+  await expect(page.getByRole("listitem").filter({ hasText: "GST registration (not asked)" })).toBeVisible();
+  await expect(page.getByLabel("GST registered")).toHaveValue("");
+
+  // Mike records a Yes. The banner no longer names GST, and Not asked yet is no longer on offer.
+  await page.getByLabel("GST registered").selectOption("yes");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page).toHaveURL(/\/ops\/contractors$/, { timeout: 10_000 });
+  await expect(page.getByRole("link").filter({ hasText: name })).not.toContainText("GST registration (not asked)");
+  await page.getByRole("link").filter({ hasText: name }).click();
+  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByLabel("GST registered")).toHaveValue("yes");
+  await expect(page.getByLabel("GST registered").locator("option")).toHaveText(["Yes", "No"]);
+  await expect(page.getByRole("listitem").filter({ hasText: "GST registration (not asked)" })).toHaveCount(0);
 });
 
 test.describe(() => {

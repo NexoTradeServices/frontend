@@ -44,7 +44,12 @@ export async function openJobScreen(page: Page, job: DispatchedJob): Promise<voi
  * under test stays free. 3.0h on the books (8:07 - 11:05 bills 3.0h), work notes, no parts:
  * the invoice is $250 + 2.0h @ $180/h = $610, and the pay link is asked for straight after.
  */
-export async function completeJobAsBob(browser: Browser, job: DispatchedJob): Promise<void> {
+export async function completeJobAsBob(
+  browser: Browser,
+  job: DispatchedJob,
+  /** Feature 6003: the day Bob worked, and when he started and finished it (default: Wed 7 Oct, 3.0h). */
+  visit: { date: string; start: string; end: string } = { date: "2026-10-07", start: "08:07", end: "11:05" },
+): Promise<void> {
   const context = await browser.newContext({ baseURL: BASE_URL, storageState: testRunStorageState() });
   try {
     const page = await context.newPage();
@@ -53,7 +58,7 @@ export async function completeJobAsBob(browser: Browser, job: DispatchedJob): Pr
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
     const completed = await page.request.post(`${apiUrl}/api/contractor/jobs/${job.reference}/complete`, {
       data: {
-        timeEntries: [{ date: "2026-10-07", start: "08:07", end: "11:05", note: "" }],
+        timeEntries: [{ date: visit.date, start: visit.start, end: visit.end, note: "" }],
         completionNotes: "Replaced the cartridge.",
         parts: [],
       },
