@@ -19,6 +19,7 @@ import Link from "next/link";
 import { Field } from "@/components/auth/field";
 import { PlacesField, type PickedAddress } from "@/components/ui/places-field";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
+import { SelectField } from "@/components/ui/select-field";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Banner } from "@/components/auth/banner";
 import { Toast, useToast } from "@/components/ui/toast";
@@ -58,13 +59,24 @@ function tradeRowFromDto(specialty: ContractorDto["specialties"][number], key: s
   };
 }
 
+type GstAnswer = "" | "yes" | "no";
+
+function gstAnswerOf(value: boolean | null): GstAnswer {
+  return value === null ? "" : value ? "yes" : "no";
+}
+
+function gstValueOf(answer: GstAnswer): boolean | null {
+  return answer === "" ? null : answer === "yes";
+}
+
 interface Fields {
   name: string;
   email: string;
   phone: string;
   businessName: string;
   abn: string;
-  gstRegistered: boolean;
+  /** the Dropdown's value: "" = not asked yet, "yes", "no" */
+  gstRegistered: GstAnswer;
   address: PickedAddress | null;
   emergencyContactName: string;
   emergencyContactPhone: string;
@@ -83,7 +95,7 @@ function fieldsFromDto(dto: ContractorDto): Fields {
     phone: dto.phone,
     businessName: dto.businessName ?? "",
     abn: dto.abn ?? "",
-    gstRegistered: dto.gstRegistered,
+    gstRegistered: gstAnswerOf(dto.gstRegistered),
     address: dto.address,
     emergencyContactName: dto.emergencyContactName ?? "",
     emergencyContactPhone: dto.emergencyContactPhone ?? "",
@@ -102,7 +114,7 @@ const BLANK_FIELDS: Fields = {
   phone: "",
   businessName: "",
   abn: "",
-  gstRegistered: false,
+  gstRegistered: "",
   address: null,
   emergencyContactName: "",
   emergencyContactPhone: "",
@@ -229,7 +241,7 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
         phone: fields.phone.trim(),
         businessName: fields.businessName.trim() === "" ? null : fields.businessName.trim(),
         abn: fields.abn.trim() === "" ? null : fields.abn.trim(),
-        gstRegistered: fields.gstRegistered,
+        gstRegistered: gstValueOf(fields.gstRegistered),
         address: fields.address,
         emergencyContactName: fields.emergencyContactName.trim() === "" ? null : fields.emergencyContactName.trim(),
         emergencyContactPhone: fields.emergencyContactPhone.trim() === "" ? null : fields.emergencyContactPhone.trim(),
@@ -523,14 +535,20 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
               error={fieldErrors["abn"]}
               helper={fieldErrors["abn"] ? undefined : "11 digits."}
             />
-            <div>
-              <span className="mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase">GST registered</span>
-              <label className="flex items-center gap-2.5">
-                <ToggleSwitch checked={fields.gstRegistered} onChange={(v) => set("gstRegistered", v)} label="GST registered" />
-                <span className="font-semibold text-ink">{fields.gstRegistered ? "Yes" : "No"}</span>
-              </label>
-              <p className="mt-[5px] text-xs text-muted-text">Drives GST on their payouts.</p>
-            </div>
+            {/* Not asked yet / Yes / No. "Not asked yet" is only offered while no answer has been saved: once answered it is yes or no for good. */}
+            <SelectField
+              label="GST registered"
+              id="f-gstRegistered"
+              value={fields.gstRegistered}
+              onChange={(e) => set("gstRegistered", e.target.value as GstAnswer)}
+              error={fieldErrors["gstRegistered"]}
+              helper={fieldErrors["gstRegistered"] ? undefined : "Drives GST on their payouts."}
+              options={[
+                ...(contractor === null || contractor.gstRegistered === null ? [{ value: "", label: "Not asked yet" }] : []),
+                { value: "yes", label: "Yes" },
+                { value: "no", label: "No" },
+              ]}
+            />
             <Field
               label="BSB"
               id="f-bsb"

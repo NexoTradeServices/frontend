@@ -21,7 +21,8 @@ export interface ContractorDto {
   phone: string;
   businessName: string | null;
   abn: string | null;
-  gstRegistered: boolean;
+  /** null = never asked (counts as missing for the Ready check) */
+  gstRegistered: boolean | null;
   address: PickedAddress | null;
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
