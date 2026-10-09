@@ -28,7 +28,7 @@ export interface PayLine {
 export interface InvoiceView {
   reference: string;
   status: "draft" | "approved" | "paid" | "superseded";
-  heading: "Tax Invoice" | "Invoice";
+  heading: "Tax Invoice" | "Invoice" | "Draft invoice";
   gstRegistered: boolean;
   gstNotRecorded: boolean;
   from: { name: string; businessName: string | null; abn: string | null };
@@ -43,6 +43,8 @@ export interface InvoiceView {
   materials: { jobReference: string; name: string; amount: number }[];
   materialsTotal: number;
   total: number;
+  /** the next payout shown as the invoice it will become: no number, no approval */
+  preview?: boolean;
 }
 
 // ---- the approve link -----------------------------------------------------
@@ -71,6 +73,8 @@ export interface NextPayout {
   plusGst: boolean;
   payDay: string;
   invoicedOn: string;
+  period: string;
+  total: number;
 }
 
 export interface ContractorCard {
@@ -91,6 +95,7 @@ export interface ContractorList {
 export interface ContractorDetail {
   invoice: InvoiceView;
   payDay: string;
+  invoicedOn?: string;
   paidLabel: string | null;
 }
 

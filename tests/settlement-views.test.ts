@@ -155,8 +155,8 @@ describe("AC7 -- a dead approve link names why and carries its one fix", () => {
     expect(html).toContain("Already approved");
     expect(html).toContain("You approved CINV-518 on 20 Oct 2026.");
     expect(html).toContain("You&#x27;ll be paid on Wed 21 Oct.");
-    expect(html).toContain('href="/contractor/settlements"');
-    expect(html).toContain("See your settlements");
+    expect(html).toContain('href="/contractor/payouts"');
+    expect(html).toContain("See your payouts");
   });
 
   test("already approved and paid says so instead of promising a pay day", () => {

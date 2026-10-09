@@ -1,5 +1,5 @@
 // The contractor's Settlements page -- Feature 6003, settlement run.
-// Architecture & Routing / Page inventory: `/contractor/settlements`, contractor only. Portal
+// Architecture & Routing / Page inventory: `/contractor/payouts`, contractor only. Portal
 // shell, List page with Record cards (Pages / Which template each kind of page uses).
 import { cookies } from "next/headers";
 import { getSessionUser } from "@/lib/session";
@@ -31,8 +31,8 @@ export default async function ContractorSettlementsPage() {
     <PortalShell
       user={user}
       active="settlements"
-      title="Settlements"
-      subtitle="What you've been paid, and what's coming."
+      title="Payouts"
+      subtitle=""
       displayName={displayName}
       navItems={CONTRACTOR_NAV_ITEMS}
     >

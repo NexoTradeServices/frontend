@@ -132,7 +132,7 @@ test.describe(() => {
     await expect(menu.getByRole("link", { name: "Service area" })).toBeVisible();
     await expect(menu.getByRole("link", { name: "Calendar" })).toHaveCount(0);
     // Feature 6003 built it.
-    await expect(menu.getByRole("link", { name: "Settlements" })).toBeVisible();
+    await expect(menu.getByRole("link", { name: "Payouts" })).toBeVisible();
     await expect(menu.getByRole("link", { name: "My details" })).toHaveCount(0);
   });
 });

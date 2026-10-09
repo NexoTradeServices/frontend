@@ -35,7 +35,7 @@ test.describe(() => {
       const path = await approveLinkFor(request, draft.reference);
 
       await page.goto(path);
-      await expect(page.getByRole("heading", { name: `Tax Invoice ${draft.reference}`, level: 1 })).toBeVisible();
+      await expect(page.getByRole("heading", { name: `Draft invoice ${draft.reference}`, level: 1 })).toBeVisible();
       await expect(page.getByTestId("approve-intro")).toContainText("Check it, then approve. If something is wrong, ring the office on");
       await expect(page.getByTestId("approve-intro")).toContainText("before approving.");
       await expect(page.getByTestId("approve-intro").getByRole("link")).toHaveAttribute("href", /^tel:\d+$/);
@@ -52,7 +52,7 @@ test.describe(() => {
       await expect(weekdayLine).toContainText("$500");
       await expect(weekdayLine.getByTestId("weekend-code")).toHaveCount(0);
       await expect(weekendLine).toContainText("Sat 3 Oct");
-      await expect(weekendLine.getByTestId("weekend-code")).toHaveText("T1.5");
+      await expect(weekendLine.getByTestId("weekend-code")).toHaveText("(T1.5)");
       await expect(page.getByTestId("weekend-legend")).toHaveText("T1.5 - weekend, time and a half");
 
       // Bob is registered: GST is added on top - Subtotal, then GST at a tenth of it - and the Total follows.
@@ -68,21 +68,19 @@ test.describe(() => {
       expect(total).toBe(subtotal + gst);
 
       // A line opens to its working.
-      await weekdayLine.getByRole("button", { name: "Working" }).click();
-      await expect(page.getByTestId("pay-line-working")).toContainText("2.0h after the first at $150 an hour = $300.");
       await expectNoSidewaysScroll(page);
 
       // Approve: the Approved Message card, with the way on.
       await page.getByRole("button", { name: "Approve" }).click();
       await expect(page.getByRole("heading", { name: "Approved", level: 1 })).toBeVisible();
       await expect(page.getByText(/^You'll be paid on [A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}\.$/)).toBeVisible();
-      await expect(page.getByRole("link", { name: "See your settlements" })).toHaveAttribute("href", "/contractor/settlements");
+      await expect(page.getByRole("link", { name: "See your payouts" })).toHaveAttribute("href", "/contractor/payouts");
 
       // The same link, opened again: Already approved.
       await page.goto(path);
       await expect(page.getByRole("heading", { name: "Already approved", level: 1 })).toBeVisible();
       await expect(page.getByText(new RegExp(`^You approved ${draft.reference} on \\d{1,2} [A-Z][a-z]{2} \\d{4}\\. You'll be paid on [A-Z][a-z]{2} \\d{1,2} [A-Z][a-z]{2}\\.$`))).toBeVisible();
-      await expect(page.getByRole("link", { name: "See your settlements" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "See your payouts" })).toBeVisible();
     });
   });
 

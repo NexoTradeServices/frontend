@@ -1,5 +1,5 @@
 // Settlements -- Feature 6003, settlement run.
-// Architecture & Routing / Page inventory: `/ops/settlements`, ops + owner. Portal shell, List page
+// Architecture & Routing / Page inventory: `/ops/payouts`, ops + owner. Portal shell, List page
 // (Pages / Which template each kind of page uses). Designed at Desktop first; Mobile best effort.
 import { cookies } from "next/headers";
 import { getSessionUser } from "@/lib/session";
@@ -32,7 +32,7 @@ export default async function SettlementsPage() {
     <PortalShell
       user={user}
       active="settlements"
-      title="Settlements"
+      title="Payouts"
       subtitle="Pay the approved invoices on pay day, then mark each one paid."
       displayName={displayName}
     >

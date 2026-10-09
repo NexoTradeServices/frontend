@@ -13,7 +13,6 @@ import type { ContractorCard, ContractorList, NextPayout } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-const labelClass = "block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
 const tagClass = "inline-block shrink-0 rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] whitespace-nowrap uppercase";
 
 /** Awaiting your approval: warning pair. Approved: neutral. Paid: success pair. */
@@ -23,51 +22,50 @@ const TAG_COLOURS: Record<ContractorCard["status"], string> = {
   paid: "bg-success-bg text-brand-success",
 };
 
-function jobsText(count: number): string {
-  return `${String(count)} ${count === 1 ? "job" : "jobs"}`;
-}
-
-/** "You'll be paid $805 plus GST for 2 jobs on Wed 21 Oct." */
-function nextPayoutLine(next: NextPayout): string {
-  const amount = `${formatPay(next.amount)}${next.plusGst ? " plus GST" : ""}`;
-  const forJobs = next.jobs > 0 ? ` for ${jobsText(next.jobs)}` : "";
-  return `You'll be paid ${amount}${forJobs} on ${next.payDay}.`;
-}
-
+/** The next payout, as a card like the invoices: it opens the invoice it will become on Monday. */
 function NextPayoutCard({ next }: { next: NextPayout }) {
-  const waiting = next.jobs > 0 || next.adjustments > 0;
+  if (next.jobs === 0 && next.adjustments === 0) {
+    return (
+      <p data-testid="next-payout-line" className="rounded-[10px] border border-hairline bg-surface px-4 py-3.5 text-[13px] text-muted-text">
+        Nothing waiting to be paid.
+      </p>
+    );
+  }
   return (
-    <section data-testid="next-payout" className="rounded-[10px] border border-hairline bg-surface p-4 md:p-5">
-      <h2 className="mb-3.5 font-heading text-base font-extrabold text-ink">Next payout</h2>
-      {waiting ? (
-        <>
-          <span className={labelClass}>Waiting to be paid</span>
-          <div className="font-heading text-[28px] font-extrabold text-ink tabular-nums" data-testid="next-payout-amount">
-            {formatPay(next.amount)}
-          </div>
-          <p className="mt-1 text-sm text-secondary-text" data-testid="next-payout-line">
-            {nextPayoutLine(next)}
-          </p>
-        </>
-      ) : (
-        <p className="text-[13px] text-muted-text" data-testid="next-payout-line">
-          Nothing waiting to be paid.
-        </p>
-      )}
-    </section>
+    <Link
+      href="/contractor/payouts/next"
+      data-testid="next-payout"
+      className="block rounded-[10px] border border-hairline bg-surface p-3.5"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-heading text-[13px] font-extrabold text-ink">Invoice</span>
+        <span className={`${tagClass} bg-status-new-bg text-status-new`} data-testid="next-payout-tag">
+          Next payout
+        </span>
+      </div>
+      <div className="mt-1.5 mb-0.5 text-[15px] font-bold text-ink">{next.period}</div>
+      <div className="text-[13px] text-muted-text">
+        <span className="block font-semibold text-secondary-text tabular-nums" data-testid="next-payout-amount">
+          {formatPay(next.total)}
+        </span>
+        <span className="block" data-testid="next-payout-line">
+          To be paid on {next.payDay}
+        </span>
+      </div>
+    </Link>
   );
 }
 
 function RecordCard({ card }: { card: ContractorCard }) {
   return (
     <Link
-      href={`/contractor/settlements/${encodeURIComponent(card.reference)}`}
+      href={`/contractor/payouts/${encodeURIComponent(card.reference)}`}
       data-testid="settlement-card"
       data-ref={card.reference}
       className="block rounded-[10px] border border-hairline bg-surface p-3.5"
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="font-heading text-[13px] font-extrabold text-ink">{card.reference}</span>
+        <span className="font-heading text-[13px] font-extrabold text-ink">Invoice {card.reference}</span>
         <span className={`${tagClass} ${TAG_COLOURS[card.status]}`} data-testid="settlement-tag">
           {card.tag}
         </span>

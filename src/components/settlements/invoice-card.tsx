@@ -20,6 +20,13 @@ import { useState } from "react";
 import { formatPay, hoursText } from "./money";
 import type { InvoiceView, PayLine } from "./types";
 
+/**
+ * Each pay line can open to show how its amount was worked out (the plan's drill-down). The owner
+ * chose not to show the link for now; the working, its data and this switch stay, so showing it
+ * again is a one-word change.
+ */
+const SHOW_WORKING = false;
+
 const labelClass = "block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
 const th = "px-1.5 py-2 text-left align-bottom text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase sm:px-3";
 const td = "px-1.5 py-2.5 align-top text-secondary-text sm:px-3";
@@ -54,6 +61,16 @@ function PayLineRows({ line, view }: { line: PayLine; view: InvoiceView }) {
         <td className={td}>
           <span className="block font-heading text-[13px] font-extrabold text-ink">{line.jobReference}</span>
           <span className="block text-[12px] text-muted-text sm:hidden">{line.trade}</span>
+        </td>
+        <td className={`${td} whitespace-nowrap`}>{line.day}</td>
+        <td className={`${td} hidden sm:table-cell`}>{line.trade}</td>
+        <td className={`${td} whitespace-nowrap tabular-nums`}>
+          {line.hours === null ? "-" : hoursText(line.hours)}
+          {line.weekend ? <span data-testid="weekend-code"> ({weekendCode(view)})</span> : null}
+        </td>
+        <td className={`${td} text-right whitespace-nowrap`}>
+          <span className="block font-semibold text-ink tabular-nums">{formatPay(line.amount)}</span>
+          {SHOW_WORKING ? (
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
@@ -62,14 +79,8 @@ function PayLineRows({ line, view }: { line: PayLine; view: InvoiceView }) {
           >
             {open ? "Hide working" : "Working"}
           </button>
+          ) : null}
         </td>
-        <td className={`${td} whitespace-nowrap`}>{line.day}</td>
-        <td className={`${td} hidden sm:table-cell`}>{line.trade}</td>
-        <td className={`${td} whitespace-nowrap tabular-nums`}>
-          {line.hours === null ? "-" : hoursText(line.hours)}
-          {line.weekend ? <span data-testid="weekend-code"> {weekendCode(view)}</span> : null}
-        </td>
-        <td className={`${td} text-right font-semibold whitespace-nowrap text-ink tabular-nums`}>{formatPay(line.amount)}</td>
       </tr>
       {open ? (
         <tr data-testid="pay-line-working" className="border-b border-hairline bg-ground">
@@ -96,7 +107,7 @@ export function InvoiceCard({ invoice }: { invoice: InvoiceView }) {
   const businessName = invoice.from.businessName ?? invoice.from.name;
   return (
     <section data-testid="invoice-card" className="rounded-[10px] border border-hairline bg-surface p-4 md:p-5">
-      <div className="grid grid-cols-2 gap-x-4.5 gap-y-3.5 sm:grid-cols-4">
+      <div className="flex flex-col gap-3.5">
         <Fact label="From" testId="invoice-from">
           <span className="block font-semibold">{businessName}</span>
           {invoice.from.businessName !== null ? <span className="block text-[13px] text-muted-text">{invoice.from.name}</span> : null}
@@ -107,12 +118,14 @@ export function InvoiceCard({ invoice }: { invoice: InvoiceView }) {
           {invoice.to.abn !== null ? <span className="block text-[13px] text-muted-text">ABN {invoice.to.abn}</span> : null}
           {invoice.to.address !== null ? <span className="block text-[13px] text-muted-text">{invoice.to.address}</span> : null}
         </Fact>
-        <Fact label="Period" testId="invoice-period">
-          {invoice.period.label}
-        </Fact>
-        <Fact label="Date" testId="invoice-date">
-          {invoice.dateLabel}
-        </Fact>
+        <div className="grid grid-cols-2 gap-x-4.5">
+          <Fact label="Period" testId="invoice-period">
+            {invoice.period.label}
+          </Fact>
+          <Fact label="Date" testId="invoice-date">
+            {invoice.dateLabel}
+          </Fact>
+        </div>
       </div>
 
       <div className="mt-4 overflow-x-auto">

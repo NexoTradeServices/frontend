@@ -56,8 +56,8 @@ export function MessageCard({
 
 export function SeeYourSettlements() {
   return (
-    <Link href="/contractor/settlements" className={`${bigButton} bg-brand-accent text-on-accent`}>
-      See your settlements
+    <Link href="/contractor/payouts" className={`${bigButton} bg-brand-accent text-on-accent`}>
+      See your payouts
     </Link>
   );
 }

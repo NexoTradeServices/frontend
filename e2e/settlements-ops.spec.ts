@@ -40,12 +40,12 @@ test("6003 AC9/AC10/AC12: an approved invoice is ready to pay - open its lines, 
     if (draft === undefined) throw new Error("the run made no draft");
     await approveByLink(request, await approveLinkFor(request, draft.reference));
 
-    await page.goto("/ops/settlements");
+    await page.goto("/ops/payouts");
     await login(page, "mike@idelta.com.au");
-    await expect(page.getByRole("heading", { name: "Settlements", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Payouts", level: 1 })).toBeVisible();
     await expect(page.getByText("Pay the approved invoices on pay day, then mark each one paid.")).toBeVisible();
     // The menu entry is there.
-    await expect(page.getByRole("link", { name: "Settlements" }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Payouts" }).first()).toBeVisible();
 
     const detail = await page.request.get(`${apiUrl}/api/settlements/${draft.reference}`);
     expect(detail.status()).toBe(200);
@@ -74,8 +74,6 @@ test("6003 AC9/AC10/AC12: an approved invoice is ready to pay - open its lines, 
     await expect(line).toContainText("Wed 7 Oct");
     await expect(line).toContainText("3.0h");
     await expect(line).toContainText("$500");
-    await line.getByRole("button", { name: "Working" }).click();
-    await expect(page.getByTestId("pay-line-working")).toContainText("Call-out $200 covers turning up and the first hour. 2.0h after the first at $150 an hour = $300.");
     await row.click();
     await expect(page.getByTestId("drilldown")).toHaveCount(0);
 
@@ -133,9 +131,9 @@ test("6003 AC8/AC12: a corrected draft is flagged, Rebuild asks first and replac
     if (draft === undefined) throw new Error("the run made no draft");
     const staleLink = await approveLinkFor(request, draft.reference);
 
-    await page.goto("/ops/settlements");
+    await page.goto("/ops/payouts");
     await login(page, "mike@idelta.com.au");
-    await expect(page.getByRole("heading", { name: "Settlements", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Payouts", level: 1 })).toBeVisible();
     await page.getByRole("button", { name: /^Awaiting approval \d+$/ }).click();
     const row = page.locator(`tr[data-ref="${draft.reference}"]`);
     await expect(row).toBeVisible();
@@ -149,10 +147,8 @@ test("6003 AC8/AC12: a corrected draft is flagged, Rebuild asks first and replac
     const line = page.locator(`[data-testid="pay-line"][data-job="${job.reference}"]`);
     await expect(line).toContainText("Sat 3 Oct");
     await expect(line).toContainText("1.0h");
-    await expect(line.getByTestId("weekend-code")).toHaveText("T1.5");
+    await expect(line.getByTestId("weekend-code")).toHaveText("(T1.5)");
     await expect(page.getByTestId("weekend-legend")).toHaveText("T1.5 - weekend, time and a half");
-    await line.getByRole("button", { name: "Working" }).click();
-    await expect(page.getByTestId("pay-line-working")).toContainText("Call-out $300 covers turning up and the first hour.");
     await row.click();
 
     // Mike corrects the job after the draft was made: the draft says so.
@@ -192,7 +188,7 @@ test("6003 AC8/AC12: a corrected draft is flagged, Rebuild asks first and replac
 
     // Not yet invoiced: Bob's finished job, not swept yet, with the Monday it will be invoiced and the pay day after.
     await finishedJob(browser, request, "stl-unswept");
-    await page.goto("/ops/settlements");
+    await page.goto("/ops/payouts");
     await page.getByRole("button", { name: /^Not yet invoiced \d+$/ }).click();
     const unswept = page.locator('tr[data-ref="CON-014"]');
     await expect(unswept).toBeVisible();

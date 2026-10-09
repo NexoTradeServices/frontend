@@ -14,7 +14,7 @@ import { MOBILE_VIEWPORT } from "../playwright.config";
 import { login } from "./helpers/login";
 import { BASE_URL, testRunStorageState } from "./helpers/test-run";
 import { withSettlementsLock } from "./helpers/singleton-lock";
-import { approveByLink, approveLinkFor, expectNoSidewaysScroll, finishedJob, mondayRun, runSettlementSweep } from "./helpers/settlements";
+import { expectNoSidewaysScroll, finishedJob, mondayRun, runSettlementSweep } from "./helpers/settlements";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
 
@@ -34,17 +34,19 @@ test.describe(() => {
       await login(page, "bob@idelta.com.au");
       await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
       await page.getByRole("button", { name: "Open menu" }).click();
-      await page.getByRole("navigation", { name: "Menu" }).getByRole("link", { name: "Settlements" }).click();
-      await expect(page).toHaveURL(/\/contractor\/settlements$/, { timeout: 30_000 });
-      await expect(page.getByRole("heading", { name: "Settlements", level: 1 })).toBeVisible();
-      await expect(page.getByText("What you've been paid, and what's coming.")).toBeVisible();
+      await page.getByRole("navigation", { name: "Menu" }).getByRole("link", { name: "Payouts" }).click();
+      await expect(page).toHaveURL(/\/contractor\/payouts$/, { timeout: 30_000 });
+      await expect(page.getByRole("heading", { name: "Payouts", level: 1 })).toBeVisible();
 
-      // Next payout: finished work not yet invoiced, GST on top flagged for a registered contractor.
-      await expect(page.getByRole("heading", { name: "Next payout" })).toBeVisible();
-      await expect(page.getByTestId("next-payout-line")).toHaveText(
-        /^You'll be paid \$[\d,]+(\.\d{2})? plus GST for \d+ jobs? on [A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}\.$/,
-      );
+      // Next payout: a card like the invoices, tagged Next payout, that opens the invoice it will become.
+      await expect(page.getByTestId("next-payout-tag")).toHaveText("Next payout");
+      await expect(page.getByTestId("next-payout-line")).toHaveText(/^To be paid on [A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}$/);
       await expect(page.getByTestId("next-payout-amount")).toHaveText(/^\$[\d,]+(\.\d{2})?$/);
+      await page.getByTestId("next-payout").click();
+      await expect(page.getByTestId("preview-caption")).toContainText("You can approve this on");
+      await expect(page.getByTestId("invoice-date")).toContainText("Not yet invoiced");
+      await expect(page.getByTestId("approve-later")).toBeDisabled();
+      await page.goBack();
 
       // The Monday run makes the draft; it is a Record card tagged Awaiting your approval.
       const [draft] = await runSettlementSweep(request, mondayRun(9));
@@ -60,19 +62,18 @@ test.describe(() => {
 
       // It opens to the invoice, each job with its working; the draft points at the email.
       await card.click();
-      await expect(page).toHaveURL(new RegExp(`/contractor/settlements/${draft.reference}$`));
-      await expect(page.getByRole("heading", { name: `Tax Invoice ${draft.reference}`, level: 1 })).toBeVisible();
+      await expect(page).toHaveURL(new RegExp(`/contractor/payouts/${draft.reference}$`));
+      await expect(page.getByRole("heading", { name: `Draft invoice ${draft.reference}`, level: 1 })).toBeVisible();
       await expect(page.getByTestId("settlement-tag")).toHaveText("Awaiting your approval");
       const line = page.locator(`[data-testid="pay-line"][data-job="${job.reference}"]`);
       await expect(line).toContainText("Wed 7 Oct");
-      await line.getByRole("button", { name: "Working" }).click();
-      await expect(page.getByTestId("pay-line-working")).toContainText("Call-out $200 covers turning up and the first hour.");
-      await expect(page.getByTestId("draft-caption")).toHaveText("To approve it, use Review and approve in the email we sent you.");
-      await expect(page.getByRole("button", { name: "Approve" })).toHaveCount(0);
-      await expect(page.getByRole("link", { name: "Settlements" }).first()).toBeVisible();
+      await expect(page.getByTestId("draft-caption")).toHaveText("This is a draft until you approve it. Check it, then approve.");
+      await expect(page.getByRole("link", { name: "Payouts" }).first()).toBeVisible();
 
-      // Approved.
-      await approveByLink(request, await approveLinkFor(request, draft.reference));
+      // Approved: he taps Approve here, logged in; the draft becomes his Tax Invoice and the button goes.
+      await page.getByRole("button", { name: "Approve" }).click();
+      await expect(page.getByRole("heading", { name: `Tax Invoice ${draft.reference}`, level: 1 })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Approve" })).toHaveCount(0);
       await page.reload();
       await expect(page.getByTestId("settlement-tag")).toHaveText("Approved");
       await expect(page.getByTestId("draft-caption")).toHaveCount(0);
@@ -82,15 +83,15 @@ test.describe(() => {
       const mikes = await browser.newContext({ baseURL: BASE_URL, storageState: testRunStorageState() });
       try {
         const mikesPage = await mikes.newPage();
-        await mikesPage.goto("/ops/settlements");
+        await mikesPage.goto("/ops/payouts");
         await login(mikesPage, "mike@idelta.com.au");
-        await expect(mikesPage.getByRole("heading", { name: "Settlements", level: 1 })).toBeVisible();
+        await expect(mikesPage.getByRole("heading", { name: "Payouts", level: 1 })).toBeVisible();
         const paid = await mikesPage.request.post(`${apiUrl}/api/settlements/${draft.reference}/mark-paid`);
         expect(paid.status()).toBe(200);
       } finally {
         await mikes.close();
       }
-      await page.goto("/contractor/settlements");
+      await page.goto("/contractor/payouts");
       const paidCard = page.locator(`[data-testid="settlement-card"][data-ref="${draft.reference}"]`);
       await expect(paidCard.getByTestId("settlement-tag")).toHaveText("Paid");
       await expect(paidCard).toContainText(/Paid on \d{2}\/\d{2}\/\d{2}/);
@@ -99,7 +100,7 @@ test.describe(() => {
       const daves = await browser.newContext({ baseURL: BASE_URL, storageState: testRunStorageState() });
       try {
         const davesPage = await daves.newPage();
-        await davesPage.goto(`/contractor/settlements/${draft.reference}`);
+        await davesPage.goto(`/contractor/payouts/${draft.reference}`);
         await login(davesPage, "dave@idelta.com.au");
         await expect(davesPage.getByText("We couldn't find that invoice.")).toBeVisible();
         await expect(davesPage.getByTestId("invoice-card")).toHaveCount(0);
