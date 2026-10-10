@@ -151,6 +151,10 @@ export interface JobDetail {
   invoice: InvoiceView | null;
   /** Feature 4003: every booking on the job but the one in play, newest first. */
   earlierBookings: EarlierBooking[];
+  /** Feature 4006: which of Reschedule, Reassign and Cancel job the page offers. */
+  actions: { reschedule: boolean; takeOff: boolean; cancel: boolean };
+  /** Feature 4006: set once the job is cancelled. */
+  cancelled: { reasonLabel: string; note: string | null; byName: string; atLabel: string } | null;
   /** Feature 4002, AC29: the level and its price, once the job is dispatched. */
   serviceLevel: "normal" | "weekend" | "emergency" | null;
   priceLine: string | null;

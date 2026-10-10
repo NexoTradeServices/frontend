@@ -22,6 +22,8 @@ export interface RespondOpen {
 export type RespondDead =
   | { state: "answered"; answer: "accepted" | "declined"; answeredAtLabel: string; jobReference: string; officePhone: string }
   | { state: "expired"; jobReference: string; officePhone: string }
+  // Feature 4006: a booking the office ended says why.
+  | { state: "moved" | "taken_off" | "cancelled"; jobReference: string; officePhone: string }
   | { state: "unknown"; officePhone: string };
 
 export type RespondRead = RespondOpen | RespondDead;

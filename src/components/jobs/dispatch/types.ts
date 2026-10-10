@@ -9,7 +9,12 @@ export interface DispatchFacts {
   suburb: string;
   siteAddress: PickedAddress | null;
   customerName: string;
+  /** Feature 4006: the job's real status, for the page's tag. */
+  status: string;
   defaults: { date: string; startMinutes: number; holdMinutes: number };
+  /** Feature 4006: "reschedule" fixes the contractor who holds the booking; absent at dispatch. */
+  mode?: "reschedule";
+  contractor?: { code: string; name: string; firstName: string };
 }
 
 export interface Rating {

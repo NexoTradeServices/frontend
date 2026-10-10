@@ -11,6 +11,7 @@
 //      and the service level with its price
 // (AC22, the price following the day, and AC34, the dispatch's block on the
 //  interim texts page, are proven at the backend -- tests/dispatch.test.ts.)
+// 4006 the dispatch page's title tag shows the job's real status (it was hardcoded New)
 // AC41 at 390px every action on the dispatch page is reachable, no sideways
 //      scroll, every tap target at least 44px
 //
@@ -211,6 +212,18 @@ test("AC19: a busy contractor still opens his day; a Not ready one does not", as
   // ready row never becomes clickable in the first place.
   await expect(priyaRow).toHaveAttribute("aria-disabled", "true");
   await expect(page.getByRole("heading", { name: /Priya's/ })).toHaveCount(0);
+});
+
+test("4006: the dispatch page's title tag reads the job's real status", async ({ page, request }) => {
+  await page.goto("/ops/jobs");
+  await login(page, "mike@idelta.com.au");
+  const reference = await postEnquiry(request, "4006-tag", "Plumbing", FREMANTLE, MONDAY);
+  await putBillingAddress(page, reference);
+
+  await page.goto(`/ops/jobs/${reference}/dispatch`);
+  await expect(page.getByRole("heading", { name: `Dispatch ${reference}` })).toBeVisible();
+  await expect(page.locator('[data-status="new"]')).toBeVisible();
+  // (the reschedule page's Scheduled tag is checked in reschedule.spec.ts)
 });
 
 test.describe(() => {

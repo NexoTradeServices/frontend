@@ -63,6 +63,34 @@ export function DeadLinkCard({ dead }: { dead: RespondDead }) {
       </section>
     );
   }
+  // Feature 4006: the office moved, took him off, or cancelled -- each says so and offers the one fix.
+  if (dead.state === "moved") {
+    return (
+      <section className={`${cardClass} flex flex-col gap-2.5`}>
+        <h1 className="font-heading text-xl font-extrabold text-ink">This booking was changed</h1>
+        <p className="text-sm text-ink">Use the link in your latest message.</p>
+        <GoToJobsLink />
+      </section>
+    );
+  }
+  if (dead.state === "taken_off") {
+    return (
+      <section className={`${cardClass} flex flex-col gap-2.5`}>
+        <h1 className="font-heading text-xl font-extrabold text-ink">You&apos;re no longer booked</h1>
+        <p className="text-sm text-ink">You&apos;re no longer booked on {dead.jobReference}. Nothing to do.</p>
+        <GoToJobsLink />
+      </section>
+    );
+  }
+  if (dead.state === "cancelled") {
+    return (
+      <section className={`${cardClass} flex flex-col gap-2.5`}>
+        <h1 className="font-heading text-xl font-extrabold text-ink">This job was cancelled</h1>
+        <p className="text-sm text-ink">{dead.jobReference} was cancelled. Nothing to do.</p>
+        <GoToJobsLink />
+      </section>
+    );
+  }
   if (dead.state === "expired") {
     return (
       <section className={`${cardClass} flex flex-col gap-2.5`}>

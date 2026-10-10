@@ -4,6 +4,10 @@
 // two groups (pickable first, nearest first), picking a contractor opens
 // his day, the service level follows the date (Emergency the one hand
 // override), the price shown, then Send it.
+//
+// Feature 4006: in reschedule mode the contractor who holds the booking is
+// fixed -- no candidate list, his day shown with the job's own block not
+// counted -- and Send new time swaps the bookings.
 "use client";
 
 import { useEffect, useState } from "react";
@@ -115,7 +119,9 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
   const [startMinutes, setStartMinutes] = useState(initial.defaults.startMinutes);
   const [holdMinutes, setHoldMinutes] = useState(initial.defaults.holdMinutes);
   const [emergency, setEmergency] = useState(false);
-  const [pickedCode, setPickedCode] = useState<string | null>(null);
+  const reschedule = initial.mode === "reschedule" && initial.contractor !== undefined;
+  const fixedFirstName = initial.contractor?.firstName ?? "";
+  const [pickedCode, setPickedCode] = useState<string | null>(reschedule ? (initial.contractor?.code ?? null) : null);
   const [candidates, setCandidates] = useState<CandidatesResponse | null>(null);
   const [candidatesLoading, setCandidatesLoading] = useState(true);
   const [dayBlocks, setDayBlocks] = useState<DayBlock[]>([]);
@@ -136,6 +142,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
         startMinutes: String(startMinutes),
         holdMinutes: String(holdMinutes),
         emergency: String(emergency),
+        ...(reschedule ? { mode: "reschedule" } : {}),
       });
       fetch(`${apiUrl}/api/jobs/${encodeURIComponent(initial.reference)}/dispatch/candidates?${params.toString()}`, {
         credentials: "include",
@@ -155,7 +162,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [initial.reference, date, startMinutes, holdMinutes, emergency]);
+  }, [initial.reference, date, startMinutes, holdMinutes, emergency, reschedule]);
 
   useEffect(() => {
     let cancelled = false;
@@ -165,7 +172,8 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
         return;
       }
       setDayLoading(true);
-      fetch(`${apiUrl}/api/contractors/${encodeURIComponent(pickedCode)}/day?date=${date}`, { credentials: "include" })
+      const ignore = reschedule ? `&ignoreJob=${encodeURIComponent(initial.reference)}` : "";
+      fetch(`${apiUrl}/api/contractors/${encodeURIComponent(pickedCode)}/day?date=${date}${ignore}`, { credentials: "include" })
         .then((res) => (res.ok ? (res.json() as Promise<{ blocks: DayBlock[] }>) : null))
         .then((body) => {
           if (!cancelled) setDayBlocks(body?.blocks ?? []);
@@ -181,7 +189,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [pickedCode, date]);
+  }, [pickedCode, date, reschedule, initial.reference]);
 
   const allRows = candidates ? [...candidates.serves, ...candidates.outside] : [];
   const pickedRow = allRows.find((row) => row.code === pickedCode) ?? null;
@@ -200,20 +208,24 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
     setDispatching(true);
     setDispatchError(undefined);
     try {
-      const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(initial.reference)}/dispatch`, {
+      const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(initial.reference)}/${reschedule ? "reschedule" : "dispatch"}`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contractorCode: pickedRow.code, date, startMinutes, holdMinutes, emergency }),
+        body: JSON.stringify(
+          reschedule
+            ? { date, startMinutes, holdMinutes, emergency }
+            : { contractorCode: pickedRow.code, date, startMinutes, holdMinutes, emergency },
+        ),
       });
       const payload = (await res.json()) as { toast?: string; error?: string };
       if (!res.ok) {
-        setDispatchError(payload.error ?? "Dispatch failed.");
+        setDispatchError(payload.error ?? (reschedule ? "Reschedule failed." : "Dispatch failed."));
         return;
       }
       router.push(`/ops/jobs/${encodeURIComponent(initial.reference)}?toast=${encodeURIComponent(payload.toast ?? "")}`);
     } catch {
-      setDispatchError("Dispatch failed - check your connection and try again.");
+      setDispatchError(`${reschedule ? "Reschedule" : "Dispatch"} failed - check your connection and try again.`);
     } finally {
       setDispatching(false);
     }
@@ -282,6 +294,24 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
         </Card>
       </div>
 
+      {reschedule ? (
+        <div className="order-3 min-w-0 xl:order-none xl:col-start-1 xl:row-start-2">
+          <Card title={`${fixedFirstName}'s day`} aside={`${initial.trade} - ${shortDateOf(date)}, ${timeLabelFor(startMinutes)}-${timeLabelFor(startMinutes + holdMinutes)} AWST`}>
+            {pickedRow && !pickedRow.pickable && pickedRow.why ? (
+              <p className="mb-2.5 text-xs font-semibold text-brand-warning">{pickedRow.why}</p>
+            ) : null}
+            <CalendarDayView
+              dayLabel={`${fixedFirstName}'s ${shortDateOf(date)}`}
+              blocks={dayBlocks}
+              proposedStart={startMinutes}
+              proposedEnd={startMinutes + holdMinutes}
+              onPickHalfHour={pickHalfHour}
+              onStepDay={stepDay}
+              loading={dayLoading}
+            />
+          </Card>
+        </div>
+      ) : (
       <div className="order-3 min-w-0 xl:order-none xl:col-start-1 xl:row-start-2">
         <Card title="Contractors" aside={`${initial.trade} - ${shortDateOf(date)}, ${timeLabelFor(startMinutes)}-${timeLabelFor(startMinutes + holdMinutes)} AWST`}>
           {candidatesLoading && !candidates ? (
@@ -344,6 +374,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
           )}
         </Card>
       </div>
+      )}
 
       <div className="order-1 min-w-0 xl:order-none xl:col-start-2 xl:row-start-1">
         <Card title="The job" aside={initial.customerName}>
@@ -421,7 +452,9 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
           {dispatchError ? <p className="mb-2 text-xs text-brand-destructive">{dispatchError}</p> : null}
           <div className="flex flex-col gap-2 border-t border-hairline pt-3.5 md:flex-row md:items-center md:justify-end md:gap-3">
             <span className="text-xs text-muted-text md:order-1">
-              {canGo
+              {canGo && reschedule
+                ? `${fixedFirstName} is sent one message with the new time to accept or decline. ${initial.customerName.split(" ")[0]} is told only when he accepts.`
+                : canGo
                 ? `An email and text will be sent to ${pickedRow?.name.split(" ")[0]} to accept or decline. ${initial.customerName.split(" ")[0]} will not be notified until he accepts.`
                 : pickedRow
                   ? `Not available at this time. Choose a different slot or contractor.`
@@ -432,11 +465,11 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 type="button"
                 onClick={() => void dispatch()}
                 loading={dispatching}
-                loadingLabel="Dispatching..."
+                loadingLabel={reschedule ? "Sending..." : "Dispatching..."}
                 size="compact"
                 className="md:order-2"
               >
-                {pickedRow ? `Dispatch to ${pickedRow.name.split(" ")[0] ?? pickedRow.name}` : "Dispatch"}
+                {reschedule ? "Send new time" : pickedRow ? `Dispatch to ${pickedRow.name.split(" ")[0] ?? pickedRow.name}` : "Dispatch"}
               </PrimaryButton>
             ) : (
               <button
@@ -444,7 +477,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 disabled
                 className="min-h-[52px] w-full rounded-md border border-hairline bg-ground px-4 text-sm font-bold text-muted-text md:order-2 md:min-h-11 md:w-auto md:px-[18px]"
               >
-                Dispatch
+                {reschedule ? "Send new time" : "Dispatch"}
               </button>
             )}
           </div>

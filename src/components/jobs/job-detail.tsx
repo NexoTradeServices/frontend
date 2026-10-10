@@ -14,6 +14,7 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PlacesField, fullAddress, type PickedAddress } from "@/components/ui/places-field";
 import { LockedField } from "@/components/ui/locked-field";
@@ -22,6 +23,7 @@ import { PrimaryButton, PrimaryLink } from "@/components/auth/buttons";
 import { Field } from "@/components/auth/field";
 import { ReadOnlyPhotoGallery } from "@/components/ui/photo-gallery";
 import { Toast, useToast } from "@/components/ui/toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TimeEntryRows, isBlankRow, rowsFromEntries, type TimeEntryRow } from "@/components/ui/time-entry-rows";
 import { formatHours } from "@/lib/billed-hours";
 import { formatDollars } from "@/components/request-a-job/money";
@@ -77,6 +79,21 @@ function RequestCard({ job }: { job: JobDetail }) {
           <div className="text-xs font-normal text-muted-text tabular-nums">{job.windowLabel}</div>
         </Fact>
         <Fact label="Arrived by">{job.source === "web" ? "Web form" : "Phone"}</Fact>
+        {job.cancelled ? (
+          <>
+            <Fact label="Cancelled">
+              <span className="tabular-nums">
+                {job.cancelled.atLabel} by {job.cancelled.byName}
+              </span>
+            </Fact>
+            <Fact label="Reason">{job.cancelled.reasonLabel}</Fact>
+            {job.cancelled.note ? (
+              <Fact label="Note" wide>
+                <p className="max-w-[62ch] font-normal whitespace-pre-wrap">{job.cancelled.note}</p>
+              </Fact>
+            ) : null}
+          </>
+        ) : null}
         <Fact label="Issue Description" wide>
           <p className="max-w-[62ch] font-normal whitespace-pre-wrap">{job.description ?? "-"}</p>
         </Fact>
@@ -113,16 +130,15 @@ const LEVEL_LABELS: Record<"normal" | "weekend" | "emergency", string> = {
  * Feature 4003, Quick fixes: the job actions the platform has not built yet,
  * each shown only where it would work, outlined, greyed and disabled, naming
  * the feature that switches it on. Architect skill, Writing the plan, step 2a.
+ * Feature 4006 took Reassign, Reschedule and Cancel out of
+ * this list: they are real buttons (JobActions, below).
  */
 const ACTION_PLACEHOLDERS: { label: string; feature: string; statuses: JobDetail["status"][] }[] = [
   { label: "Edit", feature: "4004", statuses: ["new"] },
-  { label: "Reassign", feature: "4006", statuses: ["assigned", "scheduled"] },
-  { label: "Reschedule", feature: "4006", statuses: ["assigned", "scheduled"] },
   { label: "On hold", feature: "5002", statuses: ["scheduled", "in_progress"] },
   { label: "Mark no-show", feature: "6005", statuses: ["scheduled", "in_progress"] },
   { label: "Raise callback", feature: "6004", statuses: ["completed"] },
   { label: "Correct and reissue", feature: "6007", statuses: ["completed"] },
-  { label: "Cancel", feature: "4006", statuses: ["new", "assigned", "scheduled"] },
 ];
 
 function ActionPlaceholders({ job }: { job: JobDetail }) {
@@ -166,7 +182,220 @@ function EarlierBookings({ bookings }: { bookings: EarlierBooking[] }) {
   );
 }
 
-function ContractorCard({ job }: { job: JobDetail }) {
+const outlinedButton =
+  "inline-flex min-h-11 items-center rounded-md border border-hairline bg-surface px-3.5 text-[13px] font-bold text-ink";
+
+const CANCEL_REASON_OPTIONS = [
+  { value: "", label: "Choose a reason" },
+  { value: "customer_changed_mind", label: "Customer changed their mind" },
+  { value: "no_coverage", label: "Nobody can cover the area" },
+  { value: "duplicate", label: "Duplicate" },
+  { value: "price", label: "Price" },
+  { value: "other", label: "Other" },
+] as const;
+
+function firstNameOf(name: string): string {
+  return name.split(" ")[0] ?? name;
+}
+
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1] ?? ""}`;
+}
+
+/**
+ * The Cancel dialog's body line: exactly who the cancel will message, by first name, changing with
+ * the pick. The site contact hears only when the job was booked; a duplicate tells the customer
+ * side nothing (the other job stands).
+ */
+export function cancelBodyLine(job: JobDetail, reason: string): string {
+  const customer = firstNameOf(job.customer.name);
+  const siteContact = job.status === "scheduled" && job.siteContact ? firstNameOf(job.siteContact.name) : null;
+  const contractor = job.contractor ? firstNameOf(job.contractor.name) : null;
+  if (reason === "duplicate") {
+    const notTold = joinNames(siteContact ? [customer, siteContact] : [customer]);
+    const verb = siteContact ? "are" : "is";
+    if (contractor === null) return "Nobody is told - it's a duplicate.";
+    return `${contractor} is told. ${notTold} ${verb} not told - the other job stands.`;
+  }
+  const told = [customer, ...(siteContact ? [siteContact] : []), ...(contractor ? [contractor] : [])];
+  return `${joinNames(told)} ${told.length === 1 ? "is" : "are"} told. Nothing is owed.`;
+}
+
+async function postAction(path: string, body: Record<string, unknown>): Promise<{ ok: true; job: JobDetail; toast: string } | { ok: false; error: string; field?: string }> {
+  try {
+    const res = await fetch(`${apiUrl}${path}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const payload = (await res.json()) as { job?: JobDetail; toast?: string } & Partial<ApiError>;
+    if (!res.ok || !payload.job) {
+      return { ok: false, error: payload.error ?? "That did not go through. Please try again.", field: payload.field };
+    }
+    return { ok: true, job: payload.job, toast: payload.toast ?? "" };
+  } catch {
+    return { ok: false, error: "That did not go through - check your connection and try again." };
+  }
+}
+
+/** Feature 4006: Reschedule, Reassign and Cancel job, shown by the page's own `actions`. */
+function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobDetail, message: string) => void }) {
+  const [dialog, setDialog] = useState<"take-off" | "cancel" | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+  const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
+  const [reasonError, setReasonError] = useState<string | undefined>();
+  const [noteError, setNoteError] = useState<string | undefined>();
+
+  const { reschedule, takeOff, cancel } = job.actions;
+  if (!reschedule && !takeOff && !cancel) return null;
+  const contractorFirst = job.contractor ? firstNameOf(job.contractor.name) : "the contractor";
+
+  function close() {
+    setDialog(null);
+    setError(undefined);
+    setReason("");
+    setNote("");
+    setReasonError(undefined);
+    setNoteError(undefined);
+  }
+
+  async function confirmTakeOff() {
+    setBusy(true);
+    setError(undefined);
+    const result = await postAction(`/api/jobs/${encodeURIComponent(job.reference)}/take-off`, {});
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    close();
+    onChanged(result.job, result.toast);
+  }
+
+  async function confirmCancel() {
+    setReasonError(undefined);
+    setNoteError(undefined);
+    setError(undefined);
+    if (reason === "") {
+      setReasonError("Required.");
+      return;
+    }
+    if (reason === "other" && note.trim() === "") {
+      setNoteError("Required.");
+      return;
+    }
+    setBusy(true);
+    const result = await postAction(`/api/jobs/${encodeURIComponent(job.reference)}/cancel`, { reason, note: note.trim() });
+    setBusy(false);
+    if (!result.ok) {
+      if (result.field === "note") setNoteError(result.error);
+      else if (result.field === "reason") setReasonError(result.error);
+      else setError(result.error);
+      return;
+    }
+    close();
+    onChanged(result.job, result.toast);
+  }
+
+  return (
+    <>
+      <div className="mt-3.5 flex flex-wrap gap-2 border-t border-hairline pt-3" data-testid="job-actions">
+        {reschedule ? (
+          <Link href={`/ops/jobs/${encodeURIComponent(job.reference)}/dispatch?mode=reschedule`} className={outlinedButton}>
+            Reschedule
+          </Link>
+        ) : null}
+        {takeOff ? (
+          <button type="button" className={outlinedButton} onClick={() => setDialog("take-off")}>
+            Reassign
+          </button>
+        ) : null}
+        {cancel ? (
+          <button type="button" className={outlinedButton} onClick={() => setDialog("cancel")}>
+            Cancel job
+          </button>
+        ) : null}
+      </div>
+
+      <ConfirmDialog
+        open={dialog === "take-off"}
+        title={`Reassign ${job.reference}?`}
+        confirmLabel="Reassign"
+        cancelLabel={`Keep ${contractorFirst}`}
+        loading={busy}
+        loadingLabel="Reassigning..."
+        onConfirm={() => void confirmTakeOff()}
+        onCancel={close}
+      >
+        {contractorFirst} is told he is no longer booked. The job goes back to New for a new contractor.
+        {error ? <span className="mt-2 block text-xs text-brand-destructive">{error}</span> : null}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={dialog === "cancel"}
+        title={`Cancel ${job.reference}?`}
+        severity="destructive"
+        confirmLabel="Cancel job"
+        cancelLabel="Keep the job"
+        loading={busy}
+        loadingLabel="Cancelling..."
+        onConfirm={() => void confirmCancel()}
+        onCancel={close}
+        fields={
+          <>
+            <SelectField
+              id="cancel-reason"
+              label="Reason"
+              required
+              value={reason}
+              error={reasonError}
+              options={CANCEL_REASON_OPTIONS}
+              onChange={(event) => {
+                setReason(event.target.value);
+                setReasonError(undefined);
+              }}
+            />
+            <div>
+              <label
+                htmlFor="cancel-note"
+                className={`mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase ${
+                  reason === "other" ? "after:ml-0.5 after:text-brand-destructive after:content-['*']" : ""
+                }`}
+              >
+                Note
+              </label>
+              <textarea
+                id="cancel-note"
+                rows={3}
+                maxLength={500}
+                value={note}
+                aria-required={reason === "other" ? true : undefined}
+                aria-invalid={noteError ? true : undefined}
+                onChange={(event) => {
+                  setNote(event.target.value);
+                  setNoteError(undefined);
+                }}
+                className={`w-full rounded-md border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
+                  noteError ? "border-brand-destructive" : "border-hairline"
+                }`}
+              />
+              {noteError ? <p className="mt-[5px] text-xs text-brand-destructive">{noteError}</p> : null}
+            </div>
+            {error ? <p className="mt-2 text-xs text-brand-destructive">{error}</p> : null}
+          </>
+        }
+      >
+        {cancelBodyLine(job, reason)}
+      </ConfirmDialog>
+    </>
+  );
+}
+
+function ContractorCard({ job, onChanged }: { job: JobDetail; onChanged: (next: JobDetail, message: string) => void }) {
   return (
     <Card title="Contractor">
       {job.contractor ? (
@@ -209,6 +438,7 @@ function ContractorCard({ job }: { job: JobDetail }) {
         <p className="text-[13px] text-muted-text">Not dispatched yet.</p>
       )}
       <EarlierBookings bookings={job.earlierBookings} />
+      <JobActions job={job} onChanged={onChanged} />
       <ActionPlaceholders job={job} />
     </Card>
   );
@@ -1297,7 +1527,14 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
           />
         </div>
         <div className="order-4 min-w-0 xl:order-none xl:col-start-1 xl:row-start-2">
-          <ContractorCard job={job} />
+          <ContractorCard
+            job={job}
+            onChanged={(next, message) => {
+              setJob(next);
+              showToast(message);
+              router.refresh();
+            }}
+          />
         </div>
         {job.visit ? (
           <div className="order-5 min-w-0 xl:order-none xl:col-start-1 xl:row-start-3">
