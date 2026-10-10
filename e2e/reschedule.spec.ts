@@ -3,7 +3,7 @@
 // AC1  Reschedule from the job page opens the dispatch page fixed on Bob: no candidate list, the
 //      real status tag, "Send new time"; sending returns to the job page with the Toast
 // AC8  Bob's old link reads "This booking was changed"
-// AC9  Earlier bookings lists the old booking as moved
+// AC9  Earlier bookings lists the old booking as rescheduled
 // (phone) at 390px the reschedule page has no sideways scroll and Send new time is reachable
 //
 // Runs against the seeded dev database. Every test makes a throwaway accepted job of its own
@@ -62,13 +62,13 @@ test("AC1, AC8, AC9: Reschedule opens the page fixed on Bob; Send new time moves
     await send.click();
 
     await expect(page).toHaveURL(new RegExp(`/ops/jobs/${job.reference}$`));
-    await expect(page.getByText(`${job.reference} moved. Waiting for Bob's answer.`)).toBeVisible();
+    await expect(page.getByText(`${job.reference} rescheduled. Waiting for Bob's answer.`)).toBeVisible();
     await expect(page.getByText(/Waiting for Bob's answer - proposed/)).toBeVisible();
 
     // AC9: the old booking is in Earlier bookings under its new word.
     const earlier = page.getByTestId("earlier-bookings");
     await expect(earlier.getByText("Bob Reilly")).toBeVisible();
-    await expect(earlier.getByText(/moved/)).toBeVisible();
+    await expect(earlier.getByText(/rescheduled/)).toBeVisible();
 
     // AC8: the link he had already answered says why it no longer works.
     await page.goto(job.respondPath);

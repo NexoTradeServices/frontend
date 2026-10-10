@@ -1,6 +1,6 @@
 // Feature 4006 -- take off and cancel, frontend e2e (ADR 0001).
 //
-// AC4  Take off: the dialog, the Toast, the job back in New with Dispatch
+// AC4  Reassign (was "Take off"): the dialog, the Toast, the job back in New with Dispatch
 // AC5  Cancel job: reason required, Other needs a note, the body line names who is told and changes
 //      with the pick, the Cancelled facts on the page
 // AC8  Bob's old link says "You're no longer booked" / "This job was cancelled"
@@ -27,30 +27,30 @@ async function wrapUp(page: Page, reference: string) {
   await page.request.post(`${apiUrl}/api/jobs/${reference}/cancel`, { data: { reason: "duplicate" } });
 }
 
-test("AC4, AC8, AC9: Take off asks first, then frees Bob, tells him and puts the job back in New with Dispatch", async ({
+test("AC4, AC8, AC9: Reassign asks first, then frees Bob, tells him and puts the job back in New with Dispatch", async ({
   page,
   request,
 }) => {
   const job = await acceptedJob(page, request, "takeoff");
   try {
     await page.goto(`/ops/jobs/${job.reference}`);
-    await page.getByRole("button", { name: "Take off" }).click();
+    await page.getByRole("button", { name: "Reassign" }).click();
 
     const dialog = page.getByRole("alertdialog");
-    await expect(dialog.getByRole("heading", { name: `Take Bob off ${job.reference}?` })).toBeVisible();
-    await expect(dialog.getByText("Bob is told the time is off. The job goes back to New for a new contractor.")).toBeVisible();
+    await expect(dialog.getByRole("heading", { name: `Reassign ${job.reference}?` })).toBeVisible();
+    await expect(dialog.getByText("Bob is told he is no longer booked. The job goes back to New for a new contractor.")).toBeVisible();
 
     // Keep Bob: nothing changes.
     await dialog.getByRole("button", { name: "Keep Bob" }).click();
     await expect(page.getByRole("alertdialog")).toHaveCount(0);
     await expect(page.getByText(/Booked - /)).toBeVisible();
 
-    await page.getByRole("button", { name: "Take off" }).click();
-    await page.getByRole("alertdialog").getByRole("button", { name: "Take off" }).click();
+    await page.getByRole("button", { name: "Reassign" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Reassign" }).click();
 
-    await expect(page.getByText(`Bob taken off ${job.reference}. It's back in New.`)).toBeVisible();
+    await expect(page.getByText(`${job.reference} reassigned. It's back in New.`)).toBeVisible();
     await expect(page.getByRole("link", { name: "Dispatch" })).toBeVisible();
-    await expect(page.getByTestId("earlier-bookings").getByText(/taken off/)).toBeVisible();
+    await expect(page.getByTestId("earlier-bookings").getByText(/reassigned/)).toBeVisible();
 
     // AC8: the link he had answered says he is no longer booked.
     await page.goto(job.respondPath);

@@ -130,7 +130,7 @@ const LEVEL_LABELS: Record<"normal" | "weekend" | "emergency", string> = {
  * Feature 4003, Quick fixes: the job actions the platform has not built yet,
  * each shown only where it would work, outlined, greyed and disabled, naming
  * the feature that switches it on. Architect skill, Writing the plan, step 2a.
- * Feature 4006 took Reassign (now Take off), Reschedule and Cancel out of
+ * Feature 4006 took Reassign, Reschedule and Cancel out of
  * this list: they are real buttons (JobActions, below).
  */
 const ACTION_PLACEHOLDERS: { label: string; feature: string; statuses: JobDetail["status"][] }[] = [
@@ -240,7 +240,7 @@ async function postAction(path: string, body: Record<string, unknown>): Promise<
   }
 }
 
-/** Feature 4006: Reschedule, Take off and Cancel job, shown by the page's own `actions`. */
+/** Feature 4006: Reschedule, Reassign and Cancel job, shown by the page's own `actions`. */
 function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobDetail, message: string) => void }) {
   const [dialog, setDialog] = useState<"take-off" | "cancel" | null>(null);
   const [busy, setBusy] = useState(false);
@@ -311,7 +311,7 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
         ) : null}
         {takeOff ? (
           <button type="button" className={outlinedButton} onClick={() => setDialog("take-off")}>
-            Take off
+            Reassign
           </button>
         ) : null}
         {cancel ? (
@@ -323,15 +323,15 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
 
       <ConfirmDialog
         open={dialog === "take-off"}
-        title={`Take ${contractorFirst} off ${job.reference}?`}
-        confirmLabel="Take off"
+        title={`Reassign ${job.reference}?`}
+        confirmLabel="Reassign"
         cancelLabel={`Keep ${contractorFirst}`}
         loading={busy}
-        loadingLabel="Taking off..."
+        loadingLabel="Reassigning..."
         onConfirm={() => void confirmTakeOff()}
         onCancel={close}
       >
-        {contractorFirst} is told the time is off. The job goes back to New for a new contractor.
+        {contractorFirst} is told he is no longer booked. The job goes back to New for a new contractor.
         {error ? <span className="mt-2 block text-xs text-brand-destructive">{error}</span> : null}
       </ConfirmDialog>
 
