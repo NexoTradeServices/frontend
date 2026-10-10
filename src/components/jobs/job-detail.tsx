@@ -27,7 +27,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TimeEntryRows, isBlankRow, rowsFromEntries, type TimeEntryRow } from "@/components/ui/time-entry-rows";
 import { formatHours } from "@/lib/billed-hours";
 import { formatDollars } from "@/components/request-a-job/money";
-import type { ApiError, EarlierBooking, InvoiceView, JobDetail, MessageView, NoteView, VisitView } from "./types";
+import type { ApiError, CustomerRating, EarlierBooking, InvoiceView, JobDetail, MessageView, NoteView, VisitView } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -593,6 +593,57 @@ function TimeOnSiteCard({
             Save
           </button>
         )}
+      </div>
+    </Card>
+  );
+}
+
+const RATING_LABELS: Record<CustomerRating["label"], { text: string; pair: string }> = {
+  regular: { text: "Regular customer", pair: "bg-success-bg text-brand-success" },
+  returning: { text: "Returning customer", pair: "bg-status-cancelled-bg text-status-cancelled" },
+  first_time: { text: "First-time customer", pair: "bg-status-cancelled-bg text-status-cancelled" },
+  old: { text: "Old customer", pair: "bg-status-cancelled-bg text-status-cancelled" },
+};
+
+/** Feature 4010: a Fact whose value is above zero needs attention -- brand-warning, bold. */
+function RatingFact({ label, value, attention }: { label: string; value: string; attention: boolean }) {
+  return (
+    <Fact label={label}>
+      <span
+        className={attention ? "font-bold text-brand-warning" : undefined}
+        data-testid={`rating-${label.toLowerCase().replace(/\s+/g, "-")}`}
+        data-attention={attention ? "true" : "false"}
+      >
+        {value}
+      </span>
+    </Fact>
+  );
+}
+
+function CustomerRatingCard({ job }: { job: JobDetail }) {
+  const rating = job.customerRating;
+  const label = RATING_LABELS[rating.label];
+  return (
+    <Card title="Customer rating" aside={job.customer.code}>
+      <span
+        data-testid="rating-label"
+        className={`inline-block rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] whitespace-nowrap uppercase ${label.pair}`}
+      >
+        {label.text}
+      </span>
+      <p data-testid="rating-line" className="mt-1.5 text-xs text-muted-text">
+        {rating.line}
+      </p>
+      <div data-testid="rating-facts" className="mt-3.5 grid grid-cols-2 gap-x-4.5 gap-y-3.5 border-t border-hairline pt-3.5 sm:grid-cols-4">
+        <RatingFact
+          label="Missed visits"
+          value={rating.waived > 0 ? `${String(rating.missedVisits)} (${String(rating.waived)} waived)` : String(rating.missedVisits)}
+          attention={rating.missedVisits > 0}
+        />
+        <RatingFact label="Late cancellations" value={String(rating.lateCancellations)} attention={rating.lateCancellations > 0} />
+        <RatingFact label="Disputes" value={String(rating.disputes)} attention={rating.disputes > 0} />
+        <RatingFact label="Overdue invoices" value={String(rating.overdueInvoices)} attention={rating.overdueInvoices > 0} />
+        <RatingFact label="Total due" value={formatDollars(rating.totalDue)} attention={rating.totalDue > 0} />
       </div>
     </Card>
   );
@@ -1502,15 +1553,18 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
   return (
     <>
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] xl:grid-rows-[auto_auto_auto_auto_auto_1fr]">
-        {/* Mobile stack order: Request, Customer, Addresses, Contractor/Dispatch,
+        {/* Mobile stack order: Request, Customer rating + Customer, Addresses, Contractor/Dispatch,
             Messages, Operator notes -- Addresses before Dispatch mirrors the
             actual dependency (no address, no dispatch). Desktop's two-column
-            arrangement (Request+Contractor+Messages+Notes left, Customer+Addresses
+            arrangement (Request+Contractor+Messages+Notes left, Rating+Customer+Addresses
             right) rides the explicit xl: column/row placement. */}
         <div className="order-1 min-w-0 xl:order-none xl:col-start-1 xl:row-start-1">
           <RequestCard job={job} />
         </div>
-        <div className="order-2 min-w-0 xl:order-none xl:col-start-2 xl:row-start-1">
+        {/* Feature 4010: the rating stands right above Customer -- one cell, so Addresses and the
+            rows below keep their places on desktop and the single column keeps them together. */}
+        <div className="order-2 grid min-w-0 gap-4 xl:order-none xl:col-start-2 xl:row-start-1">
+          <CustomerRatingCard job={job} />
           <CustomerCard job={job} />
         </div>
         <div className="order-3 min-w-0 xl:order-none xl:col-start-2 xl:row-span-5 xl:row-start-2">
