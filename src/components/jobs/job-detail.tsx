@@ -634,7 +634,7 @@ function CustomerRatingCard({ job }: { job: JobDetail }) {
       <p data-testid="rating-line" className="mt-1.5 text-xs text-muted-text">
         {rating.line}
       </p>
-      <div data-testid="rating-facts" className="mt-3.5 grid grid-cols-2 gap-x-4.5 gap-y-3.5 border-t border-hairline pt-3.5 sm:grid-cols-4">
+      <div data-testid="rating-facts" className="mt-3.5 grid grid-cols-2 gap-x-4.5 gap-y-3.5 border-t border-hairline pt-3.5 sm:grid-cols-3">
         <RatingFact
           label="Missed visits"
           value={rating.waived > 0 ? `${String(rating.missedVisits)} (${String(rating.waived)} waived)` : String(rating.missedVisits)}
