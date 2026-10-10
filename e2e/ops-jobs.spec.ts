@@ -19,6 +19,9 @@
 // 6001 AC13-AC15 Mike's Invoice card on a completed job: facts, lines, status tag (or the
 //      waiting state); Resend invoice shows its Toast and two new rows in Messages; Copy pay
 //      link puts the link on the clipboard, and says so when the browser refuses
+// 4010 AC1, AC2, AC7, AC8 the Customer rating card above Customer: a first-time customer's label,
+//      line and plain figures; a customer with a late cancellation sees it in the warning colour;
+//      at 390px it stands right before Customer
 // AC29 at 390px: every action reachable, no sideways scroll, every tap
 //      target at least 44px -- on the queue and on the job page
 // AC30 at 390px the status chips stay one row that scrolls sideways
@@ -33,6 +36,7 @@
 // throwaway e2e-4001-... email so it never touches the cast. No test here
 // saves an address on, or adds a note to, a job it did not create.
 import { test, expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
+import { dispatchThrowawayJob } from "./helpers/dispatched-job";
 import { acceptedJobForBob, completeJobAsBob, giveInvoiceItsPayLink } from "./helpers/accepted-job";
 import { login } from "./helpers/login";
 import { MOCKS_GOOGLE_PLACES, installMockGooglePlaces } from "./helpers/mock-google-places";
@@ -513,3 +517,71 @@ function hexToRgb(hex: string): string {
   const [r, g, b] = [0, 2, 4].map((at) => Number.parseInt(value.slice(at, at + 2), 16));
   return `rgb(${String(r)}, ${String(g)}, ${String(b)})`;
 }
+
+const FIGURES = ["missed-visits", "late-cancellations", "disputes", "overdue-invoices", "total-due"] as const;
+
+test("4010 AC1, AC2, AC7, AC8: a first-time customer's card sits above Customer, with plain figures", async ({ page, request }) => {
+  const reference = await postEnquiry(request, "rating", "E2E 4010 Rating");
+  await page.goto(`/ops/jobs/${reference}`);
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: reference, exact: true })).toBeVisible({ timeout: 15_000 });
+
+  await expect(page.getByTestId("rating-label")).toHaveText("First-time customer");
+  await expect(page.getByTestId("rating-line")).toHaveText("No earlier jobs with us");
+  for (const figure of FIGURES) {
+    await expect(page.getByTestId(`rating-${figure}`)).toHaveAttribute("data-attention", "false");
+  }
+  await expect(page.getByTestId("rating-missed-visits")).toHaveText("0");
+  await expect(page.getByTestId("rating-total-due")).toHaveText("$0");
+
+  const rating = await page.getByRole("heading", { name: /^Customer rating/ }).boundingBox();
+  const customer = await page.getByRole("heading", { name: /^Customer(?! rating)/ }).boundingBox();
+  expect(rating).not.toBeNull();
+  expect(customer).not.toBeNull();
+  expect(rating!.y).toBeLessThan(customer!.y);
+  expect(Math.abs(rating!.x - customer!.x)).toBeLessThan(2);
+});
+
+test("4010 AC4, AC7: a job cancelled after Bob accepted it counts as a late cancellation, in the warning colour, bold", async ({
+  page,
+  request,
+}) => {
+  const job = await dispatchThrowawayJob(page, request, "rating");
+  const accepted = await request.post(`${apiUrl}/api/respond/${job.token}/accept`);
+  expect(accepted.status()).toBe(200);
+  const cancelled = await page.request.post(`${apiUrl}/api/jobs/${job.reference}/cancel`, { data: { reason: "duplicate" } });
+  expect(cancelled.status()).toBe(200);
+
+  await page.goto(`/ops/jobs/${job.reference}`);
+  await expect(page.getByRole("heading", { name: job.reference, exact: true })).toBeVisible({ timeout: 15_000 });
+  const late = page.getByTestId("rating-late-cancellations");
+  await expect(late).toHaveText("1");
+  await expect(late).toHaveAttribute("data-attention", "true");
+  await expect(late).toHaveCSS("color", "rgb(180, 83, 26)");
+  await expect(late).toHaveCSS("font-weight", "700");
+  const disputes = page.getByTestId("rating-disputes");
+  await expect(disputes).toHaveText("0");
+  await expect(disputes).not.toHaveCSS("font-weight", "700");
+});
+
+test.describe("4010 AC8 at 390px", () => {
+  test.use(MOBILE_VIEWPORT);
+
+  test("the card stands right before Customer in the single column, with no sideways scroll", async ({ page, request }) => {
+    const reference = await postEnquiry(request, "rating-phone", "E2E 4010 Phone");
+    await page.goto(`/ops/jobs/${reference}`);
+    await login(page, "mike@idelta.com.au");
+    await expect(page.getByRole("heading", { name: reference, exact: true })).toBeVisible({ timeout: 15_000 });
+
+    const rating = page.getByRole("heading", { name: /^Customer rating/ });
+    const customer = page.getByRole("heading", { name: /^Customer(?! rating)/ });
+    const ratingBox = (await rating.boundingBox())!;
+    const customerBox = (await customer.boundingBox())!;
+    expect(ratingBox.y).toBeLessThan(customerBox.y);
+    // Nothing sits between the two cards: Customer's heading follows the rating card's last figure.
+    const lastFigure = (await page.getByTestId("rating-total-due").boundingBox())!;
+    expect(lastFigure.y).toBeLessThan(customerBox.y);
+    expect(customerBox.y - lastFigure.y).toBeLessThan(120);
+    await expectNoSidewaysScroll(page);
+  });
+});

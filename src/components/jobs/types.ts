@@ -115,6 +115,21 @@ export interface InvoiceView {
   gstAmount: number;
 }
 
+export interface CustomerRating {
+  label: "first_time" | "returning" | "regular" | "old";
+  jobsInLastYear: number;
+  lastJobLabel: string | null;
+  /** "7 jobs in the last 12 months - last job 2 Oct 2026" */
+  line: string;
+  missedVisits: number;
+  waived: number;
+  lateCancellations: number;
+  disputes: number;
+  overdueInvoices: number;
+  /** Cents. */
+  totalDue: number;
+}
+
 export interface JobDetail {
   reference: string;
   status: JobStatus;
@@ -137,6 +152,8 @@ export interface JobDetail {
     email: string;
     billingAddress: PickedAddress | null;
   };
+  /** Feature 4010: worked out from her history on every read. */
+  customerRating: CustomerRating;
   siteAddress: PickedAddress | null;
   siteSameAsBilling: boolean;
   siteLocked: boolean;
