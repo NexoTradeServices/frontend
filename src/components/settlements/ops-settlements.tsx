@@ -452,7 +452,7 @@ export function OpsSettlements({ initial }: { initial: OpsList }) {
       </div>
 
       {/* The Filter row: one line that scrolls sideways on Mobile, never wrapping the page. */}
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 md:mx-0 md:flex-wrap md:overflow-visible md:px-0" role="group" aria-label="Show">
+      <div className="-mx-4 flex flex-nowrap gap-2 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden" role="group" aria-label="Show">
         {PILLS.map((pill) => {
           const chosen = pill.view === view;
           return (
