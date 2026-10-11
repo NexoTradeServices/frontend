@@ -41,7 +41,7 @@ test("AC11: a real Google pick stores the structured address and round-trips", a
   if (MOCKS_GOOGLE_PLACES) await installMockGooglePlaces(page);
   await page.goto("/ops/contractors/new");
   await login(page, "mike@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
 
   const tag = uniqueTag("ac11");
   const name = `E2E Places Case ${tag}`;
@@ -67,7 +67,7 @@ test("AC11: a real Google pick stores the structured address and round-trips", a
 
   const row = page.getByRole("link").filter({ hasText: name });
   await row.click();
-  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByLabel("Address")).toHaveValue(/Marine Terrace.*Fremantle/);
 });
 
@@ -77,7 +77,7 @@ test("AC11: with the Places script blocked, the address field is disabled with t
   await page.route("https://maps.googleapis.com/**", (route) => route.abort());
   await page.goto("/ops/contractors/new");
   await login(page, "mike@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
 
   await expect(page.getByLabel("Address")).toBeDisabled({ timeout: 10_000 });
   await expect(page.getByText(/Address lookup is unavailable right now -- try again shortly\. Everything else still saves\./)).toBeVisible();
@@ -95,7 +95,7 @@ test("AC11: with the Places script blocked, the address field is disabled with t
 
   const row = page.getByRole("link").filter({ hasText: name });
   await row.click();
-  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
 
   // AC8/AC9: the status switch, its confirm dialog and toasts -- on this
   // throwaway contractor, never on a seeded one.
@@ -113,7 +113,7 @@ test("AC6: a blank licence expiry stops the form with Required.; a past expiry s
 }) => {
   await page.goto("/ops/contractors/new");
   await login(page, "mike@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
 
   const name = `E2E Expiry Case ${uniqueTag("ac6")}`;
   await page.getByLabel("Name", { exact: true }).fill(name);
@@ -135,7 +135,7 @@ test("AC6: a blank licence expiry stops the form with Required.; a past expiry s
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page).toHaveURL(/\/ops\/contractors$/, { timeout: 10_000 });
   await page.getByRole("link").filter({ hasText: name }).click();
-  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText("Already expired -- this trade cannot be dispatched until renewed.")).toBeVisible();
 });
 
@@ -144,7 +144,7 @@ test("6003 AC1: GST registered offers Not asked yet, Yes and No; not asked is a 
 }) => {
   await page.goto("/ops/contractors/new");
   await login(page, "mike@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
 
   // The blank add form starts on Not asked yet, with all three answers on offer.
   const gst = page.getByLabel("GST registered");
@@ -162,7 +162,7 @@ test("6003 AC1: GST registered offers Not asked yet, Yes and No; not asked is a 
   const row = page.getByRole("link").filter({ hasText: name });
   await expect(row).toContainText("GST registration (not asked)");
   await row.click();
-  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
   // ... and in the record's Not ready banner.
   await expect(page.getByRole("listitem").filter({ hasText: "GST registration (not asked)" })).toBeVisible();
   await expect(page.getByLabel("GST registered")).toHaveValue("");
@@ -173,7 +173,7 @@ test("6003 AC1: GST registered offers Not asked yet, Yes and No; not asked is a 
   await expect(page).toHaveURL(/\/ops\/contractors$/, { timeout: 10_000 });
   await expect(page.getByRole("link").filter({ hasText: name })).not.toContainText("GST registration (not asked)");
   await page.getByRole("link").filter({ hasText: name }).click();
-  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByLabel("GST registered")).toHaveValue("yes");
   await expect(page.getByLabel("GST registered").locator("option")).toHaveText(["Yes", "No"]);
   await expect(page.getByRole("listitem").filter({ hasText: "GST registration (not asked)" })).toHaveCount(0);

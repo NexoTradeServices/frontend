@@ -359,7 +359,7 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
           void handleSave();
         }}
         noValidate
-        className="flex max-w-[760px] flex-col gap-4"
+        className="flex flex-col gap-4"
       >
         {formError ? <Banner kind="error">{formError}</Banner> : null}
 

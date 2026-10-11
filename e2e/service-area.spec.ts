@@ -50,7 +50,7 @@ function uniqueEmail(tag: string): string {
 async function addThrowawayContractor(page: Page, tag: string): Promise<{ name: string }> {
   await page.goto("/ops/contractors/new");
   await login(page, "mike@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Contractors" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
   const name = `E2E Service Area ${uniqueTag(tag)}`;
   await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByLabel("Phone", { exact: true }).fill("0412 000 555");

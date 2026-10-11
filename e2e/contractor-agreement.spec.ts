@@ -32,7 +32,7 @@ test.describe(() => {
     await login(page, "bob@idelta.com.au");
     await expect(page.getByRole("heading", { name: "Contractor agreement", level: 1 })).toBeVisible({ timeout: 15_000 });
 
-    await expect(page.getByRole("link", { name: "Back to dashboard" })).toHaveAttribute("href", "/contractor");
+    await expect(page.getByRole("link", { name: "< Dashboard" })).toHaveAttribute("href", "/contractor");
     await expect(
       page.getByText("Until you accept version 1, no new jobs can be sent to you. Jobs already booked go ahead."),
     ).toBeVisible();

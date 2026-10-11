@@ -125,7 +125,7 @@ export function AgreementCard({ timezone = TIMEZONE }: { timezone?: string }) {
   const versions = list?.versions ?? [];
 
   return (
-    <div className="mb-4.5 max-w-[720px] rounded-[10px] border border-hairline bg-surface p-4 sm:p-5">
+    <div className="mb-4.5 rounded-[10px] border border-hairline bg-surface p-4 sm:p-5">
       <h3 className="font-heading text-base font-extrabold text-ink">Contractor agreement</h3>
       <p className="mb-3.5 text-xs text-muted-text">All fields are required</p>
       {legalBanner ? <Banner kind="error">{legalBanner}</Banner> : null}

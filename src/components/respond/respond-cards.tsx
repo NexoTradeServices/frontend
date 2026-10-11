@@ -1,13 +1,11 @@
-// The respond page's frame and its stand-alone cards -- Feature 4003.
+// The respond page's stand-alone cards -- Feature 4003.
 //
-// The page wears no portal shell: the wordmark bar only, the same stripped
-// chrome as the login gate (Foundations / Brand identity - the surfaces).
+// The page wears the Focused shell (Feature 1018): the Wordmark bar and the
+// width come from the shell and the Container, not from here.
 // The three dead-link cards each say why and carry ONE button, the fix:
 // "Go to your jobs" for an answered link, "Ring the office" for the other
 // two (Passwordless capability links - a dead link explains itself).
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { Wordmark } from "@/components/brand/wordmark";
 import type { RespondDead } from "./types";
 
 export const cardClass = "rounded-[10px] border border-hairline bg-surface p-4 md:p-5";
@@ -15,18 +13,6 @@ export const labelClass = "block text-[11px] font-bold tracking-[0.08em] text-mu
 
 const bigButton =
   "flex min-h-[52px] w-full items-center justify-center rounded-md px-4 text-center text-sm font-bold md:min-h-11";
-
-export function RespondFrame({ displayName, children }: { displayName: string | null; children: ReactNode }) {
-  return (
-    <div className="flex min-h-screen flex-col bg-ground">
-      {/* A bare <header>: the one banner landmark on this page. */}
-      <header className="bg-ink px-4 py-3 md:px-10">
-        <Wordmark name={displayName} />
-      </header>
-      <main className="mx-auto w-full max-w-[560px] flex-1 px-4 py-4 md:py-8">{children}</main>
-    </div>
-  );
-}
 
 export function GoToJobsLink({ outlined = false }: { outlined?: boolean }) {
   return (

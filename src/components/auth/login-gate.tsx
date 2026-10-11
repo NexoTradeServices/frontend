@@ -10,20 +10,14 @@
 import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
-import { GateShell, GateCardTitle } from "./gate-shell";
+import { GateCard, GateCardTitle } from "./gate-shell";
 import { Field } from "./field";
 import { PrimaryButton, TextLink } from "./buttons";
 import { Banner } from "./banner";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function LoginGate({
-  portalName,
-  displayName = null,
-}: {
-  portalName: string;
-  displayName?: string | null;
-}) {
+export function LoginGate({ portalName }: { portalName: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const [email, setEmail] = useState("");
@@ -69,7 +63,7 @@ export function LoginGate({
   }
 
   return (
-    <GateShell displayName={displayName}>
+    <GateCard>
       <GateCardTitle title={portalName} subtitle="Log in to continue" />
       <form onSubmit={(event) => void handleSubmit(event)} noValidate>
         {formError ? <Banner kind="error">{formError}</Banner> : null}
@@ -98,6 +92,6 @@ export function LoginGate({
       <TextLink href={`/forgot-password?from=${encodeURIComponent(pathname)}`}>
         Forgot your password?
       </TextLink>
-    </GateShell>
+    </GateCard>
   );
 }

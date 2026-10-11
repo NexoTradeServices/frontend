@@ -53,7 +53,7 @@ export function ContractorList({ contractors }: { contractors: ContractorDto[] }
   }, [searchParams]);
 
   return (
-    <div className="max-w-[760px]">
+    <div>
       <div className="mb-4.5 flex justify-end">
         <PrimaryLink href="/ops/contractors/new" size="compact">
           Add a contractor

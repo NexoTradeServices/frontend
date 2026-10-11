@@ -1,38 +1,21 @@
-// The stripped chrome -- Feature 1003, auth + roles.
+// The gate's card -- Feature 1003, auth + roles; frame removed by Feature 1018.
 //
-// Patterns / Layout shells: "The login gate ... uses the same stripped
-// chrome: navy top bar with the wordmark, warm ground, one centered white
-// card, one primary action, no nav." Confirmed live on the Portal Login Gate
-// style reference, 31 Aug 2026 -- every value here is copied from it, not
-// re-decided.
+// The login, password, wrong-portal and dead-link pages are each one card.
+// What used to be here as a frame (the ink header and the 360px centring) is
+// now the Focused shell and the Narrow container; only the card is left, as
+// the Card organism: surface, 1px hairline, 10px corners, 16px padding on
+// Phone and 20px from Tablet. Its inside is 9001's to restyle.
 import type { ReactNode } from "react";
-import { Wordmark } from "@/components/brand/wordmark";
 
-export function GateShell({ children, displayName }: { children: ReactNode; displayName?: string | null }) {
-  return (
-    <div className="flex min-h-screen flex-col bg-ground">
-      {/* A bare <header>, not a styling-only <div>: the portal shell's own
-          top app bar (Feature 1006) carries the SAME bg-ink wordmark bar and
-          both can exist in the DOM at once for a moment after logout -- the
-          "banner" landmark this gets for free is what lets a test scope to
-          THIS one (frontend-test-harness.md, "found by the first CI run"). */}
-      <header className="bg-ink px-4 py-3">
-        <Wordmark name={displayName ?? null} />
-      </header>
-      <div className="flex flex-1 items-center justify-center px-5 py-9">
-        <div className="w-full max-w-[360px] rounded-[10px] border border-hairline bg-surface p-6">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
+export function GateCard({ children }: { children: ReactNode }) {
+  return <div className="w-full rounded-card border border-hairline bg-surface p-4 md:p-5">{children}</div>;
 }
 
 export function GateCardTitle({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <>
-      <h1 className="mb-0.5 font-heading text-base font-extrabold text-ink">{title}</h1>
-      <p className="mb-[18px] text-xs text-muted-text">{subtitle}</p>
+      <h1 className="mb-0.5 font-heading text-card-title font-extrabold text-ink">{title}</h1>
+      <p className="mb-[18px] text-caption text-muted-text">{subtitle}</p>
     </>
   );
 }

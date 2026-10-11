@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
-import { GateShell, GateCardTitle } from "./gate-shell";
+import { GateCard, GateCardTitle } from "./gate-shell";
 import { Field } from "./field";
 import { PrimaryButton } from "./buttons";
 import { Banner } from "./banner";
@@ -17,15 +17,7 @@ import type { Role } from "@/lib/session";
 
 const MIN_LENGTH = 8;
 
-export function SetNewPasswordForm({
-  email,
-  token,
-  displayName = null,
-}: {
-  email: string;
-  token: string;
-  displayName?: string | null;
-}) {
+export function SetNewPasswordForm({ email, token }: { email: string; token: string }) {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | undefined>();
@@ -68,7 +60,7 @@ export function SetNewPasswordForm({
   }
 
   return (
-    <GateShell displayName={displayName}>
+    <GateCard>
       <GateCardTitle title="Choose a new password" subtitle={`For ${email}`} />
       <form onSubmit={(event) => void handleSubmit(event)} noValidate>
         {formError ? <Banner kind="error">{formError}</Banner> : null}
@@ -87,6 +79,6 @@ export function SetNewPasswordForm({
           Set password
         </PrimaryButton>
       </form>
-    </GateShell>
+    </GateCard>
   );
 }

@@ -18,7 +18,7 @@ function dollars(cents: number): string {
 
 export function ServiceTypeCatalog({ serviceTypes }: { serviceTypes: ServiceTypeDto[] }) {
   return (
-    <div className="max-w-[720px]">
+    <div>
       <div className="mb-4.5 flex justify-end">
         <PrimaryLink href="/ops/pricing/new" size="compact">
           Add a trade

@@ -55,10 +55,10 @@ async function logout(page: Page) {
   await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10_000 });
 }
 
-test("AC2: Mike (ops) gets the wrong-door card at /ops/settings", async ({ page }) => {
+test("AC2: Mike (ops) gets the Owner only card at /ops/settings, in his own portal's frame", async ({ page }) => {
   await page.goto("/ops/settings");
   await login(page, "mike@idelta.com.au");
-  await expect(page.getByRole("heading", { name: "Wrong portal" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Owner only" })).toBeVisible();
 });
 
 test("AC2: Mike's ops-portal nav shows no OWNER group -- Settings is owner-only", async ({ page }) => {

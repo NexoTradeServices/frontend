@@ -264,7 +264,7 @@ export function ServiceArea({
 
   const crossedCount = inRange.length - kept.length;
   return (
-    <div className="flex max-w-[760px] flex-col gap-4">
+    <div className="flex flex-col gap-4">
       {formError ? (
         <div className="rounded-lg border border-error-border bg-error-bg p-3.5 text-[13px] text-brand-destructive">
           <b>Not saved.</b> {formError.replace(/^Not saved\.\s*/, "")}

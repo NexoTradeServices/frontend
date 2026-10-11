@@ -96,3 +96,25 @@ export async function warmRoutes(): Promise<void> {
     await context.dispose();
   }
 }
+
+export interface CustomerLogin {
+  email: string;
+  name: string;
+  password: string;
+}
+
+/**
+ * Feature 1018: a customer login for the customer portal. The seeded cast has none (Sarah is a guest
+ * by design), so the test makes its own through the backend's test-data hook: a labelled `e2e`
+ * customer, removed by the suite's sweep.
+ */
+export async function makeCustomerLogin(): Promise<CustomerLogin> {
+  const context = await request.newContext({ storageState: testRunStorageState() });
+  try {
+    const res = await context.post(`${API_URL}/api/test-data/customer-login`);
+    if (!res.ok()) throw new Error(`the customer login hook failed: ${String(res.status())} ${await res.text()}`);
+    return (await res.json()) as CustomerLogin;
+  } finally {
+    await context.dispose();
+  }
+}

@@ -9,7 +9,9 @@ import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { TextLinkButton } from "./buttons";
 
-export function LogoutLink() {
+// `onInk`: the Sidebar and the Menu drawer draw it as a small on-ink-text link,
+// 44px tall -- the gate's own text link colour would not read on ink.
+export function LogoutLink({ onInk = false }: { onInk?: boolean }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -17,6 +19,19 @@ export function LogoutLink() {
     setLoading(true);
     await authClient.signOut();
     router.refresh();
+  }
+
+  if (onInk) {
+    return (
+      <button
+        type="button"
+        disabled={loading}
+        onClick={() => void handleClick()}
+        className="flex min-h-11 w-full items-center text-small font-semibold text-on-ink-text underline underline-offset-2"
+      >
+        Log out
+      </button>
+    );
   }
 
   return (
