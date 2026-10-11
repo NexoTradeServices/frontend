@@ -8,18 +8,12 @@
 
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
-import { GateShell, GateCardTitle } from "./gate-shell";
+import { GateCard, GateCardTitle } from "./gate-shell";
 import { Field } from "./field";
 import { PrimaryButton, TextLink } from "./buttons";
 import { Banner } from "./banner";
 
-export function ForgotPasswordForm({
-  backTo,
-  displayName = null,
-}: {
-  backTo: string;
-  displayName?: string | null;
-}) {
+export function ForgotPasswordForm({ backTo }: { backTo: string }) {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -37,7 +31,7 @@ export function ForgotPasswordForm({
   }
 
   return (
-    <GateShell displayName={displayName}>
+    <GateCard>
       <GateCardTitle title="Reset your password" subtitle="We'll email you a link to set a new one" />
       {sent ? (
         <Banner kind="success">
@@ -59,6 +53,6 @@ export function ForgotPasswordForm({
         </form>
       )}
       <TextLink href={backTo}>Back to log in</TextLink>
-    </GateShell>
+    </GateCard>
   );
 }

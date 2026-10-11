@@ -4,6 +4,7 @@
 // once, server-side, by forwarding the incoming request's cookies to the
 // backend's GET /api/me (credentialed fetch, decision 1) -- no client-side
 // flash of the wrong state.
+import { cache } from "react";
 import { cookies } from "next/headers";
 
 export type Role = "customer" | "contractor" | "ops" | "owner";
@@ -17,7 +18,9 @@ export interface SessionUser {
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-export async function getSessionUser(): Promise<SessionUser | null> {
+// React's cache(): the Portal layout and the page under it both ask who is
+// logged in during one render, and the backend is asked once.
+export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
 
@@ -28,4 +31,4 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
   if (res.status !== 200) return null;
   return (await res.json()) as SessionUser;
-}
+});

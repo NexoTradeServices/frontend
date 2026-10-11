@@ -1,29 +1,16 @@
-// The approve page's frame and its Message cards -- Feature 6003, settlement run.
+// The approve page's Message cards -- Feature 6003, settlement run.
 //
-// frontend-conventions.md: Templates / Shells (Focused shell: the Wordmark bar, one centered
-// column up to 640px, no menu), Organisms / Cards (Message card: up to 420px, an optional icon, a
+// frontend-conventions.md: Templates / Shells (Focused shell: the Wordmark bar, no menu -- drawn
+// by the shell's layout file since Feature 1018, with the width from the Container), Organisms / Cards (Message card: up to 420px, an optional icon, a
 // Page title, one line of text, one Primary, an optional Link), Pages / Link pages and dead links
 // (a dead link names why and carries the fix as its one Primary).
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Wordmark } from "@/components/brand/wordmark";
 import { telHref } from "./money";
 import type { ApproveDead } from "./types";
 
 const bigButton =
   "flex min-h-[52px] w-full items-center justify-center rounded-md px-4 text-center text-sm font-bold md:min-h-11";
-
-export function ApproveFrame({ displayName, children }: { displayName: string | null; children: ReactNode }) {
-  return (
-    <div className="flex min-h-screen flex-col bg-ground">
-      {/* A bare <header>: the one banner landmark on this page. */}
-      <header className="bg-ink px-4 py-3 md:px-10">
-        <Wordmark name={displayName} />
-      </header>
-      <main className="mx-auto w-full max-w-[640px] flex-1 px-4 py-4 md:py-8">{children}</main>
-    </div>
-  );
-}
 
 /** A Message card: the page has one thing to say. */
 export function MessageCard({
@@ -39,7 +26,7 @@ export function MessageCard({
   action?: ReactNode;
 }) {
   return (
-    <section data-testid="message-card" className="mx-auto flex w-full max-w-[420px] flex-col items-center gap-2.5 rounded-[10px] border border-hairline bg-surface p-5 text-center">
+    <section data-testid="message-card" className="flex w-full flex-col items-center gap-2.5 rounded-[10px] border border-hairline bg-surface p-5 text-center">
       {success ? (
         <span aria-hidden className="flex size-12 items-center justify-center rounded-full bg-success-bg text-brand-success">
           <svg viewBox="0 0 24 24" className="size-6" fill="none">

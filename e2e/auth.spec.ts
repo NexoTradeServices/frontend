@@ -5,6 +5,12 @@
 //      session to the job queue)
 // AC3  Bob, logged in as a contractor, opening /ops sees the wrong-door card
 // AC11 "Go to your portal" lands each role on its own root
+// 1018 AC4 logged out, /ops, /ops/settings, /contractor/payouts and /account each show the
+//      Focused frame with the login card named for the portal at that same URL; logging
+//      in as the right role shows that same URL's page in the Portal frame
+// 1018 AC5 Bob at /ops sees the wrong-portal card in the Focused frame
+// 1018 AC6 Mike at /ops/settings or /ops/pricing stays in the Portal frame and sees the
+//      Owner only card with "Go to Jobs"
 // AC12 the gate holds the responsive floor at 390px -- its own describe
 //      block below opts into MOBILE_VIEWPORT (project/setup/
 //      frontend-test-harness.md Part 1); every other test in this file is
@@ -17,6 +23,7 @@
 // and log out, all reversible.
 import { test, expect } from "@playwright/test";
 import { login, waitForHydration } from "./helpers/login";
+import { makeCustomerLogin } from "./helpers/test-run";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 
 test("AC1: Mike logs in at /ops and lands in the ops portal", async ({ page }) => {
@@ -28,7 +35,7 @@ test("AC1: Mike logs in at /ops and lands in the ops portal", async ({ page }) =
   // Feature 4001, plan decision 11: the queue is ops' dashboard.
   await expect(page).toHaveURL(/\/ops\/jobs$/, { timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible();
-  await expect(page.getByText("mike@idelta.com.au").first()).toBeVisible();
+  await expect(page.getByTestId("menu-person")).toHaveText("Mike");
   // The menu's Jobs entry is shown and marked current (desktop sidebar).
   const jobsEntry = page.getByRole("navigation", { name: "Sidebar" }).getByRole("link", { name: "Jobs", exact: true });
   await expect(jobsEntry).toHaveAttribute("aria-current", "page");
@@ -53,6 +60,12 @@ test("AC3 + AC11: Bob's contractor session sees the wrong-door card on /ops, and
   await page.goto("/ops");
   await expect(page.getByRole("heading", { name: "Wrong portal" })).toBeVisible();
   await expect(page.getByText("bob@idelta.com.au")).toBeVisible();
+  // 1018 AC5: the Focused frame - the Wordmark-only Top bar, no sidebar, no menu.
+  await expect(page).toHaveURL(/\/ops$/);
+  await expect(page.getByRole("banner").getByRole("link")).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Open menu" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Go to your portal" })).toHaveAttribute("href", "/contractor");
 
   await page.getByRole("link", { name: "Go to your portal" }).click();
   await expect(page).toHaveURL(/\/contractor$/);
@@ -60,6 +73,80 @@ test("AC3 + AC11: Bob's contractor session sees the wrong-door card on /ops, and
 
   await page.getByRole("button", { name: "Log out" }).click();
   await expect(page.getByRole("heading", { name: "Contractor portal" })).toBeVisible();
+});
+
+const GATES = [
+  { url: "/ops", card: "Operations portal", role: "mike@idelta.com.au", landing: "Jobs" },
+  { url: "/ops/settings", card: "Operations portal", role: "owner@idelta.com.au", landing: "Settings" },
+  { url: "/contractor/payouts", card: "Contractor portal", role: "bob@idelta.com.au", landing: "Payouts" },
+];
+
+for (const gate of GATES) {
+  test(`1018 AC4: logged out, ${gate.url} shows the Focused frame with the ${gate.card} login card at that same URL; the right login lands on the page in the Portal frame`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const response = await page.goto(gate.url);
+    // No redirect, no login URL.
+    expect(response?.url()).toMatch(new RegExp(`${gate.url}$`));
+    await expect(page).toHaveURL(new RegExp(`${gate.url}$`));
+    await expect(page.getByRole("heading", { name: gate.card })).toBeVisible();
+    // The Focused frame: one ink Top bar with the Wordmark only, no sidebar.
+    await expect(page.getByRole("banner").getByRole("link")).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
+
+    await login(page, gate.role);
+    // /ops is the one root that forwards to the queue (4001); every other URL stays put.
+    if (gate.url === "/ops") await expect(page).toHaveURL(/\/ops\/jobs$/, { timeout: 15_000 });
+    else await expect(page).toHaveURL(new RegExp(`${gate.url}$`));
+    await expect(page.getByRole("heading", { name: gate.landing, exact: true })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
+    await page.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: "Log out" }).click();
+    await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
+  });
+}
+
+test("1018 AC4: logged out, /account shows the Customer account login card at that same URL; a customer lands on the same URL in the Portal frame", async ({
+  page,
+}) => {
+  const customer = await makeCustomerLogin();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/account");
+  await expect(page).toHaveURL(/\/account$/);
+  await expect(page.getByRole("heading", { name: "Customer account" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
+
+  await login(page, customer.email, customer.password);
+  await expect(page).toHaveURL(/\/account$/);
+  await expect(page.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: "Log out" }).click();
+  await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
+});
+
+test("1018 AC6: Mike at /ops/settings and /ops/pricing stays in the Portal frame and sees the Owner only card", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/ops/settings");
+  await login(page, "mike@idelta.com.au");
+  // The same URL, now Mike's page in the Portal frame. Wait for it: the sign-in is still
+  // in flight when the Log in button gives way to "Logging in...".
+  await expect(page.getByRole("heading", { name: "Owner only" })).toBeVisible();
+
+  for (const url of ["/ops/settings", "/ops/pricing"]) {
+    await page.goto(url);
+    await expect(page.getByRole("heading", { name: "Owner only" })).toBeVisible();
+    await expect(page.getByText("You're logged in as Mike. This page is for the owner's login.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Go to Jobs" })).toHaveAttribute("href", "/ops/jobs");
+    // Still in the Portal frame: the Sidebar is there, with his name.
+    await expect(page.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
+    await expect(page.getByTestId("menu-person")).toHaveText("Mike");
+  }
+
+  await page.getByRole("link", { name: "Go to Jobs" }).click();
+  await expect(page).toHaveURL(/\/ops\/jobs$/);
+  await page.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: "Log out" }).click();
+  await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
 });
 
 test("AC2: a wrong password shows the generic banner, never a field-specific one", async ({

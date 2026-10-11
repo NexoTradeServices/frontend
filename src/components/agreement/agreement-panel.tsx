@@ -22,7 +22,7 @@ const textButton = "min-h-11 py-2.5 text-[13px] font-semibold text-secondary-tex
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mb-4 max-w-[520px] rounded-[10px] border border-hairline bg-surface p-4 sm:p-5">
+    <div className="mb-4 rounded-[10px] border border-hairline bg-surface p-4 sm:p-5">
       <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">{title}</h3>
       {children}
     </div>
@@ -126,7 +126,7 @@ export function AgreementPanel() {
   if (agreement === null) {
     return (
       <>
-        <div aria-hidden="true" className="h-40 max-w-[520px] rounded-[10px] bg-ground" />
+        <div aria-hidden="true" className="h-40 rounded-[10px] bg-ground" />
       </>
     );
   }

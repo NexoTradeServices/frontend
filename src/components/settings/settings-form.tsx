@@ -239,7 +239,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
       {formError ? <Banner kind="error">{formError}</Banner> : null}
       {saved ? <Banner kind="success">Saved.</Banner> : null}
 
-      <div className="mb-4.5 max-w-[720px] rounded-[10px] border border-hairline bg-surface p-5">
+      <div className="mb-4.5 rounded-[10px] border border-hairline bg-surface p-5">
         <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Business</h3>
         <div className="flex flex-wrap gap-4">
           <div className="min-w-[200px] flex-1">
@@ -311,7 +311,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
         </div>
       </div>
 
-      <div className="mb-4.5 max-w-[720px] rounded-[10px] border border-hairline bg-surface p-5">
+      <div className="mb-4.5 rounded-[10px] border border-hairline bg-surface p-5">
         <h3 className="font-heading text-base font-extrabold text-ink">Legal identity</h3>
         <p className="mb-3.5 text-xs text-muted-text">Printed on contracts and invoices</p>
         <div className="flex flex-wrap gap-4">
@@ -337,7 +337,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
         />
       </div>
 
-      <div className="mb-4.5 max-w-[720px] rounded-[10px] border border-hairline bg-surface p-5">
+      <div className="mb-4.5 rounded-[10px] border border-hairline bg-surface p-5">
         <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">GST</h3>
         <div className="flex items-start gap-3">
           <ToggleSwitch
@@ -383,7 +383,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
         </div>
       </div>
 
-      <div className="mb-4.5 max-w-[720px] rounded-[10px] border border-hairline bg-surface p-5">
+      <div className="mb-4.5 rounded-[10px] border border-hairline bg-surface p-5">
         <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Charges &amp; rules</h3>
         <div className="flex flex-wrap gap-4">
           <div className="min-w-[200px] flex-1">
@@ -460,7 +460,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
         </div>
       </div>
 
-      <div className="mb-4.5 max-w-[720px] rounded-[10px] border border-hairline bg-surface p-5">
+      <div className="mb-4.5 rounded-[10px] border border-hairline bg-surface p-5">
         <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Payouts &amp; providers</h3>
         <div className="flex flex-wrap gap-4">
           <div className="min-w-[200px] flex-1">
@@ -511,7 +511,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
         </div>
       </div>
 
-      <div className="flex max-w-[720px] justify-end">
+      <div className="flex justify-end">
         <PrimaryButton
           loading={saving || addressPicking}
           loadingLabel={addressPicking ? "Picking address..." : "Saving..."}

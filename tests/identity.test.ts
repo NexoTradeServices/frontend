@@ -45,3 +45,33 @@ describe("AC7 -- degrades gracefully when the identity read fails", () => {
     expect(Wordmark({ name })).toBeNull();
   });
 });
+
+// Feature 1018: the identity read also carries the support phone the Footer shows.
+describe("1018 -- the identity read carries the phone", () => {
+  test("getIdentity() returns the name and the phone", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = (() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ displayName: "Perth Trades & Services", operatorPhone: "08 0000 0000" }), {
+          status: 200,
+        }),
+      )) as typeof fetch;
+    try {
+      const { getIdentity } = await import("../src/lib/identity");
+      await expect(getIdentity()).resolves.toEqual({ displayName: "Perth Trades & Services", operatorPhone: "08 0000 0000" });
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("getIdentity() returns null when the read fails, so the Footer leaves name and phone out", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = (() => Promise.resolve(new Response(null, { status: 503 }))) as typeof fetch;
+    try {
+      const { getIdentity } = await import("../src/lib/identity");
+      await expect(getIdentity()).resolves.toBeNull();
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});

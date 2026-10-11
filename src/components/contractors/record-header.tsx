@@ -5,6 +5,7 @@
 // exist yet does not show -- so this carries only Details on /new (no
 // contractor yet), and both tabs once the record exists.
 import Link from "next/link";
+import { PageHeader } from "@/components/ui/page-header";
 import { fmtDate, recordTagClasses, type ContractorDto } from "./types";
 
 export function ContractorRecordHeader({
@@ -23,35 +24,32 @@ export function ContractorRecordHeader({
 
   return (
     <>
-      <div className="mb-1.5 max-w-[760px] text-xs text-muted-text">
-        <Link href="/ops/contractors" className="text-muted-text">
-          Contractors
-        </Link>{" "}
-        / <span>{contractor ? contractor.code : "New contractor"}</span>
-      </div>
-      <div className="mb-4.5 flex max-w-[760px] flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="mb-0.5 font-heading text-xl font-black text-ink md:text-[22px]">
-            {contractor ? `${contractor.code} ${contractor.name}` : "New contractor"}
-          </h1>
-          <p className="text-[13px] text-muted-text">
-            {contractor ? `Added ${fmtDate(contractor.createdAt)}. Change anything and press Save.` : "Only name, email and phone are needed to save. The rest can arrive later."}
-          </p>
-        </div>
-        {contractor ? (
-          <div className="flex gap-1.5">
-            {headTags.map((t) => (
-              <span key={t.label} className={recordTagClasses(t.kind)}>
-                {t.label}
-              </span>
-            ))}
-            {readyTag ? <span className={recordTagClasses(readyTag.kind)}>{readyTag.label}</span> : null}
-          </div>
-        ) : null}
-      </div>
+      {/* The page's one Page header (Organisms / Page header): the Breadcrumb back to the list, the record's name,
+          its muted line and its Tags. The Record tabs sit under it. */}
+      <PageHeader
+        breadcrumb={{ label: "Contractors", href: "/ops/contractors" }}
+        title={contractor ? `${contractor.code} ${contractor.name}` : "New contractor"}
+        subtitle={
+          contractor
+            ? `Added ${fmtDate(contractor.createdAt)}. Change anything and press Save.`
+            : "Only name, email and phone are needed to save. The rest can arrive later."
+        }
+        tags={
+          contractor ? (
+            <span className="flex gap-1.5">
+              {headTags.map((t) => (
+                <span key={t.label} className={recordTagClasses(t.kind)}>
+                  {t.label}
+                </span>
+              ))}
+              {readyTag ? <span className={recordTagClasses(readyTag.kind)}>{readyTag.label}</span> : null}
+            </span>
+          ) : undefined
+        }
+      />
 
       {contractor ? (
-        <div className="mb-4.5 flex max-w-[760px] gap-5 border-b border-hairline" role="tablist">
+        <div className="mb-4.5 flex gap-5 border-b border-hairline" role="tablist">
           <Link
             href={`/ops/contractors/${contractor.code}`}
             role="tab"

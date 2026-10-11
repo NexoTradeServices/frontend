@@ -53,14 +53,7 @@ const WINDOWS: { value: PreferredWindow; label: string; note: string }[] = [
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function RequestAJobForm({
-  formData,
-  displayName,
-}: {
-  formData: FormDataDto;
-  /** PlatformSettings.displayName -- brand is config, never code (Ground rules; Brand identity surfaces). Null when the identity read failed upstream; the slot renders empty, never a literal fallback (Wordmark's own decision 6). */
-  displayName: string | null;
-}) {
+export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
   const router = useRouter();
   const { operatorPhone, serviceTypes } = formData;
 
@@ -218,25 +211,7 @@ export function RequestAJobForm({
   }
 
   return (
-    <div className="min-h-screen bg-ground">
-      <header className="border-b border-hairline bg-surface">
-        <div className="mx-auto flex max-w-[640px] items-center justify-between px-5 py-4">
-          {displayName ? (
-            <span className="font-heading text-lg font-black text-ink">
-              {displayName.split("&").map((part, index) => (
-                <span key={index}>
-                  {index > 0 ? <span className="text-brand-accent">&amp;</span> : null}
-                  {part}
-                </span>
-              ))}
-            </span>
-          ) : null}
-          <a href={`tel:${operatorPhone}`} className="text-[13px] font-bold text-secondary-text">
-            {operatorPhone}
-          </a>
-        </div>
-      </header>
-
+    <div>
       <div className="border-b border-[#f3cda3] bg-warning-bg px-5 py-3 text-center">
         <p className="text-[13px] font-semibold text-brand-warning">
           Job urgent? Don&apos;t fill the form -- call us now:{" "}
@@ -246,8 +221,8 @@ export function RequestAJobForm({
         </p>
       </div>
 
-      <div className="mx-auto max-w-[640px] px-5">
-        <div className="pt-6 pb-1">
+      <div>
+        <div className="pb-1">
           <div className="flex items-center gap-1.5">
             {STEPS.map((key, i) => (
               <div

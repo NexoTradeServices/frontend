@@ -5,43 +5,38 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Foundations tokens -- project/design/frontend-conventions.md, section B.
- * Named pairs (background + the text color that sits on it); nothing below
- * this block or in any component may hardcode a hex value -- change the
- * palette here and it moves everywhere at once.
+ * The tokens -- project/design/frontend-conventions.md, Tokens.
+ *
+ * ONE block holds every colour value, under the conventions' names. Nothing
+ * below it and no component may type a colour in: change the palette here
+ * and it moves everywhere at once. Colours come in pairs (a background and
+ * the text colour that sits on it); tests/contrast.test.ts reads this block
+ * and fails the build on a pair under 4.5 to 1, bar the parked exceptions.
  */
 :root {
+  /* Base */
   --ground: #faf9f7;
   --surface: #ffffff;
   --hairline: #e6e2db;
-  /* Feature 6001 -- the QR code keeps its surface square and ink squares in every theme (Atoms / Small visuals), so any phone camera reads it. Never overridden under .dark. */
-  --qr-surface: #ffffff;
-  --qr-ink: #1c2b3a;
   --ink: #1c2b3a;
   --secondary-text: #4a5561;
   --muted-text: #7a828c;
+  --control-off: #cfd4da;
+
+  /* Meaning */
   --brand-accent: #e8762d;
-  --on-accent: #ffffff;
+  --brand-accent-loading: #ef9d68;
   --brand-success: #1f7a67;
   --success-bg: #e2f2ee;
   --success-border: #bfe0d7;
+  --brand-warning: #b4531a;
+  --warning-bg: #fdeadd;
   --brand-destructive: #b3362b;
   --error-bg: #fbeceb;
   --error-border: #eac6c2;
-  /* Feature 2001 -- the warning state (an already-expired date, the
-     persistent info/alert banner): true, not an error, so it gets its own
-     color rather than reusing destructive. */
-  --brand-warning: #b4531a;
-  --warning-bg: #fdeadd;
-  /* Accent's own loading-state shade -- the button ladder's dimmed fill
-     while a submit is in flight (Patterns / Page loading vs button loading). */
-  --brand-accent-loading: #ef9d68;
-  /* Status palette (Colors, "identical everywhere - queue, calendar, track
-     page"): one pair per lifecycle status, read only by the shared status
-     tag (components/ui/status-tag.tsx) -- Feature 4001, BKLG-022. Scheduled
-     and in progress carry the same values as brand-success/brand-warning by
-     design, but as their own pair, so the palette can move without the
-     buttons moving with it. */
+  --on-accent: #ffffff;
+
+  /* Job status, text and background -- the same everywhere a status shows */
   --status-new: #2456a6;
   --status-new-bg: #e8eefb;
   --status-assigned: #6b4fa3;
@@ -57,17 +52,79 @@
   --status-cancelled: #7a828c;
   --status-cancelled-bg: #efedea;
 
-  /* Message-tag pairs -- Feature 4008, the job page's Messages card (RVW1.1).
-     Their own tokens: a move of the lifecycle palette above never recolours
-     a message's standing. Failed reads the error tokens. */
+  /* Message status -- their own pairs; Failed reads the error pair */
   --message-waiting: #7a828c;
   --message-waiting-bg: #efedea;
   --message-sent: #2456a6;
   --message-sent-bg: #e8eefb;
   --message-delivered: #4a7c59;
   --message-delivered-bg: #e8f1ea;
+
+  /* On ink: the Sidebar, the Top bar, the Menu drawer, a Toast */
+  --on-ink: #ffffff;
+  --on-ink-text: #b9c2cc;
+  --on-ink-label: #dfe4e9;
+
+  /* The QR code keeps its two colours in every theme, so any phone camera reads it */
+  --qr-ink: #1c2b3a;
+  --qr-surface: #ffffff;
+}
+
+:root {
+  /* Fonts */
   --font-heading-family: var(--font-archivo), system-ui, sans-serif;
   --font-body-family: var(--font-public-sans), system-ui, sans-serif;
+
+  /* Text sizes (Tokens / Fonts). Phone first; Tablet and up below. */
+  --text-page-title-size: 20px;
+  --text-card-title-size: 16px;
+  --text-body-size: 14px;
+  --text-small-size: 13px;
+  --text-caption-size: 12px;
+  --text-amount-size: 28px;
+  --text-name-size: 15px;
+  --text-field-label-size: 11px;
+  --text-hero-headline-size: 28px;
+  --text-lead-size: 18px;
+
+  /* Corners (Tokens / Spacing, corners, heights). Pill is fully round. */
+  --corner-card: 10px;
+  --corner-small-box: 8px;
+  --corner-button: 6px;
+  --corner-tag: 4px;
+  --corner-pill: 9999px;
+
+  /* Heights: buttons, fields and the smallest tappable thing */
+  --height-control: 44px;
+
+  /* shadcn's own names, pointed at the tokens above (Stack). Nothing here
+     is a colour value: every one is a token. */
+  --background: var(--ground);
+  --foreground: var(--secondary-text);
+  --card: var(--surface);
+  --card-foreground: var(--secondary-text);
+  --popover: var(--surface);
+  --popover-foreground: var(--secondary-text);
+  --primary: var(--brand-accent);
+  --primary-foreground: var(--on-accent);
+  --secondary: var(--ground);
+  --secondary-foreground: var(--ink);
+  --muted: var(--ground);
+  --muted-foreground: var(--muted-text);
+  --accent: var(--ground);
+  --accent-foreground: var(--ink);
+  --destructive: var(--brand-destructive);
+  --border: var(--hairline);
+  --input: var(--hairline);
+  --ring: var(--brand-accent);
+  --radius: 0.625rem;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --text-page-title-size: 22px;
+    --text-hero-headline-size: 40px;
+  }
 }
 
 @theme inline {
@@ -76,24 +133,26 @@
   --font-sans: var(--font-body-family);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --font-heading: var(--font-heading-family);
-  /* Direct Foundations tokens -- bg-ground, text-ink, border-hairline, etc. */
+
+  /* The tokens as utilities -- bg-ground, text-ink, border-hairline, ... */
   --color-ground: var(--ground);
   --color-surface: var(--surface);
   --color-hairline: var(--hairline);
   --color-ink: var(--ink);
   --color-secondary-text: var(--secondary-text);
   --color-muted-text: var(--muted-text);
+  --color-control-off: var(--control-off);
   --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-loading: var(--brand-accent-loading);
   --color-on-accent: var(--on-accent);
   --color-brand-success: var(--brand-success);
   --color-success-bg: var(--success-bg);
-  --color-brand-destructive: var(--brand-destructive);
-  --color-error-bg: var(--error-bg);
-  --color-error-border: var(--error-border);
   --color-success-border: var(--success-border);
   --color-brand-warning: var(--brand-warning);
   --color-warning-bg: var(--warning-bg);
-  --color-brand-accent-loading: var(--brand-accent-loading);
+  --color-brand-destructive: var(--brand-destructive);
+  --color-error-bg: var(--error-bg);
+  --color-error-border: var(--error-border);
   --color-status-new: var(--status-new);
   --color-status-new-bg: var(--status-new-bg);
   --color-status-assigned: var(--status-assigned);
@@ -114,19 +173,37 @@
   --color-message-sent-bg: var(--message-sent-bg);
   --color-message-delivered: var(--message-delivered);
   --color-message-delivered-bg: var(--message-delivered-bg);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
+  --color-on-ink: var(--on-ink);
+  --color-on-ink-text: var(--on-ink-text);
+  --color-on-ink-label: var(--on-ink-label);
+  --color-qr-ink: var(--qr-ink);
+  --color-qr-surface: var(--qr-surface);
+
+  /* Text sizes: text-page-title, text-card-title, text-body, ... */
+  --text-page-title: var(--text-page-title-size);
+  --text-card-title: var(--text-card-title-size);
+  --text-body: var(--text-body-size);
+  --text-small: var(--text-small-size);
+  --text-caption: var(--text-caption-size);
+  --text-amount: var(--text-amount-size);
+  --text-name: var(--text-name-size);
+  --text-field-label: var(--text-field-label-size);
+  --text-hero-headline: var(--text-hero-headline-size);
+  --text-lead: var(--text-lead-size);
+
+  /* Corners: rounded-card, rounded-small-box, rounded-button, rounded-tag, rounded-pill */
+  --radius-card: var(--corner-card);
+  --radius-small-box: var(--corner-small-box);
+  --radius-button: var(--corner-button);
+  --radius-tag: var(--corner-tag);
+  --radius-pill: var(--corner-pill);
+
+  /* Container widths (Templates / Frame pieces / Container): max-w-narrow, max-w-medium, max-w-wide */
+  --container-narrow: 420px;
+  --container-medium: 720px;
+  --container-wide: 1280px;
+
+  /* shadcn's names */
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -150,75 +227,6 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
-}
-
-:root {
-  --background: var(--ground);
-  --foreground: var(--secondary-text);
-  --card: var(--surface);
-  --card-foreground: var(--secondary-text);
-  --popover: var(--surface);
-  --popover-foreground: var(--secondary-text);
-  --primary: var(--brand-accent);
-  --primary-foreground: var(--on-accent);
-  --secondary: #f1efe9;
-  --secondary-foreground: var(--ink);
-  --muted: #f1efe9;
-  --muted-foreground: var(--muted-text);
-  --accent: #f1efe9;
-  --accent-foreground: var(--ink);
-  --destructive: var(--brand-destructive);
-  --border: var(--hairline);
-  --input: var(--hairline);
-  --ring: var(--ink);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
 }
 
 @layer base {
