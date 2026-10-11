@@ -32,7 +32,7 @@ export default async function JobPage({ params }: { params: Promise<{ ref: strin
           subtitle="No job has this reference."
           breadcrumb={JOBS_CRUMB}
         />
-        <div className="rounded-[10px] border border-hairline bg-surface p-5 text-sm text-secondary-text">
+        <div className="rounded-card border border-hairline bg-surface p-5 text-sm text-secondary-text">
           Check the reference, or find the job from the queue by its customer code, name or phone.
         </div>
       </Container>

@@ -330,7 +330,7 @@ export function PlacesField({
     <div className="relative mb-3.5">
       <label
         htmlFor={id}
-        className={`mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase ${
+        className={`mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase ${
           required ? "after:ml-0.5 after:text-brand-destructive after:content-['*']" : ""
         }`}
       >
@@ -338,7 +338,7 @@ export function PlacesField({
       </label>
       <input
         id={id}
-        className={`min-h-[44px] w-full rounded-md border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 disabled:bg-ground disabled:text-muted-text ${
+        className={`min-h-[44px] w-full rounded-button border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 disabled:bg-ground disabled:text-muted-text ${
           error ? "border-brand-destructive" : "border-hairline"
         }`}
         placeholder={variant === "suburb" ? "Start typing a suburb, then pick it" : "Start typing, then pick the match"}
@@ -351,11 +351,11 @@ export function PlacesField({
       />
       {suggOpen && !unavailable ? (
         <div className="absolute inset-x-0 top-full z-10 overflow-hidden rounded-b-md border border-t-0 border-hairline bg-surface shadow-lg">
-          <div className="px-3 pt-1.5 pb-0.5 text-[11px] tracking-[0.08em] text-muted-text uppercase">
+          <div className="px-3 pt-1.5 pb-0.5 text-field-label tracking-[0.08em] text-muted-text uppercase">
             Google suggestions
           </div>
           {predictions.length === 0 ? (
-            <div className="px-3 py-2.5 text-[13px] text-muted-text">No match. Keep typing, or check the spelling.</div>
+            <div className="px-3 py-2.5 text-small text-muted-text">No match. Keep typing, or check the spelling.</div>
           ) : (
             predictions.map((prediction) => (
               <button

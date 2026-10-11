@@ -27,8 +27,8 @@ import type { InvoiceView, PayLine } from "./types";
  */
 const SHOW_WORKING = false;
 
-const labelClass = "block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
-const th = "px-1.5 py-2 text-left align-bottom text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase sm:px-3";
+const labelClass = "block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase";
+const th = "px-1.5 py-2 text-left align-bottom text-field-label font-bold tracking-[0.08em] text-muted-text uppercase sm:px-3";
 const td = "px-1.5 py-2.5 align-top text-secondary-text sm:px-3";
 
 function weekendCode(view: InvoiceView): string {
@@ -59,8 +59,8 @@ function PayLineRows({ line, view }: { line: PayLine; view: InvoiceView }) {
     <>
       <tr data-testid="pay-line" data-job={line.jobReference} className="border-b border-hairline">
         <td className={td}>
-          <span className="block font-heading text-[13px] font-extrabold text-ink">{line.jobReference}</span>
-          <span className="block text-[12px] text-muted-text sm:hidden">{line.trade}</span>
+          <span className="block font-heading text-small font-extrabold text-ink">{line.jobReference}</span>
+          <span className="block text-caption text-muted-text sm:hidden">{line.trade}</span>
         </td>
         <td className={`${td} whitespace-nowrap`}>{line.day}</td>
         <td className={`${td} hidden sm:table-cell`}>{line.trade}</td>
@@ -75,7 +75,7 @@ function PayLineRows({ line, view }: { line: PayLine; view: InvoiceView }) {
             type="button"
             onClick={() => setOpen((value) => !value)}
             aria-expanded={open}
-            className="inline-flex min-h-11 items-center text-[13px] font-semibold text-secondary-text underline underline-offset-2"
+            className="inline-flex min-h-11 items-center text-small font-semibold text-secondary-text underline underline-offset-2"
           >
             {open ? "Hide working" : "Working"}
           </button>
@@ -84,7 +84,7 @@ function PayLineRows({ line, view }: { line: PayLine; view: InvoiceView }) {
       </tr>
       {open ? (
         <tr data-testid="pay-line-working" className="border-b border-hairline bg-ground">
-          <td colSpan={5} className="px-3 py-2.5 text-[13px] text-secondary-text">
+          <td colSpan={5} className="px-3 py-2.5 text-small text-secondary-text">
             <Working line={line} view={view} />
           </td>
         </tr>
@@ -106,17 +106,17 @@ export function InvoiceCard({ invoice }: { invoice: InvoiceView }) {
   const anyWeekend = invoice.lines.some((line) => line.weekend);
   const businessName = invoice.from.businessName ?? invoice.from.name;
   return (
-    <section data-testid="invoice-card" className="rounded-[10px] border border-hairline bg-surface p-4 md:p-5">
+    <section data-testid="invoice-card" className="rounded-card border border-hairline bg-surface p-4 md:p-5">
       <div className="flex flex-col gap-3.5">
         <Fact label="From" testId="invoice-from">
           <span className="block font-semibold">{businessName}</span>
-          {invoice.from.businessName !== null ? <span className="block text-[13px] text-muted-text">{invoice.from.name}</span> : null}
-          {invoice.from.abn !== null ? <span className="block text-[13px] text-muted-text">ABN {invoice.from.abn}</span> : null}
+          {invoice.from.businessName !== null ? <span className="block text-small text-muted-text">{invoice.from.name}</span> : null}
+          {invoice.from.abn !== null ? <span className="block text-small text-muted-text">ABN {invoice.from.abn}</span> : null}
         </Fact>
         <Fact label="To" testId="invoice-to">
           <span className="block font-semibold">{invoice.to.name}</span>
-          {invoice.to.abn !== null ? <span className="block text-[13px] text-muted-text">ABN {invoice.to.abn}</span> : null}
-          {invoice.to.address !== null ? <span className="block text-[13px] text-muted-text">{invoice.to.address}</span> : null}
+          {invoice.to.abn !== null ? <span className="block text-small text-muted-text">ABN {invoice.to.abn}</span> : null}
+          {invoice.to.address !== null ? <span className="block text-small text-muted-text">{invoice.to.address}</span> : null}
         </Fact>
         <div className="grid grid-cols-2 gap-x-4.5">
           <Fact label="Period" testId="invoice-period">
@@ -171,7 +171,7 @@ export function InvoiceCard({ invoice }: { invoice: InvoiceView }) {
             {invoice.materials.length > 0 ? (
               <>
                 <tr data-testid="materials-heading">
-                  <td colSpan={5} className="px-1.5 pt-3.5 pb-1 text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase sm:px-3">
+                  <td colSpan={5} className="px-1.5 pt-3.5 pb-1 text-field-label font-bold tracking-[0.08em] text-muted-text uppercase sm:px-3">
                     Materials reimbursement - per receipts, not subject to GST
                   </td>
                 </tr>

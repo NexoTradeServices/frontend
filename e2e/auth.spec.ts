@@ -29,6 +29,9 @@ import { MOBILE_VIEWPORT } from "../playwright.config";
 test("AC1: Mike logs in at /ops and lands in the ops portal", async ({ page }) => {
   await page.goto("/ops");
   await expect(page.getByRole("heading", { name: "Operations portal" })).toBeVisible();
+  // 9001 AC4: the login title is the Page title token -- heading font, 800, 22px from Tablet up.
+  await expect(page.getByRole("heading", { name: "Operations portal" })).toHaveCSS("font-size", "22px");
+  await expect(page.getByRole("heading", { name: "Operations portal" })).toHaveCSS("font-weight", "800");
 
   await login(page, "mike@idelta.com.au");
 
@@ -60,6 +63,12 @@ test("AC3 + AC11: Bob's contractor session sees the wrong-door card on /ops, and
   await page.goto("/ops");
   await expect(page.getByRole("heading", { name: "Wrong portal" })).toBeVisible();
   await expect(page.getByText("bob@idelta.com.au")).toBeVisible();
+  // 9001 AC4/AC5: the one Message card in the Narrow container, its title 22px and 800, one Primary, one Link.
+  await expect(page.locator('[data-container="narrow"]').getByTestId("message-card")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Wrong portal" })).toHaveCSS("font-size", "22px");
+  await expect(page.getByRole("heading", { name: "Wrong portal" })).toHaveCSS("font-weight", "800");
+  await expect(page.getByTestId("message-card").getByRole("link")).toHaveCount(1);
+  await expect(page.getByTestId("message-card").getByRole("button", { name: "Log out" })).toBeVisible();
   // 1018 AC5: the Focused frame - the Wordmark-only Top bar, no sidebar, no menu.
   await expect(page).toHaveURL(/\/ops$/);
   await expect(page.getByRole("banner").getByRole("link")).toHaveCount(0);
@@ -165,6 +174,7 @@ test("the forgot-password form reaches the no-enumeration sent state", async ({ 
   await page.goto("/ops");
   await page.getByRole("link", { name: "Forgot your password?" }).click();
   await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Reset your password" })).toHaveCSS("font-size", "22px");
 
   await waitForHydration(page, "email");
   await page.getByLabel("Email").fill("mike@idelta.com.au");
@@ -179,6 +189,10 @@ test("a dead reset link shows the dead-link page with its fix as the primary act
   await page.goto("/reset-password?error=INVALID_TOKEN");
   await expect(page.getByRole("heading", { name: "This link has expired" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Email me a fresh link" })).toBeVisible();
+  // 9001 AC4/AC5: the one Message card in the Narrow container, its title 22px and 800.
+  await expect(page.locator('[data-container="narrow"]').getByTestId("message-card")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "This link has expired" })).toHaveCSS("font-size", "22px");
+  await expect(page.getByRole("heading", { name: "This link has expired" })).toHaveCSS("font-weight", "800");
 });
 
 test.describe(() => {

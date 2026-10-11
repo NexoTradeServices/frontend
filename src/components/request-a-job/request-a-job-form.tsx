@@ -212,8 +212,8 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
 
   return (
     <div>
-      <div className="border-b border-[#f3cda3] bg-warning-bg px-5 py-3 text-center">
-        <p className="text-[13px] font-semibold text-brand-warning">
+      <div className="bg-warning-bg px-5 py-3 text-center">
+        <p className="text-small font-semibold text-brand-warning">
           Job urgent? Don&apos;t fill the form -- call us now:{" "}
           <a href={`tel:${operatorPhone}`} className="text-ink underline">
             {operatorPhone}
@@ -237,7 +237,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
         </div>
 
         <section className="py-7 pb-12">
-          <h1 className="mb-5 font-heading text-2xl font-extrabold text-ink">{STEP_LABELS[step]}</h1>
+          <h1 className="mb-5 font-heading text-page-title font-extrabold text-ink">{STEP_LABELS[step]}</h1>
 
           {step === "suburb" ? (
             <>
@@ -259,7 +259,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
 
           {step === "trade" ? (
             <>
-              <span className="mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']">
+              <span className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']">
                 Trade
               </span>
               <div className="grid grid-cols-3 gap-2">
@@ -272,7 +272,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
                       setTradeError(undefined);
                       setQuestionAnswers({});
                     }}
-                    className={`min-h-11 rounded-lg border bg-surface px-2 py-2.5 text-center ${
+                    className={`min-h-11 rounded-small-box border bg-surface px-2 py-2.5 text-center ${
                       trade === type.trade ? "border-brand-accent ring-1 ring-brand-accent" : "border-hairline"
                     }`}
                   >
@@ -301,14 +301,14 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
                 helper="Defaults to today -- move it later if that suits you better."
               />
               <div className="mb-3.5">
-                <span className="mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']">
+                <span className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']">
                   Time of day
                 </span>
                 <div className="flex flex-col gap-2.5">
                   {WINDOWS.map((w) => (
                     <label
                       key={w.value}
-                      className={`flex cursor-pointer items-center gap-3 rounded-lg border bg-surface px-4 py-3.5 ${
+                      className={`flex cursor-pointer items-center gap-3 rounded-small-box border bg-surface px-4 py-3.5 ${
                         preferredWindow === w.value ? "border-brand-accent ring-1 ring-brand-accent" : "border-hairline"
                       }`}
                     >
@@ -335,13 +335,13 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
               <div className="mb-3.5">
                 <label
                   htmlFor="description"
-                  className="mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']"
+                  className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']"
                 >
                   What&apos;s happening
                 </label>
                 <textarea
                   id="description"
-                  className={`min-h-[110px] w-full rounded-md border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
+                  className={`min-h-[110px] w-full rounded-button border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
                     descriptionError ? "border-brand-destructive" : "border-hairline"
                   }`}
                   placeholder="e.g. Kitchen tap won't stop dripping, started yesterday"
@@ -425,19 +425,19 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
                 autoComplete="organization"
               />
               <div className="mt-5 flex flex-col gap-2.5">
-                <label className="flex cursor-pointer items-center gap-2.5">
+                <label className="flex min-h-11 cursor-pointer items-center gap-2.5">
                   <input
                     type="checkbox"
-                    className="h-[18px] w-[18px] accent-[var(--brand-accent)]"
+                    className="size-5 accent-brand-accent"
                     checked={marketingEmail}
                     onChange={(e) => setMarketingEmail(e.target.checked)}
                   />
                   <span className="text-sm text-ink">Send me offers and updates by email</span>
                 </label>
-                <label className="flex cursor-pointer items-center gap-2.5">
+                <label className="flex min-h-11 cursor-pointer items-center gap-2.5">
                   <input
                     type="checkbox"
-                    className="h-[18px] w-[18px] accent-[var(--brand-accent)]"
+                    className="size-5 accent-brand-accent"
                     checked={marketingSms}
                     onChange={(e) => setMarketingSms(e.target.checked)}
                   />
@@ -450,21 +450,21 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
           {step === "price" ? (
             <>
               {submitError ? <Banner kind="error">{submitError}</Banner> : null}
-              <div className="mb-5 grid grid-cols-2 gap-3 rounded-lg border border-hairline bg-surface px-4 py-3.5 sm:grid-cols-4">
+              <div className="mb-5 grid grid-cols-2 gap-3 rounded-small-box border border-hairline bg-surface px-4 py-3.5 sm:grid-cols-4">
                 <div>
-                  <div className="text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase">Selected Trade</div>
+                  <div className="text-field-label font-bold tracking-[0.08em] text-muted-text uppercase">Selected Trade</div>
                   <div className="text-sm font-bold text-ink">{trade}</div>
                 </div>
                 <div>
-                  <div className="text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase">Day</div>
+                  <div className="text-field-label font-bold tracking-[0.08em] text-muted-text uppercase">Day</div>
                   <div className="text-sm font-bold text-ink">{formatDayName(preferredDate)}</div>
                 </div>
                 <div>
-                  <div className="text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase">Date</div>
+                  <div className="text-field-label font-bold tracking-[0.08em] text-muted-text uppercase">Date</div>
                   <div className="text-sm font-bold text-ink">{formatFriendlyDate(preferredDate)}</div>
                 </div>
                 <div>
-                  <div className="text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase">Time Range</div>
+                  <div className="text-field-label font-bold tracking-[0.08em] text-muted-text uppercase">Time Range</div>
                   <div className="text-sm font-bold text-ink">
                     {WINDOWS.find((w) => w.value === preferredWindow)?.note}
                   </div>
@@ -474,12 +474,12 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
                 This price includes the call-out and up to one hour of service. Any additional time is charged at the
                 hourly rate shown below.
               </p>
-              <div className="flex items-center justify-between rounded-lg border border-brand-accent px-4 py-3.5 ring-1 ring-brand-accent">
-                <div className="text-sm font-bold text-ink">{weekend ? "Weekend rate" : "Standard Rate"}</div>
-                <div className="text-right">
-                  <div className="text-[15px] font-extrabold text-ink">{formatDollars(calloutRate)}</div>
-                  <div className="text-[11.5px] text-muted-text">then {formatDollars(standardRate)} per additional hour</div>
-                </div>
+              <div data-testid="price-box" className="rounded-small-box bg-ground p-3.5">
+                <span className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase">
+                  {weekend ? "Weekend rate" : "Standard Rate"}
+                </span>
+                <div className="font-heading text-page-title font-extrabold text-ink">{formatDollars(calloutRate)}</div>
+                <p className="text-caption text-muted-text">then {formatDollars(standardRate)} per additional hour</p>
               </div>
             </>
           ) : null}
@@ -489,7 +489,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
               <button
                 type="button"
                 onClick={() => goTo(stepIndex - 1)}
-                className="min-h-11 rounded-md border border-hairline bg-surface px-5 py-2.5 text-sm font-bold text-ink"
+                className="min-h-11 rounded-button border border-hairline bg-surface px-5 py-2.5 text-sm font-bold text-ink"
               >
                 Back
               </button>
@@ -501,7 +501,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
                 type="button"
                 disabled={submitting}
                 onClick={() => void handleSubmit()}
-                className={`min-h-11 rounded-md px-5 py-2.5 text-sm font-bold text-on-accent ${
+                className={`min-h-11 rounded-button px-5 py-2.5 text-sm font-bold text-on-accent ${
                   submitting ? "bg-brand-accent-loading" : "bg-brand-accent"
                 }`}
               >
@@ -511,7 +511,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
               <button
                 type="button"
                 onClick={handleContinue}
-                className="min-h-11 rounded-md bg-brand-accent px-5 py-2.5 text-sm font-bold text-on-accent"
+                className="min-h-11 rounded-button bg-brand-accent px-5 py-2.5 text-sm font-bold text-on-accent"
               >
                 Continue
               </button>

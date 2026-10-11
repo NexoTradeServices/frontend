@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { fullAddress } from "@/components/ui/places-field";
 import { CalendarDayView, timeLabelFor, type DayBlock } from "@/components/ui/calendar-day-view";
 import { PrimaryButton } from "@/components/auth/buttons";
+import { formatDateWithDay, weekdayName } from "@/lib/date-format";
 import {
   LEVEL_LABELS,
   moneyCents,
@@ -36,13 +37,12 @@ function holdLabel(minutes: number): string {
 }
 
 function weekdayNameOf(date: string): string {
-  return new Date(`${date}T00:00:00.000Z`).toLocaleDateString("en-AU", { weekday: "long", timeZone: "UTC" });
+  return weekdayName(date);
 }
 
+/** "Thu 10 Sep" this year, "Thu 10 Sep 2027" any other (the shared date writer). */
 function shortDateOf(date: string): string {
-  const [year, month, day] = date.split("-");
-  const weekday = new Date(`${date}T00:00:00.000Z`).toLocaleDateString("en-AU", { weekday: "short", timeZone: "UTC" });
-  return `${weekday} ${day}/${month}/${(year ?? "").slice(2)}`;
+  return formatDateWithDay(date);
 }
 
 function addDays(date: string, delta: number): string {
@@ -53,7 +53,7 @@ function addDays(date: string, delta: number): string {
 
 function Card({ title, aside, children }: { title: string; aside?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-[10px] border border-hairline bg-surface p-5">
+    <section className="rounded-card border border-hairline bg-surface p-5">
       <h2 className="mb-3 font-heading text-base font-extrabold text-ink">
         {title}
         {aside ? <small className="ml-1.5 font-body text-xs font-normal text-muted-text">{aside}</small> : null}
@@ -63,7 +63,7 @@ function Card({ title, aside, children }: { title: string; aside?: string; child
   );
 }
 
-const labelClass = "block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
+const labelClass = "block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase";
 
 function CandidateRowButton({
   row,
@@ -85,21 +85,21 @@ function CandidateRowButton({
       type="button"
       onClick={openable ? onPick : undefined}
       aria-disabled={!openable}
-      className={`mb-2.5 block w-full rounded-[10px] border p-3.5 text-left ${
+      className={`mb-2.5 block w-full rounded-card border p-3.5 text-left ${
         picked ? "border-2 border-brand-accent p-[13px]" : "border-hairline"
       } ${grey ? "bg-ground" : "bg-surface"} ${openable ? "cursor-pointer" : "cursor-default"}`}
     >
       <div className="mb-1 flex flex-wrap items-center gap-2">
-        <span className="font-heading text-[13px] font-extrabold text-ink">{row.code}</span>
+        <span className="font-heading text-small font-extrabold text-ink">{row.code}</span>
         <span
-          className={`inline-block rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] uppercase ${
+          className={`inline-block rounded px-2 py-0.5 text-field-label font-bold tracking-[0.04em] uppercase ${
             row.ready ? "bg-success-bg text-brand-success" : "bg-warning-bg text-brand-warning"
           }`}
         >
           {row.ready ? "Ready to dispatch" : "Not ready to dispatch"}
         </span>
       </div>
-      <div className={`mb-0.5 font-heading text-[15px] font-extrabold ${grey ? "text-muted-text" : "text-ink"}`}>
+      <div className={`mb-0.5 font-heading text-name font-extrabold ${grey ? "text-muted-text" : "text-ink"}`}>
         {row.name}
       </div>
       <div className="text-xs text-muted-text">
@@ -252,7 +252,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 type="date"
                 value={date}
                 onChange={(event) => event.target.value && setDate(event.target.value)}
-                className="min-h-11 w-full rounded-md border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
+                className="min-h-11 w-full rounded-button border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
               />
             </div>
             <div>
@@ -263,7 +263,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 id="dispatch-start"
                 value={startMinutes}
                 onChange={(event) => setStartMinutes(Number(event.target.value))}
-                className="min-h-11 w-full rounded-md border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
+                className="min-h-11 w-full rounded-button border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
               >
                 {START_MINUTES.map((minutes) => (
                   <option key={minutes} value={minutes}>
@@ -280,7 +280,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 id="dispatch-hold"
                 value={holdMinutes}
                 onChange={(event) => setHoldMinutes(Number(event.target.value))}
-                className="min-h-11 w-full rounded-md border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
+                className="min-h-11 w-full rounded-button border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
               >
                 {HOLD_MINUTES.map((minutes) => (
                   <option key={minutes} value={minutes}>
@@ -315,11 +315,11 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
       <div className="order-3 min-w-0 xl:order-none xl:col-start-1 xl:row-start-2">
         <Card title="Contractors" aside={`${initial.trade} - ${shortDateOf(date)}, ${timeLabelFor(startMinutes)}-${timeLabelFor(startMinutes + holdMinutes)} AWST`}>
           {candidatesLoading && !candidates ? (
-            <p className="text-[13px] text-muted-text">Loading candidates...</p>
+            <p className="text-small text-muted-text">Loading candidates...</p>
           ) : (
             <>
               <div className="mb-2 flex flex-wrap items-baseline gap-2.5">
-                <h3 className="text-[13px] font-extrabold tracking-[0.06em] text-ink uppercase">Serve this postcode</h3>
+                <h3 className="text-small font-extrabold tracking-[0.06em] text-ink uppercase">Serve this postcode</h3>
               </div>
               {candidates && candidates.serves.length > 0 ? (
                 candidates.serves.map((row) => (
@@ -339,13 +339,13 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                   </div>
                 ))
               ) : (
-                <div className="rounded-[10px] border border-dashed border-hairline p-3.5 text-[13px] text-muted-text">
+                <div className="rounded-card border border-dashed border-hairline p-3.5 text-small text-muted-text">
                   No contractors list {initial.suburb} for {initial.trade}. See the nearest match below.
                 </div>
               )}
 
               <div className="mt-4.5 mb-2 flex flex-wrap items-baseline gap-2.5">
-                <h3 className="text-[13px] font-extrabold tracking-[0.06em] text-ink uppercase">Outside their area</h3>
+                <h3 className="text-small font-extrabold tracking-[0.06em] text-ink uppercase">Outside their area</h3>
                 <span className="text-xs text-muted-text">Same trade, nearest first. Confirm availability before dispatch.</span>
               </div>
               {candidates && candidates.outside.length > 0 ? (
@@ -366,7 +366,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                   </div>
                 ))
               ) : (
-                <div className="rounded-[10px] border border-dashed border-hairline p-3.5 text-[13px] text-muted-text">
+                <div className="rounded-card border border-dashed border-hairline p-3.5 text-small text-muted-text">
                   No other {initial.trade.toLowerCase()} contractors.
                 </div>
               )}
@@ -400,7 +400,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
       <div className="order-4 min-w-0 xl:order-none xl:col-start-2 xl:row-start-2">
         <Card title="Service level and price">
           <span className={labelClass}>Service level</span>
-          <div className="flex min-h-11 items-center gap-2 rounded-md border border-hairline bg-ground px-2.5 py-2 text-sm tabular-nums text-ink">
+          <div className="flex min-h-11 items-center gap-2 rounded-button border border-hairline bg-ground px-2.5 py-2 text-sm tabular-nums text-ink">
             <svg aria-hidden viewBox="0 0 24 24" className="size-3.5 shrink-0 text-muted-text" fill="none">
               <rect x="5" y="11" width="14" height="9" rx="1.5" stroke="currentColor" strokeWidth="2" />
               <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="currentColor" strokeWidth="2" />
@@ -417,7 +417,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
             <span className="font-bold">Emergency</span>
           </label>
           {candidates ? (
-            <div className="mt-3 rounded-lg border border-hairline bg-ground p-3.5">
+            <div className="mt-3 rounded-small-box border border-hairline bg-ground p-3.5">
               <span className={labelClass}>Price to quote the customer</span>
               <div className="font-heading text-lg font-extrabold tabular-nums text-ink">
                 First hour (includes call-out) {candidates.price.calloutRate}, then {candidates.price.standardRate}/h
@@ -475,7 +475,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
               <button
                 type="button"
                 disabled
-                className="min-h-[52px] w-full rounded-md border border-hairline bg-ground px-4 text-sm font-bold text-muted-text md:order-2 md:min-h-11 md:w-auto md:px-[18px]"
+                className="min-h-[52px] w-full rounded-button border border-hairline bg-ground px-4 text-sm font-bold text-muted-text md:order-2 md:min-h-11 md:w-auto md:px-[18px]"
               >
                 {reschedule ? "Send new time" : "Dispatch"}
               </button>

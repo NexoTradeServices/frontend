@@ -16,12 +16,12 @@ export function RatesCard({ specialty }: { specialty: RateSpecialtyDto }) {
   const expired = state === "expired";
 
   return (
-    <div className="rounded-[9px] border border-hairline bg-surface p-3.5">
+    <div className="rounded-card border border-hairline bg-surface p-3.5">
       <div className="mb-0.5 flex items-center justify-between gap-2.5">
         <span className="font-heading text-base font-extrabold text-ink">{specialty.trade}</span>
         <span className={dispatchStateTagClasses(state)}>{dispatchStateLabel(state)}</span>
       </div>
-      <p className={`mb-3 text-[13px] ${expired ? "text-brand-warning" : "text-muted-text"}`}>
+      <p className={`mb-3 text-small ${expired ? "text-brand-warning" : "text-muted-text"}`}>
         {expired
           ? `Licence ${specialty.licenceNumber} expired ${fmtDate(specialty.licenceExpiry)} -- send us your renewal to start getting ${specialty.trade.toLowerCase()} jobs again.`
           : `Licence ${specialty.licenceNumber}, expires ${fmtDate(specialty.licenceExpiry)}`}
@@ -29,13 +29,13 @@ export function RatesCard({ specialty }: { specialty: RateSpecialtyDto }) {
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
-            <th scope="col" className="border-b border-hairline pb-1.5 text-left text-[11px] font-bold tracking-[0.06em] text-muted-text uppercase">
+            <th scope="col" className="border-b border-hairline pb-1.5 text-left text-field-label font-bold tracking-[0.06em] text-muted-text uppercase">
               Level
             </th>
-            <th scope="col" className="border-b border-hairline pb-1.5 text-right text-[11px] font-bold tracking-[0.06em] text-muted-text uppercase">
+            <th scope="col" className="border-b border-hairline pb-1.5 text-right text-field-label font-bold tracking-[0.06em] text-muted-text uppercase">
               Call-out
             </th>
-            <th scope="col" className="border-b border-hairline pb-1.5 text-right text-[11px] font-bold tracking-[0.06em] text-muted-text uppercase">
+            <th scope="col" className="border-b border-hairline pb-1.5 text-right text-field-label font-bold tracking-[0.06em] text-muted-text uppercase">
               Per hour after
             </th>
           </tr>

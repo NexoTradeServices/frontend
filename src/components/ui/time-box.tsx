@@ -114,7 +114,7 @@ export function TimeBox({
   return (
     <div id={`${id}-group`} role="group" aria-label={label} className="flex items-stretch gap-2">
       <div
-        className={`flex min-h-[44px] items-center justify-center rounded-md border bg-surface px-2 focus-within:border-ink focus-within:ring-2 focus-within:ring-ink/10 ${border}`}
+        className={`flex min-h-[44px] items-center justify-center rounded-button border bg-surface px-2 focus-within:border-ink focus-within:ring-2 focus-within:ring-ink/10 ${border}`}
       >
         <input
           id={id}
@@ -147,7 +147,7 @@ export function TimeBox({
           className={`${partClass} ${tone}`}
         />
       </div>
-      <div className={`flex overflow-hidden rounded-md border ${border}`}>
+      <div className={`flex overflow-hidden rounded-button border ${border}`}>
         {(["am", "pm"] as const).map((option) => (
           <button
             key={option}
@@ -157,7 +157,7 @@ export function TimeBox({
             aria-label={`${label} ${option === "am" ? "AM" : "PM"}`}
             onClick={() => choose(option)}
             className={`min-h-[44px] min-w-[52px] px-3 text-sm font-bold ${
-              meridiem === option ? "bg-ink text-white" : "bg-surface text-secondary-text"
+              meridiem === option ? "bg-ink text-on-ink" : "bg-surface text-secondary-text"
             }`}
           >
             {option === "am" ? "AM" : "PM"}
@@ -172,7 +172,7 @@ export function TimeBox({
             setMinuteDraft(null);
             onNow();
           }}
-          className="min-h-[44px] px-1 text-[13px] font-semibold text-secondary-text underline underline-offset-2"
+          className="min-h-[44px] px-1 text-small font-semibold text-secondary-text underline underline-offset-2"
         >
           Now
         </button>

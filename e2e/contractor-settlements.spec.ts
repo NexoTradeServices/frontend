@@ -94,7 +94,7 @@ test.describe(() => {
       await page.goto("/contractor/payouts");
       const paidCard = page.locator(`[data-testid="settlement-card"][data-ref="${draft.reference}"]`);
       await expect(paidCard.getByTestId("settlement-tag")).toHaveText("Paid");
-      await expect(paidCard).toContainText(/Paid on \d{2}\/\d{2}\/\d{2}/);
+      await expect(paidCard).toContainText(/Paid on \d{1,2} [A-Z][a-z]{2} \d{4}/);
 
       // Dave cannot open Bob's invoice.
       const daves = await browser.newContext({ baseURL: BASE_URL, storageState: testRunStorageState() });

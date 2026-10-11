@@ -3,6 +3,7 @@
 import { RequestAJobForm } from "@/components/request-a-job/request-a-job-form";
 import type { FormDataDto } from "@/components/request-a-job/types";
 import { Container } from "@/components/frame/container";
+import { MessageCard } from "@/components/ui/message-card";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -15,10 +16,9 @@ export default async function RequestAJobPage() {
   if (res.status !== 200) {
     return (
       <Container width="narrow">
-        <div className="text-center">
-          <h1 className="mb-2 font-heading text-card-title font-extrabold text-ink">We can&apos;t take requests right now</h1>
-          <p className="text-body text-secondary-text">Please try again shortly, or call us to book directly.</p>
-        </div>
+        <MessageCard title="We can't take requests right now">
+          Please try again shortly, or call us to book directly.
+        </MessageCard>
       </Container>
     );
   }

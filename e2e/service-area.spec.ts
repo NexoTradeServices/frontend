@@ -214,6 +214,9 @@ test("AC7: Bob sees his own area at his own door; Priya sees her own (empty) are
   await expect(page.getByRole("heading", { name: "Your service area" })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByLabel("Suburb")).toHaveValue(/Fremantle/);
   await expect(page.getByRole("button", { name: /^6163 -/ })).toHaveAttribute("aria-pressed", "true", { timeout: 10_000 });
+  // 9001 AC7: the keep chip is 44px tall (more only when its words wrap).
+  const keepChip = await page.getByRole("button", { name: /^6163 -/ }).boundingBox();
+  expect(keepChip?.height ?? 0).toBeGreaterThanOrEqual(44);
 
   const menuButton = page.getByRole("button", { name: "Open menu" });
   if (await menuButton.isVisible()) await menuButton.click();
@@ -298,6 +301,9 @@ test.describe(() => {
     await expect(slider).toBeVisible();
     await expect(slider).toHaveValue("30");
     await expect(page.getByRole("button", { name: /^6163 -/ })).toBeVisible({ timeout: 10_000 });
+    // 9001 AC7: chips are at least 44px tall on a phone too.
+    const phoneChip = await page.getByRole("button", { name: /^6163 -/ }).boundingBox();
+    expect(phoneChip?.height ?? 0).toBeGreaterThanOrEqual(44);
     await expect(page.getByRole("button", { name: "Tick all", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Untick all" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Undo changes" })).toBeVisible();

@@ -46,8 +46,8 @@ function JobScreen({
     <>
       <div className="flex flex-col gap-3 pb-28 md:pb-0">
         <div>
-          <div className="text-[13px] text-secondary-text">New job for you, {job.contractorFirstName}</div>
-          <h1 className="font-heading text-2xl font-extrabold text-ink md:text-[28px]">
+          <div className="text-small text-secondary-text">New job for you, {job.contractorFirstName}</div>
+          <h1 className="font-heading text-page-title font-extrabold text-ink">
             {job.trade} - {job.jobReference}
           </h1>
         </div>
@@ -91,7 +91,7 @@ function JobScreen({
               <span className={labelClass}>Instructions from the office</span>
               <div className="mt-1 flex flex-col gap-2">
                 {job.instructions.map((note, index) => (
-                  <div key={index} className="rounded-lg border border-hairline bg-ground px-3 py-2.5 text-sm text-ink">
+                  <div key={index} className="rounded-small-box border border-hairline bg-ground px-3 py-2.5 text-sm text-ink">
                     <span className="whitespace-pre-wrap">{note.note}</span>
                     <div className="mt-1 text-xs text-secondary-text">
                       {note.authorFirstName}, {note.dateLabel}
@@ -116,7 +116,7 @@ function JobScreen({
           type="button"
           disabled={busy}
           onClick={onDecline}
-          className="min-h-[52px] flex-1 rounded-md border border-[#c9c3b8] bg-surface text-sm font-bold text-ink disabled:opacity-60 md:min-h-11 md:flex-none md:px-[22px]"
+          className="min-h-[52px] flex-1 rounded-button border border-hairline bg-surface text-sm font-bold text-ink disabled:opacity-60 md:min-h-11 md:flex-none md:px-[22px]"
         >
           Decline
         </button>
@@ -124,7 +124,7 @@ function JobScreen({
           type="button"
           disabled={busy}
           onClick={onAccept}
-          className="min-h-[52px] flex-[2] rounded-md bg-brand-success text-sm font-bold text-on-accent disabled:opacity-60 md:min-h-11 md:flex-none md:px-7"
+          className="min-h-[52px] flex-[2] rounded-button bg-brand-success text-sm font-bold text-on-accent disabled:opacity-60 md:min-h-11 md:flex-none md:px-7"
         >
           {busy ? "Accepting..." : "Accept"}
         </button>
@@ -177,11 +177,11 @@ export function RespondView({ token, job }: { token: string; job: RespondOpen })
   if (screen === "accepted") {
     return (
       <div className="flex flex-col gap-4 pt-2">
-        <section className="flex flex-col gap-2 rounded-[10px] border border-success-border bg-success-bg p-5">
+        <section className="flex flex-col gap-2 rounded-card border border-success-border bg-success-bg p-5">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true" className="text-brand-success">
             <path d="M5 12l5 5L20 7" />
           </svg>
-          <h1 className="font-heading text-[22px] font-extrabold text-ink">You&apos;re booked</h1>
+          <h1 className="font-heading text-page-title font-extrabold text-ink">You&apos;re booked</h1>
           <p className="text-sm text-ink">
             {job.jobReference}, {job.slotLabel} at {job.addressLine}. {job.customerFirstName} has been told.
           </p>
@@ -195,7 +195,7 @@ export function RespondView({ token, job }: { token: string; job: RespondOpen })
     return (
       <div className="flex flex-col gap-4 pt-2">
         <section className={`${cardClass} flex flex-col gap-2 p-5`}>
-          <h1 className="font-heading text-[22px] font-extrabold text-ink">Declined</h1>
+          <h1 className="font-heading text-page-title font-extrabold text-ink">Declined</h1>
           <p className="text-sm text-ink">{job.jobReference} is back with the office. Nothing else to do.</p>
         </section>
         <GoToJobsLink outlined />
@@ -207,10 +207,10 @@ export function RespondView({ token, job }: { token: string; job: RespondOpen })
     return (
       <div className="flex flex-col gap-3">
         <div>
-          <div className="text-[13px] text-secondary-text">
+          <div className="text-small text-secondary-text">
             {job.trade} - {job.jobReference}
           </div>
-          <h1 className="font-heading text-2xl font-extrabold text-ink">Decline this job?</h1>
+          <h1 className="font-heading text-page-title font-extrabold text-ink">Decline this job?</h1>
           <p className="text-sm text-secondary-text">
             {job.slotLabel} - {job.addressLine}
           </p>
@@ -224,7 +224,7 @@ export function RespondView({ token, job }: { token: string; job: RespondOpen })
             value={note}
             maxLength={NOTE_MAX}
             onChange={(event) => setNote(event.target.value)}
-            className="min-h-24 resize-y rounded-md border border-[#c9c3b8] bg-surface px-3 py-2.5 text-sm text-ink"
+            className="min-h-24 resize-y rounded-button border border-hairline bg-surface px-3 py-2.5 text-sm text-ink"
           />
         </section>
         {error ? (
@@ -243,7 +243,7 @@ export function RespondView({ token, job }: { token: string; job: RespondOpen })
               setError(null);
               setScreen("job");
             }}
-            className="min-h-[52px] rounded-md border border-[#c9c3b8] bg-surface text-sm font-bold text-ink"
+            className="min-h-[52px] rounded-button border border-hairline bg-surface text-sm font-bold text-ink"
           >
             Back
           </button>

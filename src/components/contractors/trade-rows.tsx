@@ -92,17 +92,17 @@ export function TradeRows({
             <div
               key={row.key}
               data-trade={row.trade || undefined}
-              className="relative rounded-lg border border-hairline bg-ground p-3.5"
+              className="relative rounded-small-box border border-hairline bg-ground p-3.5"
             >
               <button
                 type="button"
                 aria-label="Remove this trade"
                 onClick={() => remove(row)}
-                className="absolute top-2 right-2 flex size-11 items-center justify-center rounded-md text-lg text-muted-text"
+                className="absolute top-2 right-2 flex size-11 items-center justify-center rounded-button text-lg text-muted-text"
               >
                 &#215;
               </button>
-              <div className="mb-2.5 flex items-center gap-2 font-heading text-[13px] font-extrabold text-ink">
+              <div className="mb-2.5 flex items-center gap-2 font-heading text-small font-extrabold text-ink">
                 Trade {index + 1}
                 {row.existing ? (
                   <span className={dispatchStateTagClasses(dispatchState(row.active, row.licenceExpiry))}>
@@ -162,7 +162,7 @@ export function TradeRows({
                 />
                 {row.existing ? (
                   <div className="sm:col-span-2 lg:col-span-3">
-                    <span className="mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase">
+                    <span className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase">
                       Status
                     </span>
                     <label className="flex items-center gap-2.5">

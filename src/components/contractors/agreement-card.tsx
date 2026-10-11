@@ -20,12 +20,12 @@ export function ContractorAgreementCard({ code, agreement }: { code: string; agr
   }
 
   return (
-    <div className="rounded-[10px] border border-hairline bg-surface p-4 sm:p-5">
+    <div className="rounded-card border border-hairline bg-surface p-4 sm:p-5">
       <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Contractor agreement</h3>
       {agreement.state === "accepted" && agreement.acceptedAt ? (
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <span className="mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase">
+            <span className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase">
               Accepted
             </span>
             <span className="text-sm text-ink">
@@ -36,7 +36,7 @@ export function ContractorAgreementCard({ code, agreement }: { code: string; agr
             <button
               type="button"
               onClick={() => void openRecord()}
-              className="min-h-11 py-2.5 text-[13px] font-semibold text-secondary-text underline underline-offset-2"
+              className="min-h-11 py-2.5 text-small font-semibold text-secondary-text underline underline-offset-2"
             >
               Acceptance record (PDF)
             </button>
@@ -52,7 +52,7 @@ export function ContractorAgreementCard({ code, agreement }: { code: string; agr
         </>
       ) : null}
       {agreement.state === "none_published" ? (
-        <p className="text-[13px] text-muted-text">No agreement published yet.</p>
+        <p className="text-small text-muted-text">No agreement published yet.</p>
       ) : null}
       {error ? <p className="mt-2 text-xs text-brand-destructive">{error}</p> : null}
     </div>

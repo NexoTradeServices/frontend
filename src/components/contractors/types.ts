@@ -2,6 +2,7 @@
 // Mirrors the backend's DTO (backend/src/contractors/routes.ts, toDto()).
 import type { PickedAddress } from "@/components/ui/places-field";
 import type { ContractorAgreementDto } from "@/components/agreement/types";
+import { formatDate } from "@/lib/date-format";
 
 export interface ContractorSpecialtyDto {
   trade: string;
@@ -54,13 +55,9 @@ export interface ApiFieldError {
   field?: string;
 }
 
-/** ISO datetime or yyyy-mm-dd -> dd/mm/yy, matching the walkthrough's TODAY format. */
+/** ISO datetime or yyyy-mm-dd -> "9 Sep 2026" (the shared date writer). */
 export function fmtDate(iso: string): string {
-  const d = new Date(iso);
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yy = String(d.getFullYear()).slice(2);
-  return `${dd}/${mm}/${yy}`;
+  return formatDate(iso);
 }
 
 /** true when a yyyy-mm-dd date string is strictly in the future. */
@@ -94,7 +91,7 @@ export function dispatchStateLabel(state: DispatchState): string {
 
 /** the record header's own tags (Active/Deactivated, Ready/Not ready) -- shared by the Details and Service area tabs. */
 export function recordTagClasses(kind: "active" | "suspended" | "ready" | "notready"): string {
-  const base = "inline-block rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] uppercase";
+  const base = "inline-block rounded px-2 py-0.5 text-field-label font-bold tracking-[0.04em] uppercase";
   if (kind === "active" || kind === "ready") return `${base} bg-success-bg text-brand-success`;
   if (kind === "notready") return `${base} bg-warning-bg text-brand-warning`;
   return `${base} bg-ground text-muted-text`;
@@ -109,7 +106,7 @@ export function dispatchStateTagClasses(state: DispatchState): string {
   // T). Pills are body-font everywhere else; pin it instead of relying on
   // where the tag happens to sit.
   const base =
-    "inline-block shrink-0 whitespace-nowrap rounded px-2 py-0.5 font-sans text-[11px] font-bold tracking-[0.04em] uppercase";
+    "inline-block shrink-0 whitespace-nowrap rounded px-2 py-0.5 font-sans text-field-label font-bold tracking-[0.04em] uppercase";
   if (state === "dispatchable") return `${base} bg-success-bg text-brand-success`;
   if (state === "expired") return `${base} bg-warning-bg text-brand-warning`;
   return `${base} bg-ground text-muted-text`;

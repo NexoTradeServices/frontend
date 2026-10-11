@@ -41,7 +41,7 @@ const RECEIPT_UNAVAILABLE = "Photo upload isn't working right now - try again sh
 const PAYMENT_POLL_MS = 5_000;
 const PAYMENT_POLL_TRIES = (30 * 60_000) / PAYMENT_POLL_MS;
 
-const labelClass = "block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
+const labelClass = "block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase";
 const starClass = "after:ml-0.5 after:text-brand-destructive after:content-['*']";
 
 interface Receipt {
@@ -78,7 +78,7 @@ type Errors = Record<string, string>;
 
 function Card({ title, aside, children }: { title: string; aside?: string; children: ReactNode }) {
   return (
-    <section className="rounded-[10px] border border-hairline bg-surface p-4 md:p-5">
+    <section className="rounded-card border border-hairline bg-surface p-4 md:p-5">
       <h2 className="font-heading text-base font-extrabold text-ink">
         {title}
         {aside ? <small className="ml-1.5 font-body text-xs font-normal text-muted-text">{aside}</small> : null}
@@ -98,7 +98,7 @@ function PaymentBody({ payment, customerName }: { payment: PaymentDto; customerN
   const total = (
     <>
       <span className={labelClass}>Customer pays</span>
-      <p data-testid="payment-total" className="mt-[5px] font-heading text-[28px] leading-none font-extrabold text-ink">
+      <p data-testid="payment-total" className="mt-[5px] font-heading text-amount leading-none font-extrabold text-ink">
         {formatDollars(payment.amount)}
       </p>
     </>
@@ -108,7 +108,7 @@ function PaymentBody({ payment, customerName }: { payment: PaymentDto; customerN
     return (
       <div>
         {total}
-        <p data-testid="payment-paid" className="mt-3 rounded-md border border-success-border bg-success-bg px-3 py-2.5 text-[13px] text-brand-success">
+        <p data-testid="payment-paid" className="mt-3 rounded-button border border-success-border bg-success-bg px-3 py-2.5 text-small text-brand-success">
           Paid - nothing more to collect.
         </p>
       </div>
@@ -118,28 +118,28 @@ function PaymentBody({ payment, customerName }: { payment: PaymentDto; customerN
     <div>
       {total}
       {payment.messages === "sent" ? (
-        <p data-testid="payment-sent" className="mt-3 rounded-md border border-success-border bg-success-bg px-3 py-2.5 text-[13px] text-brand-success">
+        <p data-testid="payment-sent" className="mt-3 rounded-button border border-success-border bg-success-bg px-3 py-2.5 text-small text-brand-success">
           Invoice sent to {who} by email and text.
         </p>
       ) : payment.messages === "failed" ? (
-        <p role="alert" className="mt-3 rounded-md border border-error-border bg-error-bg px-3 py-2.5 text-[13px] text-brand-destructive">
+        <p role="alert" className="mt-3 rounded-button border border-error-border bg-error-bg px-3 py-2.5 text-small text-brand-destructive">
           The invoice could not be sent to {who}. {who} can still pay with the code below.
         </p>
       ) : (
-        <p data-testid="payment-sending" className="mt-3 rounded-md border border-brand-warning/30 bg-warning-bg px-3 py-2.5 text-[13px] text-brand-warning">
+        <p data-testid="payment-sending" className="mt-3 rounded-button border border-brand-warning/30 bg-warning-bg px-3 py-2.5 text-small text-brand-warning">
           Sending the invoice to {who} by email and text...
         </p>
       )}
       <div className="mt-4">
         {payment.payLinkUrl === null ? (
-          <p className="text-[13px] text-muted-text">The pay link is on its way - you can collect payment with a QR code here in a moment.</p>
+          <p className="text-small text-muted-text">The pay link is on its way - you can collect payment with a QR code here in a moment.</p>
         ) : (
           <>
             <button
               type="button"
               onClick={() => setShowQr((open) => !open)}
               aria-expanded={showQr}
-              className="inline-flex min-h-11 items-center gap-2 rounded-md border border-hairline bg-surface px-4 text-sm font-bold text-ink"
+              className="inline-flex min-h-11 items-center gap-2 rounded-button border border-hairline bg-surface px-4 text-sm font-bold text-ink"
             >
               <QrCodeIcon aria-hidden className="size-4" />
               {showQr ? "Hide QR code" : "Collect payment with QR code"}
@@ -180,7 +180,7 @@ function LockedValue({
   return (
     <div className="mb-3.5">
       <span className={hideLabel ? "sr-only" : `${labelClass} mb-[5px]`}>{label}</span>
-      <div className="flex min-h-[44px] items-center gap-2 rounded-md border border-hairline bg-ground px-2.5 py-2 text-sm text-ink">
+      <div className="flex min-h-[44px] items-center gap-2 rounded-button border border-hairline bg-ground px-2.5 py-2 text-sm text-ink">
         <Lock aria-hidden className="size-3.5 shrink-0 text-muted-text" />
         <span className="whitespace-pre-wrap">{value}</span>
       </div>
@@ -550,7 +550,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
     <>
       <div className="grid items-start gap-4 pb-28 md:pb-0 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         {banner ? (
-          <p role="alert" className="col-span-full rounded-md border border-error-border bg-error-bg px-3 py-2.5 text-[13px] text-brand-destructive">
+          <p role="alert" className="col-span-full rounded-button border border-error-border bg-error-bg px-3 py-2.5 text-small text-brand-destructive">
             {banner}
           </p>
         ) : null}
@@ -589,7 +589,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                 <h3 className={labelClass}>Instructions</h3>
                 <div className="mt-1.5 flex flex-col gap-2">
                   {job.instructions.map((note, index) => (
-                    <div key={index} className="rounded-md border border-hairline bg-ground px-3 py-2.5 text-sm text-ink">
+                    <div key={index} className="rounded-small-box border border-hairline bg-ground px-3 py-2.5 text-sm text-ink">
                       <span className="whitespace-pre-wrap">{note.note}</span>
                       <div className="mt-1 text-xs text-muted-text">
                         {note.authorFirstName}, {note.dateLabel}
@@ -605,14 +605,14 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
         <div className="order-2 flex min-w-0 flex-col gap-4 xl:col-start-1 xl:row-start-1">
           {job.canOnSite && !frozen ? (
             <Card title="Arrival">
-              <p className="mb-3 text-[13px] text-secondary-text">
+              <p className="mb-3 text-small text-secondary-text">
                 Tap when you get to the job. The office then sees it as in progress.
               </p>
               <button
                 type="button"
                 onClick={() => void onSite()}
                 disabled={busy !== null}
-                className="min-h-[52px] w-full rounded-md border border-hairline bg-surface px-[18px] text-sm font-bold text-ink disabled:opacity-50 md:min-h-11 md:w-auto"
+                className="min-h-[52px] w-full rounded-button border border-hairline bg-surface px-[18px] text-sm font-bold text-ink disabled:opacity-50 md:min-h-11 md:w-auto"
               >
                 I&apos;ve arrived
               </button>
@@ -653,7 +653,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                     setNotes(e.target.value);
                     setErrors((current) => ({ ...current, notes: "" }));
                   }}
-                  className={`min-h-[96px] w-full resize-y rounded-md border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
+                  className={`min-h-[96px] w-full resize-y rounded-button border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
                     errors["notes"] ? "border-brand-destructive" : "border-hairline"
                   }`}
                 />
@@ -665,7 +665,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
 
         <div className="order-4 min-w-0 xl:col-start-1 xl:row-start-3">
           <Card title="Parts used" aside={`Up to ${capLabel} in total`}>
-            {parts.length === 0 && frozen ? <p className="text-[13px] text-muted-text">No parts.</p> : null}
+            {parts.length === 0 && frozen ? <p className="text-small text-muted-text">No parts.</p> : null}
             {parts.map((part, index) => {
               const at = (field: string): string | undefined => errors[`part.${String(index)}.${field}`] || undefined;
               const id = `part-${String(index)}`;
@@ -681,12 +681,12 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                       <div className="mb-3.5">
                         <span className={`${labelClass} mb-[5px]`}>Receipt photo</span>
                         {part.receipt && part.receipt.fullUrl ? (
-                          <a href={part.receipt.fullUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open ${part.receipt.fileName}`} className="block size-24 overflow-hidden rounded-md border border-hairline">
+                          <a href={part.receipt.fullUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open ${part.receipt.fileName}`} className="block size-24 overflow-hidden rounded-button border border-hairline">
                             {/* eslint-disable-next-line @next/next/no-img-element -- a Cloudinary thumbnail */}
                             <img src={part.receipt.thumbnailUrl} alt={part.receipt.fileName} className="size-full object-cover" />
                           </a>
                         ) : (
-                          <p className="text-[13px] text-muted-text">{part.receipt?.fileName ?? "-"}</p>
+                          <p className="text-small text-muted-text">{part.receipt?.fileName ?? "-"}</p>
                         )}
                         <p className="mt-[5px] text-xs text-muted-text">{FROZEN_MESSAGE}</p>
                       </div>
@@ -742,7 +742,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                       <button
                         type="button"
                         onClick={() => setParts((current) => current.filter((_, i) => i !== index))}
-                        className="min-h-11 text-[13px] font-semibold text-secondary-text underline underline-offset-2"
+                        className="min-h-11 text-small font-semibold text-secondary-text underline underline-offset-2"
                       >
                         Remove part
                       </button>
@@ -755,7 +755,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               <button
                 type="button"
                 onClick={() => setParts((current) => [...current, newPart()])}
-                className="min-h-11 text-[13px] font-semibold text-secondary-text underline underline-offset-2"
+                className="min-h-11 text-small font-semibold text-secondary-text underline underline-offset-2"
               >
                 + Add a part
               </button>
@@ -776,7 +776,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               type="button"
               onClick={() => void send(false)}
               disabled={!changed || busy !== null || uploading}
-              className={`min-h-[52px] flex-1 rounded-md px-4 text-sm font-bold md:min-h-11 md:flex-none ${
+              className={`min-h-[52px] flex-1 rounded-button px-4 text-sm font-bold md:min-h-11 md:flex-none ${
                 changed ? "border border-hairline bg-surface text-ink" : "bg-hairline text-muted-text"
               } disabled:cursor-not-allowed`}
             >
@@ -791,7 +791,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                 if (Object.keys(problems).length === 0) setConfirming(true);
               }}
               disabled={busy !== null || uploading}
-              className="min-h-[52px] flex-[2] rounded-md bg-brand-success px-4 text-sm font-bold text-white disabled:opacity-50 md:min-h-11 md:flex-none"
+              className="min-h-[52px] flex-[2] rounded-button bg-brand-success px-4 text-sm font-bold text-on-accent disabled:opacity-50 md:min-h-11 md:flex-none"
             >
               Complete job
             </button>

@@ -12,14 +12,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Field } from "@/components/auth/field";
 import { Banner } from "@/components/auth/banner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { openSignedFile, shortDate } from "@/lib/agreement-files";
+import { friendlyDate, openSignedFile } from "@/lib/agreement-files";
 import type { AgreementListDto, AgreementVersionDto } from "@/components/agreement/types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 const TIMEZONE = "Australia/Perth";
 const NAME_MAX = 36;
 
-const textButton = "min-h-11 py-2.5 text-[13px] font-semibold text-secondary-text underline underline-offset-2";
+const textButton = "min-h-11 py-2.5 text-small font-semibold text-secondary-text underline underline-offset-2";
 
 function shortName(name: string): string {
   return name.length > NAME_MAX ? `${name.slice(0, NAME_MAX - 3)}...` : name;
@@ -27,7 +27,7 @@ function shortName(name: string): string {
 
 function CurrentTag() {
   return (
-    <span className="inline-block rounded bg-success-bg px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] whitespace-nowrap text-brand-success uppercase">
+    <span className="inline-block rounded bg-success-bg px-2 py-0.5 text-field-label font-bold tracking-[0.04em] whitespace-nowrap text-brand-success uppercase">
       Current
     </span>
   );
@@ -125,7 +125,7 @@ export function AgreementCard({ timezone = TIMEZONE }: { timezone?: string }) {
   const versions = list?.versions ?? [];
 
   return (
-    <div className="mb-4.5 rounded-[10px] border border-hairline bg-surface p-4 sm:p-5">
+    <div className="mb-4.5 rounded-card border border-hairline bg-surface p-4 sm:p-5">
       <h3 className="font-heading text-base font-extrabold text-ink">Contractor agreement</h3>
       <p className="mb-3.5 text-xs text-muted-text">All fields are required</p>
       {legalBanner ? <Banner kind="error">{legalBanner}</Banner> : null}
@@ -134,7 +134,7 @@ export function AgreementCard({ timezone = TIMEZONE }: { timezone?: string }) {
       <div className="mb-3.5">
         <label
           htmlFor="agreementFile"
-          className="mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase"
+          className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase"
         >
           Agreement file
         </label>
@@ -142,7 +142,7 @@ export function AgreementCard({ timezone = TIMEZONE }: { timezone?: string }) {
           <button
             type="button"
             onClick={() => fileInput.current?.click()}
-            className="min-h-[52px] w-full rounded-md border border-hairline bg-surface px-4 py-3.5 text-sm font-bold text-ink sm:min-h-11 sm:w-auto sm:py-2.5"
+            className="min-h-[52px] w-full rounded-button border border-hairline bg-surface px-4 py-3.5 text-sm font-bold text-ink sm:min-h-11 sm:w-auto sm:py-2.5"
           >
             Choose file
           </button>
@@ -181,7 +181,7 @@ export function AgreementCard({ timezone = TIMEZONE }: { timezone?: string }) {
       <button
         type="button"
         onClick={askToPublish}
-        className="min-h-[52px] w-full rounded-md border border-hairline bg-surface px-4 py-3.5 text-sm font-bold text-ink sm:min-h-11 sm:w-auto sm:py-2.5"
+        className="min-h-[52px] w-full rounded-button border border-hairline bg-surface px-4 py-3.5 text-sm font-bold text-ink sm:min-h-11 sm:w-auto sm:py-2.5"
       >
         Publish version
       </button>
@@ -189,11 +189,11 @@ export function AgreementCard({ timezone = TIMEZONE }: { timezone?: string }) {
       <hr className="mt-3.5 mb-3 border-0 border-t border-hairline" />
 
       {loadFailed ? (
-        <p className="text-[13px] text-brand-destructive">Couldn&apos;t load the versions - try again shortly.</p>
+        <p className="text-small text-brand-destructive">Couldn&apos;t load the versions - try again shortly.</p>
       ) : list === null ? (
-        <div aria-hidden="true" className="h-10 rounded-md bg-ground" />
+        <div aria-hidden="true" className="h-10 rounded-button bg-ground" />
       ) : versions.length === 0 ? (
-        <p className="text-[13px] text-muted-text">No agreement published yet.</p>
+        <p className="text-small text-muted-text">No agreement published yet.</p>
       ) : (
         <>
           <table className="hidden w-full border-collapse sm:table">
@@ -202,7 +202,7 @@ export function AgreementCard({ timezone = TIMEZONE }: { timezone?: string }) {
                 {["Version", "Issued", "By", ""].map((heading) => (
                   <th
                     key={heading || "open"}
-                    className="border-b border-hairline px-3 py-2.5 text-left text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase"
+                    className="border-b border-hairline px-3 py-2.5 text-left text-field-label font-bold tracking-[0.08em] text-muted-text uppercase"
                   >
                     {heading}
                   </th>
@@ -216,7 +216,7 @@ export function AgreementCard({ timezone = TIMEZONE }: { timezone?: string }) {
                     <span className="mr-2">{version.version}</span>
                     {version.current ? <CurrentTag /> : null}
                   </td>
-                  <td className="px-3 py-2.5 text-sm text-ink">{shortDate(version.issuedAt, timezone)}</td>
+                  <td className="px-3 py-2.5 text-sm text-ink">{friendlyDate(version.issuedAt, timezone)}</td>
                   <td className="px-3 py-2.5 text-sm text-ink">{version.issuedBy}</td>
                   <td className="px-3 py-2.5 text-right">
                     <button type="button" className={textButton} onClick={() => void openVersion(version)}>
@@ -229,13 +229,13 @@ export function AgreementCard({ timezone = TIMEZONE }: { timezone?: string }) {
           </table>
           <ul className="m-0 flex list-none flex-col gap-2.5 p-0 sm:hidden">
             {versions.map((version) => (
-              <li key={version.id} className="rounded-[10px] border border-hairline bg-surface p-3.5">
+              <li key={version.id} className="rounded-card border border-hairline bg-surface p-3.5">
                 <div className="flex items-center justify-between gap-2">
                   <b className="font-heading text-ink">Version {version.version}</b>
                   {version.current ? <CurrentTag /> : null}
                 </div>
-                <p className="mt-1 text-[13px] text-muted-text">
-                  Issued {shortDate(version.issuedAt, timezone)} by {version.issuedBy}
+                <p className="mt-1 text-small text-muted-text">
+                  Issued {friendlyDate(version.issuedAt, timezone)} by {version.issuedBy}
                 </p>
                 <button type="button" className={textButton} onClick={() => void openVersion(version)}>
                   Open PDF

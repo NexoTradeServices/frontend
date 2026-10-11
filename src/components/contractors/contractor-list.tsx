@@ -61,7 +61,7 @@ export function ContractorList({ contractors }: { contractors: ContractorDto[] }
       </div>
 
       {contractors.length === 0 ? (
-        <div className="rounded-[10px] border border-hairline bg-surface p-5 text-sm text-muted-text">
+        <div className="rounded-card border border-hairline bg-surface p-5 text-sm text-muted-text">
           No contractors yet. Add one to get started.
         </div>
       ) : (
@@ -70,26 +70,26 @@ export function ContractorList({ contractors }: { contractors: ContractorDto[] }
             <Link
               key={contractor.code}
               href={`/ops/contractors/${contractor.code}`}
-              className="block rounded-[10px] border border-hairline bg-surface p-4"
+              className="block rounded-card border border-hairline bg-surface p-4"
             >
               <div className="mb-1 flex flex-wrap items-center gap-2">
-                <span className="font-heading text-[13px] font-extrabold text-ink">{contractor.code}</span>
+                <span className="font-heading text-small font-extrabold text-ink">{contractor.code}</span>
                 <span
-                  className={`inline-block rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] uppercase ${
+                  className={`inline-block rounded px-2 py-0.5 text-field-label font-bold tracking-[0.04em] uppercase ${
                     contractor.status === "active" ? "bg-success-bg text-brand-success" : "bg-ground text-muted-text"
                   }`}
                 >
                   {contractor.status === "active" ? "Active" : "Deactivated"}
                 </span>
                 <span
-                  className={`inline-block rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] uppercase ${
+                  className={`inline-block rounded px-2 py-0.5 text-field-label font-bold tracking-[0.04em] uppercase ${
                     contractor.ready ? "bg-success-bg text-brand-success" : "bg-warning-bg text-brand-warning"
                   }`}
                 >
                   {contractor.ready ? "Ready to dispatch" : "Not ready to dispatch"}
                 </span>
               </div>
-              <div className="mb-0.5 font-heading text-[15px] font-extrabold text-ink">{contractor.name}</div>
+              <div className="mb-0.5 font-heading text-name font-extrabold text-ink">{contractor.name}</div>
               <div className="text-xs text-muted-text">
                 <div>{tradesLine(contractor)}</div>
                 <div>{coverLine(contractor)}</div>

@@ -46,19 +46,19 @@ export function ConfirmDialog({
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
-        className="w-full max-w-[420px] rounded-[10px] border border-hairline bg-surface p-5"
+        className="w-full max-w-[420px] rounded-card border border-hairline bg-surface p-5"
       >
-        <h4 id="confirm-dialog-title" className="mb-2 font-heading text-[15px] font-extrabold text-ink">
+        <h4 id="confirm-dialog-title" className="mb-2 font-heading text-name font-extrabold text-ink">
           {title}
         </h4>
-        <div className="mb-4 text-[13px] text-secondary-text">{children}</div>
+        <div className="mb-4 text-small text-secondary-text">{children}</div>
         {fields ? <div className="mb-4">{fields}</div> : null}
         <div className="flex justify-end gap-2.5">
           <button
             type="button"
             onClick={onCancel}
             disabled={loading}
-            className="rounded-md border border-hairline bg-surface px-4 py-2.5 text-sm font-bold text-ink"
+            className="rounded-button border border-hairline bg-surface px-4 py-2.5 text-sm font-bold text-ink"
           >
             {cancelLabel}
           </button>
@@ -66,7 +66,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            className={`rounded-md px-4 py-2.5 text-sm font-bold text-white ${
+            className={`rounded-button px-4 py-2.5 text-sm font-bold text-on-accent ${
               severity === "destructive" ? "bg-brand-destructive" : tone === "success" ? "bg-brand-success" : "bg-brand-accent"
             }`}
           >

@@ -39,6 +39,7 @@ import { test, expect, type APIRequestContext, type Locator, type Page } from "@
 import { dispatchThrowawayJob } from "./helpers/dispatched-job";
 import { acceptedJobForBob, completeJobAsBob, giveInvoiceItsPayLink } from "./helpers/accepted-job";
 import { login } from "./helpers/login";
+import { expectFilterRowOnPhone, expectFilterRowWraps } from "./helpers/filter-row";
 import { MOCKS_GOOGLE_PLACES, installMockGooglePlaces } from "./helpers/mock-google-places";
 import { installMockPhotoImages } from "./helpers/mock-cloudinary";
 import { MOBILE_VIEWPORT } from "../playwright.config";
@@ -317,6 +318,23 @@ test.describe(() => {
     // The row scrolls; the page never does.
     await expectNoSidewaysScroll(page);
   });
+
+  test("9001 AC9: the Filter row on a phone - pills 8px apart, chosen pill ink, no scrollbar, snapping, edge fade, chosen pill in view", async ({
+    page,
+  }) => {
+    await page.goto("/ops/jobs");
+    await login(page, "mike@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible();
+    await expectFilterRowOnPhone(page, page.getByRole("group", { name: "Filter by status" }));
+  });
+});
+
+test("9001 AC9: at 1024px the job queue's Filter row wraps and its pills look the same", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 800 });
+  await page.goto("/ops/jobs");
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible();
+  await expectFilterRowWraps(page.getByRole("group", { name: "Filter by status" }));
 });
 
 test("3003 AC11: Mike sees the customer's photos in The request card; tapping one opens the full photo in a new tab; a job without says No photos", async ({

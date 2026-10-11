@@ -57,7 +57,7 @@ export function RepeatableRows({
 
   return (
     <div className="mb-3.5">
-      <label className="mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase">
+      <label className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase">
         {label}
       </label>
       {values.map((value, index) => (
@@ -69,7 +69,7 @@ export function RepeatableRows({
                 aria-label={`Move ${label.toLowerCase()} ${index + 1} up`}
                 disabled={index === 0}
                 onClick={() => moveUp(index)}
-                className="flex size-11 items-center justify-center rounded-md border border-hairline text-base text-muted-text disabled:cursor-not-allowed disabled:opacity-30"
+                className="flex size-11 items-center justify-center rounded-button border border-hairline text-base text-muted-text disabled:cursor-not-allowed disabled:opacity-30"
               >
                 &#8593;
               </button>
@@ -78,7 +78,7 @@ export function RepeatableRows({
                 aria-label={`Move ${label.toLowerCase()} ${index + 1} down`}
                 disabled={index === values.length - 1}
                 onClick={() => moveDown(index)}
-                className="flex size-11 items-center justify-center rounded-md border border-hairline text-base text-muted-text disabled:cursor-not-allowed disabled:opacity-30"
+                className="flex size-11 items-center justify-center rounded-button border border-hairline text-base text-muted-text disabled:cursor-not-allowed disabled:opacity-30"
               >
                 &#8595;
               </button>
@@ -89,20 +89,20 @@ export function RepeatableRows({
             value={value}
             placeholder={placeholder}
             onChange={(e) => updateAt(index, e.target.value)}
-            className="min-h-[44px] w-full flex-1 rounded-md border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
+            className="min-h-[44px] w-full flex-1 rounded-button border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
           />
           <button
             type="button"
             aria-label={`Remove ${label.toLowerCase()} ${index + 1}`}
             onClick={() => removeAt(index)}
-            className="flex size-11 shrink-0 items-center justify-center rounded-md border border-hairline text-base text-muted-text"
+            className="flex size-11 shrink-0 items-center justify-center rounded-button border border-hairline text-base text-muted-text"
           >
             &#215;
           </button>
         </div>
       ))}
       {helper ? <p className="mt-[-4px] mb-2 text-xs text-muted-text">{helper}</p> : null}
-      <button type="button" onClick={add} className="text-[13px] font-semibold text-secondary-text underline underline-offset-2">
+      <button type="button" onClick={add} className="text-small font-semibold text-secondary-text underline underline-offset-2">
         {addLabel}
       </button>
     </div>

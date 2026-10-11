@@ -12,6 +12,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Banner } from "@/components/auth/banner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FilterRow } from "@/components/ui/filter-row";
 import { Toast, useToast } from "@/components/ui/toast";
 import { downloadFile } from "@/lib/download";
 import { InvoiceCard } from "./invoice-card";
@@ -20,12 +21,12 @@ import type { OpsDetail, OpsList, OpsRow, OpsView, UpcomingRow } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-const labelClass = "block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
-const tagClass = "inline-block shrink-0 rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] whitespace-nowrap uppercase";
+const labelClass = "block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase";
+const tagClass = "inline-block shrink-0 rounded px-2 py-0.5 text-field-label font-bold tracking-[0.04em] whitespace-nowrap uppercase";
 const warningTag = `${tagClass} bg-warning-bg text-brand-warning`;
-const th = "border-b border-hairline px-3 py-2.5 text-left align-bottom text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
+const th = "border-b border-hairline px-3 py-2.5 text-left align-bottom text-field-label font-bold tracking-[0.08em] text-muted-text uppercase";
 const td = "border-b border-hairline px-3 py-2.5 align-top text-secondary-text";
-const textButton = "inline-flex min-h-11 items-center text-[13px] font-semibold text-secondary-text underline underline-offset-2";
+const textButton = "inline-flex min-h-11 items-center text-small font-semibold text-secondary-text underline underline-offset-2";
 
 const PILLS: { view: OpsView; label: string }[] = [
   { view: "ready", label: "Ready to pay" },
@@ -102,8 +103,8 @@ function Drilldown({ reference }: { reference: string }) {
       current = false;
     };
   }, [reference]);
-  if (failed) return <p className="text-[13px] text-brand-destructive">The invoice could not be opened - try again.</p>;
-  if (detail === null) return <p className="text-[13px] text-muted-text">Opening...</p>;
+  if (failed) return <p className="text-small text-brand-destructive">The invoice could not be opened - try again.</p>;
+  if (detail === null) return <p className="text-small text-muted-text">Opening...</p>;
   return <InvoiceCard invoice={detail.invoice} />;
 }
 
@@ -178,7 +179,7 @@ function ColumnHeads({ view }: { view: OpsView }) {
 }
 
 function Cells({ view, row }: { view: OpsView; row: OpsRow }) {
-  const reference = <td className={td}><span className="font-heading text-[13px] font-extrabold text-ink">{row.reference}</span></td>;
+  const reference = <td className={td}><span className="font-heading text-small font-extrabold text-ink">{row.reference}</span></td>;
   const name = <td className={`${td} font-semibold text-ink`}>{row.contractor.name}</td>;
   const amount = <td className={`${td} text-right font-semibold whitespace-nowrap text-ink tabular-nums`}>{formatPay(row.amount)}</td>;
   if (view === "ready") {
@@ -275,7 +276,7 @@ function InvoiceCards({ view, rows, actions }: { view: OpsView; rows: OpsRow[]; 
   return (
     <div className="flex flex-col gap-2.5 md:hidden" data-testid="settlements-cards">
       {rows.map((row) => (
-        <div key={row.reference} data-ref={row.reference} className="rounded-[10px] border border-hairline bg-surface p-3.5">
+        <div key={row.reference} data-ref={row.reference} className="rounded-card border border-hairline bg-surface p-3.5">
           <button
             type="button"
             aria-expanded={open === row.reference}
@@ -283,13 +284,13 @@ function InvoiceCards({ view, rows, actions }: { view: OpsView; rows: OpsRow[]; 
             className="block min-h-11 w-full text-left"
           >
             <span className="flex items-center justify-between gap-2">
-              <span className="font-heading text-[13px] font-extrabold text-ink">{row.reference}</span>
+              <span className="font-heading text-small font-extrabold text-ink">{row.reference}</span>
               <span className="flex flex-wrap justify-end gap-1.5">
                 <RowTags row={row} />
               </span>
             </span>
-            <span className="mt-1.5 mb-0.5 block text-[15px] font-bold text-ink">{row.contractor.name}</span>
-            <span className="block text-[13px] text-muted-text">
+            <span className="mt-1.5 mb-0.5 block text-name font-bold text-ink">{row.contractor.name}</span>
+            <span className="block text-small text-muted-text">
               <span className="block font-semibold text-secondary-text tabular-nums">{formatPay(row.amount)}</span>
               {view === "ready" ? <span className="block tabular-nums">BSB {row.bsb ?? "-"} - account {row.account ?? "-"}</span> : <span className="block">{row.period}</span>}
               {view === "paid" ? <span className="block">Paid {row.paidLabel ?? "-"} by {row.paidBy ?? "-"}</span> : null}
@@ -336,9 +337,9 @@ function UpcomingTable({ rows }: { rows: UpcomingRow[] }) {
       </div>
       <div className="flex flex-col gap-2.5 md:hidden" data-testid="settlements-cards">
         {rows.map((row) => (
-          <div key={row.contractor.code} data-ref={row.contractor.code} className="rounded-[10px] border border-hairline bg-surface p-3.5">
-            <span className="block text-[15px] font-bold text-ink">{row.contractor.name}</span>
-            <span className="block text-[13px] text-muted-text">
+          <div key={row.contractor.code} data-ref={row.contractor.code} className="rounded-card border border-hairline bg-surface p-3.5">
+            <span className="block text-name font-bold text-ink">{row.contractor.name}</span>
+            <span className="block text-small text-muted-text">
               <span className="block font-semibold text-secondary-text tabular-nums">
                 {formatPay(row.amount)} - {row.jobs} {row.jobs === 1 ? "job" : "jobs"}
               </span>
@@ -451,30 +452,16 @@ export function OpsSettlements({ initial }: { initial: OpsList }) {
         </div>
       </div>
 
-      {/* The Filter row: one line that scrolls sideways on Mobile, never wrapping the page. */}
-      <div className="-mx-4 flex flex-nowrap gap-2 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden" role="group" aria-label="Show">
-        {PILLS.map((pill) => {
-          const chosen = pill.view === view;
-          return (
-            <button
-              key={pill.view}
-              type="button"
-              data-pill={pill.view}
-              aria-pressed={chosen}
-              onClick={() => void load(pill.view)}
-              className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold ${
-                chosen ? "bg-ink text-white" : "border border-hairline bg-surface text-secondary-text"
-              }`}
-            >
-              {pill.label} <span className="tabular-nums">{data.counts[pill.view]}</span>
-            </button>
-          );
-        })}
-      </div>
+      <FilterRow
+        label="Show"
+        pills={PILLS.map((pill) => ({ key: pill.view, label: pill.label, count: data.counts[pill.view] }))}
+        chosen={view}
+        onChoose={(key) => void load(key as OpsView)}
+      />
 
       {error ? <Banner kind="error">{error}</Banner> : null}
 
-      <section className="rounded-[10px] border border-hairline bg-surface p-4 md:p-5" aria-busy={loading}>
+      <section className="rounded-card border border-hairline bg-surface p-4 md:p-5" aria-busy={loading}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-heading text-base font-extrabold text-ink">{TITLES[view]}</h2>
           {view === "ready" ? (
@@ -502,7 +489,7 @@ export function OpsSettlements({ initial }: { initial: OpsList }) {
           type="button"
           onClick={() => void loadMore()}
           disabled={loading}
-          className="min-h-11 w-full rounded-md border border-hairline bg-surface px-4 text-sm font-bold text-ink disabled:opacity-60 md:w-auto md:self-center"
+          className="min-h-11 w-full rounded-button border border-hairline bg-surface px-4 text-sm font-bold text-ink disabled:opacity-60 md:w-auto md:self-center"
         >
           {loading ? "Loading..." : "Load more"}
         </button>

@@ -219,7 +219,7 @@ test.describe(() => {
         await page.getByRole("button", { name: "Save settings" }).click();
         await expect(page.getByRole("heading", { name: "Switch GST on?" })).toBeVisible();
         await page.getByRole("button", { name: "Switch on" }).click();
-        await expect(page.getByText(/Changed \d{2}\/\d{2}\/\d{2} by The owner/)).toBeVisible();
+        await expect(page.getByText(/Changed \d{1,2} [A-Z][a-z]{2} \d{4} by The owner/)).toBeVisible();
       });
     },
   );

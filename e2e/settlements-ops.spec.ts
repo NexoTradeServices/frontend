@@ -18,6 +18,7 @@
 import { readFile } from "node:fs/promises";
 import { test, expect } from "@playwright/test";
 import { login } from "./helpers/login";
+import { expectFilterRowOnPhone, expectFilterRowWraps } from "./helpers/filter-row";
 import { withSettlementsLock } from "./helpers/singleton-lock";
 import { approveByLink, approveLinkFor, expectNoSidewaysScroll, finishedJob, mondayRun, runSettlementSweep } from "./helpers/settlements";
 
@@ -195,5 +196,24 @@ test("6003 AC8/AC12: a corrected draft is flagged, Rebuild asks first and replac
     await expect(unswept).toContainText("Bob Reilly");
     await expect(unswept.locator("td").nth(3)).toHaveText(/^Mon \d{1,2} [A-Z][a-z]{2}$/);
     await expect(unswept.locator("td").nth(4)).toHaveText(/^[A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}$/);
+  });
+});
+
+test("9001 AC9: the Payouts Filter row is the same row - 8px apart, chosen pill ink - wrapping at 1024px", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 800 });
+  await page.goto("/ops/payouts");
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "Payouts", level: 1 })).toBeVisible();
+  await expectFilterRowWraps(page.getByRole("group", { name: "Show" }));
+});
+
+test.describe("on a phone", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("9001 AC9: at 390px the Payouts Filter row is one line that scrolls sideways, with the edge fade and no scrollbar", async ({ page }) => {
+    await page.goto("/ops/payouts");
+    await login(page, "mike@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Payouts", level: 1 })).toBeVisible();
+    await expectFilterRowOnPhone(page, page.getByRole("group", { name: "Show" }));
   });
 });

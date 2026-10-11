@@ -41,7 +41,7 @@ export default async function DispatchPage({
           subtitle="No job has this reference."
           breadcrumb={jobCrumb(ref)}
         />
-        <div className="rounded-[10px] border border-hairline bg-surface p-5 text-sm text-secondary-text">
+        <div className="rounded-card border border-hairline bg-surface p-5 text-sm text-secondary-text">
           Check the reference, or find the job from the queue.
         </div>
       </Container>
@@ -56,7 +56,7 @@ export default async function DispatchPage({
           subtitle="This job has no booking to move."
           breadcrumb={jobCrumb(ref)}
         />
-        <div className="rounded-[10px] border border-hairline bg-surface p-5 text-sm text-secondary-text">
+        <div className="rounded-card border border-hairline bg-surface p-5 text-sm text-secondary-text">
           <Link href={`/ops/jobs/${encodeURIComponent(ref)}`} className="underline underline-offset-2">
             Back to {ref}
           </Link>

@@ -52,7 +52,7 @@ describe("AC14 -- the ops record's agreement card", () => {
       recordAvailable: true,
     });
     expect(html).toContain("Accepted");
-    expect(html).toMatch(/09\/09\/26, version 2/);
+    expect(html).toMatch(/9 Sep 2026, version 2/);
     expect(html).toContain("Acceptance record (PDF)");
     expect(html).not.toMatch(/>Accept</);
   });

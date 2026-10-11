@@ -39,7 +39,7 @@ export function Field({
     <div className="mb-3.5">
       <label
         htmlFor={id}
-        className={`mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase ${
+        className={`mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase ${
           // A CSS-generated mark, not DOM text: the star never enters the
           // label's accessible name (a screen reader stays at "Name", never
           // "Name star") or its text content (so `getByLabel("Name", {
@@ -60,7 +60,7 @@ export function Field({
         ) : null}
         <input
           id={id}
-          className={`min-h-[44px] w-full rounded-md border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
+          className={`min-h-[44px] w-full rounded-button border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
             error ? "border-brand-destructive" : "border-hairline"
           } ${prefix ? "pl-5" : ""} ${suffix ? "pr-9" : ""} ${className ?? ""}`}
           aria-invalid={error ? true : undefined}

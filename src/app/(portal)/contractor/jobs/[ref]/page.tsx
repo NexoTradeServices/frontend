@@ -30,7 +30,7 @@ export default async function ContractorJobPage({ params }: { params: Promise<{ 
           subtitle="This job isn't one of yours."
           breadcrumb={DASHBOARD_CRUMB}
         />
-        <div className="rounded-[10px] border border-hairline bg-surface p-4 text-sm text-secondary-text md:p-5">
+        <div className="rounded-card border border-hairline bg-surface p-4 text-sm text-secondary-text md:p-5">
           Open your jobs from the dashboard.
         </div>
       </Container>

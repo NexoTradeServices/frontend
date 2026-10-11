@@ -64,7 +64,7 @@ export function ApproveHere({ reference }: { reference: string }) {
         type="button"
         onClick={() => void approve()}
         disabled={working}
-        className="flex min-h-[52px] w-full items-center justify-center rounded-md bg-brand-success px-4 text-sm font-bold text-on-accent disabled:opacity-60 md:min-h-11 md:w-auto md:min-w-40"
+        className="flex min-h-[52px] w-full items-center justify-center rounded-button bg-brand-success px-4 text-sm font-bold text-on-accent disabled:opacity-60 md:min-h-11 md:w-auto md:min-w-40"
       >
         {working ? "Approving..." : "Approve"}
       </button>

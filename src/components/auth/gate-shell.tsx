@@ -14,7 +14,7 @@ export function GateCard({ children }: { children: ReactNode }) {
 export function GateCardTitle({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <>
-      <h1 className="mb-0.5 font-heading text-card-title font-extrabold text-ink">{title}</h1>
+      <h1 className="mb-0.5 font-heading text-page-title font-extrabold text-ink">{title}</h1>
       <p className="mb-[18px] text-caption text-muted-text">{subtitle}</p>
     </>
   );
