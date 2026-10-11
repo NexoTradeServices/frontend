@@ -73,10 +73,10 @@ test("AC2, AC26: the page leads with when, where and who to ask for; Decline sho
   // AC26: Decline opens the note step; Back returns to the job.
   await page.getByRole("button", { name: "Decline", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Decline this job?" })).toBeVisible();
-  await expect(page.getByLabel("Anything Mike should know?")).toBeVisible();
+  await expect(page.getByLabel("Decline note")).toBeVisible();
   await expect(page.getByRole("button", { name: "Decline the job" })).toBeVisible();
   // 9001 AC8: the reason box and the Outlined Back button sit on the hairline border (#e6e2db).
-  await expect(page.getByLabel("Anything Mike should know?")).toHaveCSS("border-top-color", "rgb(230, 226, 219)");
+  await expect(page.getByLabel("Decline note")).toHaveCSS("border-top-color", "rgb(230, 226, 219)");
   await expect(page.getByRole("button", { name: "Back", exact: true })).toHaveCSS("border-top-color", "rgb(230, 226, 219)");
   await expect(page.getByRole("heading", { name: "Decline this job?" })).toHaveCSS("font-size", "22px");
   await page.getByRole("button", { name: "Back", exact: true }).click();
@@ -125,7 +125,7 @@ test("AC18, AC21, AC23: Decline with a note -> Declined; Mike's queue badges the
   const note = "Still on another job in Kalamunda that morning";
   await page.goto(job.respondPath);
   await page.getByRole("button", { name: "Decline", exact: true }).click();
-  await page.getByLabel("Anything Mike should know?").fill(note);
+  await page.getByLabel("Decline note").fill(note);
   await page.getByRole("button", { name: "Decline the job" }).click();
   await expect(page.getByRole("heading", { name: "Declined", exact: true })).toBeVisible();
   await expect(page.getByText(`${job.reference} is back with the office.`)).toBeVisible();
@@ -188,7 +188,7 @@ test.describe("on a phone", () => {
 
     // The note step is just as reachable.
     await decline.click();
-    await expect(page.getByLabel("Anything Mike should know?")).toBeVisible();
+    await expect(page.getByLabel("Decline note")).toBeVisible();
     await expect(page.getByRole("button", { name: "Decline the job" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Back", exact: true })).toBeVisible();
     await expectNoSidewaysScroll(page);

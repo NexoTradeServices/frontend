@@ -4,8 +4,8 @@
 // then the job (her description and answers, the office's Instruction
 // notes), and the two answers. Accept (green, filled) and Decline (outlined)
 // are fixed at the bottom on a phone and sit right-aligned under the cards
-// from md up. Decline opens ONE step - a single optional note, "Anything Mike
-// should know?" - and Back returns with nothing sent. After an answer: one
+// from md up. Decline opens ONE step - a single optional note box - and Back
+// returns with nothing sent. After an answer: one
 // line and "Go to your jobs". The page carries no money (Contractor messages).
 "use client";
 
@@ -216,11 +216,9 @@ export function RespondView({ token, job }: { token: string; job: RespondOpen })
           </p>
         </div>
         <section className={`${cardClass} flex flex-col gap-1.5`}>
-          <label htmlFor="decline-note" className="text-sm font-bold text-ink">
-            Anything Mike should know?
-          </label>
           <textarea
             id="decline-note"
+            aria-label="Decline note"
             value={note}
             maxLength={NOTE_MAX}
             onChange={(event) => setNote(event.target.value)}
