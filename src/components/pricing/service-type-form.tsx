@@ -155,7 +155,7 @@ export function ServiceTypeForm({
       {saved ? <Banner kind="success">Saved.</Banner> : null}
 
       {mode === "create" ? (
-        <div className="mb-4.5 rounded-[10px] border border-hairline bg-surface p-5">
+        <div className="mb-4.5 rounded-card border border-hairline bg-surface p-5">
           <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Trade</h3>
           <Field
             id="trade"
@@ -169,7 +169,7 @@ export function ServiceTypeForm({
         </div>
       ) : null}
 
-      <div className="mb-4.5 rounded-[10px] border border-hairline bg-surface p-5">
+      <div className="mb-4.5 rounded-card border border-hairline bg-surface p-5">
         <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Customer rates</h3>
         <div className="flex flex-wrap gap-4">
           <div className="min-w-[200px] flex-1">
@@ -208,7 +208,7 @@ export function ServiceTypeForm({
         </div>
       </div>
 
-      <div className="mb-4.5 rounded-[10px] border border-hairline bg-surface p-5">
+      <div className="mb-4.5 rounded-card border border-hairline bg-surface p-5">
         <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Service-level multipliers</h3>
 
         <LockedField
@@ -259,7 +259,7 @@ export function ServiceTypeForm({
         </div>
       </div>
 
-      <div className="mb-4.5 rounded-[10px] border border-hairline bg-surface p-5">
+      <div className="mb-4.5 rounded-card border border-hairline bg-surface p-5">
         <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Prefilled enquiry options</h3>
         <RepeatableRows
           label="Option"

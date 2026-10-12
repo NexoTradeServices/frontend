@@ -53,10 +53,15 @@ test("AC2, AC26: the page leads with when, where and who to ask for; Decline sho
   await page.goto(job.respondPath);
 
   await expect(page.getByRole("banner")).toBeVisible();
-  await expect(page.getByRole("heading", { name: `Plumbing - ${job.reference}` })).toBeVisible();
+  const title = page.getByRole("heading", { name: `Plumbing - ${job.reference}` });
+  await expect(title).toBeVisible();
+  // 9001 AC4: the Page title token -- heading font, 800, 22px from Tablet up.
+  await expect(title).toHaveCSS("font-size", "22px");
+  await expect(title).toHaveCSS("font-weight", "800");
   await expect(page.getByText("New job for you, Bob")).toBeVisible();
   await expect(page.getByText("When", { exact: true })).toBeVisible();
-  await expect(page.getByText(/\d\d\/\d\d, \d{1,2}:\d\dam AWST|\d\d\/\d\d, \d{1,2}:\d\dpm AWST/).first()).toBeVisible();
+  // 9001 AC3: the slot is written out, "Thu 15 Oct, 8:00am AWST" -- never a date in numbers.
+  await expect(page.getByText(/[A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}( \d{4})?, \d{1,2}:\d\d(am|pm) AWST/).first()).toBeVisible();
   await expect(page.getByText("14 Marine Terrace, Fremantle")).toBeVisible();
   // No site contact on this job: the customer's name is who to ask for.
   await expect(page.getByText("Site contact", { exact: true })).toBeVisible();
@@ -68,8 +73,12 @@ test("AC2, AC26: the page leads with when, where and who to ask for; Decline sho
   // AC26: Decline opens the note step; Back returns to the job.
   await page.getByRole("button", { name: "Decline", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Decline this job?" })).toBeVisible();
-  await expect(page.getByLabel("Anything Mike should know?")).toBeVisible();
+  await expect(page.getByLabel("Decline note")).toBeVisible();
   await expect(page.getByRole("button", { name: "Decline the job" })).toBeVisible();
+  // 9001 AC8: the reason box and the Outlined Back button sit on the hairline border (#e6e2db).
+  await expect(page.getByLabel("Decline note")).toHaveCSS("border-top-color", "rgb(230, 226, 219)");
+  await expect(page.getByRole("button", { name: "Back", exact: true })).toHaveCSS("border-top-color", "rgb(230, 226, 219)");
+  await expect(page.getByRole("heading", { name: "Decline this job?" })).toHaveCSS("font-size", "22px");
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.getByRole("button", { name: "Accept", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: `Plumbing - ${job.reference}` })).toBeVisible();
@@ -98,6 +107,12 @@ test("AC7, AC9: Accept shows You're booked, and the link then reads Already answ
   // BKLG-027: the link now says it was answered, naming the accept.
   await page.goto(job.respondPath);
   await expect(page.getByRole("heading", { name: "Already answered" })).toBeVisible();
+  // 9001 AC5: the one Message card, in the Narrow container, its title at the Page title size.
+  const card = page.getByTestId("message-card");
+  await expect(card).toBeVisible();
+  await expect(page.locator('[data-container="narrow"]').getByTestId("message-card")).toBeVisible();
+  await expect(card.getByRole("heading", { name: "Already answered" })).toHaveCSS("font-size", "22px");
+  await expect(card.getByRole("heading", { name: "Already answered" })).toHaveCSS("font-weight", "800");
   await expect(page.getByText(new RegExp(`You accepted ${job.reference} on`))).toBeVisible();
   await expect(page.getByRole("link", { name: "Go to your jobs" })).toBeVisible();
 });
@@ -110,7 +125,7 @@ test("AC18, AC21, AC23: Decline with a note -> Declined; Mike's queue badges the
   const note = "Still on another job in Kalamunda that morning";
   await page.goto(job.respondPath);
   await page.getByRole("button", { name: "Decline", exact: true }).click();
-  await page.getByLabel("Anything Mike should know?").fill(note);
+  await page.getByLabel("Decline note").fill(note);
   await page.getByRole("button", { name: "Decline the job" }).click();
   await expect(page.getByRole("heading", { name: "Declined", exact: true })).toBeVisible();
   await expect(page.getByText(`${job.reference} is back with the office.`)).toBeVisible();
@@ -134,6 +149,7 @@ test("AC18, AC21, AC23: Decline with a note -> Declined; Mike's queue badges the
 test("AC25: a link that does not exist reads \"This link doesn't work\" and offers the office number", async ({ page }) => {
   await page.goto("/a/this-is-not-a-real-link");
   await expect(page.getByRole("heading", { name: "This link doesn't work" })).toBeVisible();
+  await expect(page.getByTestId("message-card")).toBeVisible();
   const ring = page.getByRole("link", { name: /^Ring the office - / });
   await expect(ring).toBeVisible();
   await expect(ring).toHaveAttribute("href", /^tel:\d+$/);
@@ -146,6 +162,9 @@ test.describe("on a phone", () => {
     const job = await newJob(page, request, "phone");
     await page.goto(job.respondPath);
     await expect(page.getByRole("heading", { name: `Plumbing - ${job.reference}` })).toBeVisible();
+    // 9001 AC4: 20px on a phone, weight 800.
+    await expect(page.getByRole("heading", { name: `Plumbing - ${job.reference}` })).toHaveCSS("font-size", "20px");
+    await expect(page.getByRole("heading", { name: `Plumbing - ${job.reference}` })).toHaveCSS("font-weight", "800");
 
     const accept = page.getByRole("button", { name: "Accept", exact: true });
     const decline = page.getByRole("button", { name: "Decline", exact: true });
@@ -169,7 +188,7 @@ test.describe("on a phone", () => {
 
     // The note step is just as reachable.
     await decline.click();
-    await expect(page.getByLabel("Anything Mike should know?")).toBeVisible();
+    await expect(page.getByLabel("Decline note")).toBeVisible();
     await expect(page.getByRole("button", { name: "Decline the job" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Back", exact: true })).toBeVisible();
     await expectNoSidewaysScroll(page);

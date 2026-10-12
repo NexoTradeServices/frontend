@@ -6,5 +6,5 @@ export function Banner({ kind, children }: { kind: "error" | "success" | "warnin
       : kind === "warning"
         ? "border-warning-bg bg-warning-bg text-brand-warning"
         : "border-success-border bg-success-bg text-brand-success";
-  return <div className={`mb-4 rounded-md border px-3 py-2.5 text-[13px] ${styles}`}>{children}</div>;
+  return <div className={`mb-4 rounded-button border px-3 py-2.5 text-small ${styles}`}>{children}</div>;
 }

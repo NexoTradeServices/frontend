@@ -3,7 +3,7 @@
 // bring a job on.
 export function EmptyDashboard() {
   return (
-    <div className="rounded-[9px] border border-hairline bg-surface px-4 py-7.5 text-center">
+    <div className="rounded-card border border-hairline bg-surface px-4 py-7.5 text-center">
       <div
         aria-hidden="true"
         className="mx-auto mb-3 flex size-11 items-center justify-center rounded-full border border-hairline bg-ground text-lg text-muted-text"

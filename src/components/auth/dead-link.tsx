@@ -2,18 +2,18 @@
 //
 // Expired or already-used, both land here: one page, the fix as the primary
 // action. Confirmed live on the Portal Login Gate style reference.
-import { GateCard, GateCardTitle } from "./gate-shell";
-import { PrimaryLink, TextLink } from "./buttons";
+import { MessageCard } from "@/components/ui/message-card";
+import { TextLink } from "./buttons";
 
+// Feature 9001: the one shared Message card, with today's words.
 export function DeadLink() {
   return (
-    <GateCard>
-      <GateCardTitle
-        title="This link has expired"
-        subtitle="Reset links work once and expire after an hour"
-      />
-      <PrimaryLink href="/forgot-password">Email me a fresh link</PrimaryLink>
-      <TextLink href="/">Back to log in</TextLink>
-    </GateCard>
+    <MessageCard
+      title="This link has expired"
+      primary={{ label: "Email me a fresh link", href: "/forgot-password" }}
+      link={<TextLink href="/">Back to log in</TextLink>}
+    >
+      Reset links work once and expire after an hour
+    </MessageCard>
   );
 }

@@ -152,7 +152,7 @@ test("AC13-AC16: the Messages card lists the enquiry's two messages -- to whom, 
     await expect(row).toHaveCount(1);
     await expect(row).toContainText(to);
     await expect(row).toContainText("Email");
-    await expect(row).toContainText(/\d{2}\/\d{2}\/\d{2} \d{1,2}:\d{2}(am|pm)/);
+    await expect(row).toContainText(/\d{1,2} [A-Z][a-z]{2} \d{4}, \d{1,2}:\d{2}(am|pm)/);
     await expect(row.locator("[data-message-status]")).toHaveText(words);
   }
   await expect(card.getByTestId("message-card").first()).toBeHidden();

@@ -26,7 +26,7 @@ interface Slot {
 
 /**
  * A random Tuesday-to-Friday half hour between 7:00am and 4:00pm, 1-17 weeks
- * after Monday 2027-03-01 -- inside Bob's fixture licence (30/06/27). Never a
+ * after Monday 2027-03-01 -- inside Bob's fixture licence (30 Jun 2027). Never a
  * Monday morning and never a weekend: 4002's own spec books Monday 7-10am
  * slots from a finite pool, and a weekend would state the weekend price.
  */

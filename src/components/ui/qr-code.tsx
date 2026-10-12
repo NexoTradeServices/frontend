@@ -33,7 +33,7 @@ export function QrCode({ value, caption }: { value: string; caption?: string }) 
         height={SIZE}
         viewBox={`${String(-quiet)} ${String(-quiet)} ${String(box)} ${String(box)}`}
         shapeRendering="crispEdges"
-        className="rounded-md border border-hairline"
+        className="rounded-button border border-hairline"
         style={{ background: "var(--qr-surface)" }}
       >
         <path d={squares.join("")} fill="var(--qr-ink)" />

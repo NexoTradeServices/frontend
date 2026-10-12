@@ -52,10 +52,10 @@ export function isBlankRow(row: TimeEntryRow): boolean {
   return row.start === "" && row.note.trim() === "" && (row.endIsDefault || row.end === "");
 }
 
-const labelClass = "mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
+const labelClass = "mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase";
 const starClass = "after:ml-0.5 after:text-brand-destructive after:content-['*']";
 const boxClass =
-  "min-h-[44px] w-full rounded-md border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10";
+  "min-h-[44px] w-full rounded-button border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10";
 
 function Control({
   id,
@@ -85,7 +85,7 @@ function LockedBox({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
       <span className={labelClass}>{label}</span>
-      <div className="flex min-h-[44px] items-center gap-2 rounded-md border border-hairline bg-ground px-2.5 py-2 text-sm text-ink">
+      <div className="flex min-h-[44px] items-center gap-2 rounded-button border border-hairline bg-ground px-2.5 py-2 text-sm text-ink">
         <Lock aria-hidden className="size-3.5 shrink-0 text-muted-text" />
         <span className="whitespace-pre-wrap">{value}</span>
       </div>
@@ -126,7 +126,7 @@ export function TimeEntryRows({
   if (mode !== "edit") {
     return (
       <div>
-        {rows.length === 0 ? <p className="text-[13px] text-muted-text">No time entered.</p> : null}
+        {rows.length === 0 ? <p className="text-small text-muted-text">No time entered.</p> : null}
         {rows.map((row, index) => (
           <div key={row.key} className={index > 0 ? "mt-3.5 border-t border-hairline pt-3.5" : undefined}>
             <div className={rowGrid}>
@@ -218,7 +218,7 @@ export function TimeEntryRows({
               type="button"
               aria-label={`Delete visit ${String(index + 1)}`}
               onClick={() => onChange?.(rows.length === 1 ? [newEntryRow(zone)] : rows.filter((_, i) => i !== index))}
-              className="mt-1 min-h-11 text-[13px] font-semibold text-secondary-text underline underline-offset-2"
+              className="mt-1 min-h-11 text-small font-semibold text-secondary-text underline underline-offset-2"
             >
               Delete
             </button>
@@ -229,7 +229,7 @@ export function TimeEntryRows({
       <button
         type="button"
         onClick={() => onChange?.([...rows, newEntryRow(zone)])}
-        className="mt-1 min-h-11 text-[13px] font-semibold text-secondary-text underline underline-offset-2"
+        className="mt-1 min-h-11 text-small font-semibold text-secondary-text underline underline-offset-2"
       >
         + Add a visit
       </button>

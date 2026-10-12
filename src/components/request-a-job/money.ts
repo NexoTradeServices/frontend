@@ -1,6 +1,7 @@
 // Whole-cent-integer money, formatted for a person -- Feature 3001. Mirrors
 // backend/src/enquiries/money.ts so the estimate shown here and the rate
 // frozen on the job never disagree (plan decision 5).
+import { formatDate, weekdayName } from "@/lib/date-format";
 export function formatDollars(cents: number): string {
   const dollars = cents / 100;
   return `$${Number.isInteger(dollars) ? String(dollars) : dollars.toFixed(2)}`;
@@ -22,12 +23,10 @@ export function todayYmd(): string {
 
 /** "Wednesday" -- the day name for the Price step's summary row. */
 export function formatDayName(yyyyMmDd: string): string {
-  return new Intl.DateTimeFormat("en-AU", { weekday: "long", timeZone: "UTC" }).format(new Date(`${yyyyMmDd}T00:00:00Z`));
+  return weekdayName(yyyyMmDd);
 }
 
 /** "9 Sep 2026" -- a friendly date for the Price step's summary row. */
 export function formatFriendlyDate(yyyyMmDd: string): string {
-  return new Intl.DateTimeFormat("en-AU", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(
-    new Date(`${yyyyMmDd}T00:00:00Z`),
-  );
+  return formatDate(yyyyMmDd);
 }

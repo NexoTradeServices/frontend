@@ -1,5 +1,6 @@
 // How a visit's dates, times and money read -- Feature 5001.
 // Times are the JOB's own wall clock (Data Model / Time), never the viewer's.
+import { formatDate } from "./date-format";
 
 /** "08:07" -> "8:07am". */
 export function formatClock(time: string): string {
@@ -12,9 +13,7 @@ export function formatClock(time: string): string {
 
 /** "2026-10-07" -> "7 Oct 2026". */
 export function formatVisitDate(date: string): string {
-  const parsed = new Date(`${date}T00:00:00Z`);
-  if (Number.isNaN(parsed.getTime())) return date;
-  return new Intl.DateTimeFormat("en-AU", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(parsed);
+  return formatDate(date);
 }
 
 /** The job's calendar date and clock right now, as the date and time boxes hold them. */

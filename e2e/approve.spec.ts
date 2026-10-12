@@ -35,7 +35,11 @@ test.describe(() => {
       const path = await approveLinkFor(request, draft.reference);
 
       await page.goto(path);
-      await expect(page.getByRole("heading", { name: `Draft invoice ${draft.reference}`, level: 1 })).toBeVisible();
+      const title = page.getByRole("heading", { name: `Draft invoice ${draft.reference}`, level: 1 });
+      await expect(title).toBeVisible();
+      // 9001 AC4: the Page title token -- heading font, 800, 20px on a phone (22px from Tablet up).
+      await expect(title).toHaveCSS("font-size", "20px");
+      await expect(title).toHaveCSS("font-weight", "800");
       await expect(page.getByTestId("approve-intro")).toContainText("Check it, then approve. If something is wrong, ring the office on");
       await expect(page.getByTestId("approve-intro")).toContainText("before approving.");
       await expect(page.getByTestId("approve-intro").getByRole("link")).toHaveAttribute("href", /^tel:\d+$/);
@@ -79,6 +83,8 @@ test.describe(() => {
       // The same link, opened again: Already approved.
       await page.goto(path);
       await expect(page.getByRole("heading", { name: "Already approved", level: 1 })).toBeVisible();
+      // 9001 AC5: the one Message card, in the Narrow container.
+      await expect(page.locator('[data-container="narrow"]').getByTestId("message-card")).toBeVisible();
       await expect(page.getByText(new RegExp(`^You approved ${draft.reference} on \\d{1,2} [A-Z][a-z]{2} \\d{4}\\. You'll be paid on [A-Z][a-z]{2} \\d{1,2} [A-Z][a-z]{2}\\.$`))).toBeVisible();
       await expect(page.getByRole("link", { name: "See your payouts" })).toBeVisible();
     });

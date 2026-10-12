@@ -16,8 +16,8 @@ import Link from "next/link";
 export type PrimarySize = "full" | "compact";
 
 const sizeClasses: Record<PrimarySize, string> = {
-  full: "mt-1.5 block min-h-[52px] w-full rounded-md px-4 py-3.5 text-center text-sm font-bold text-on-accent",
-  compact: "inline-block min-h-11 rounded-md px-[18px] py-2.5 text-center text-sm font-bold text-on-accent",
+  full: "mt-1.5 block min-h-[52px] w-full rounded-button px-4 py-3.5 text-center text-sm font-bold text-on-accent",
+  compact: "inline-block min-h-11 rounded-button px-[18px] py-2.5 text-center text-sm font-bold text-on-accent",
 };
 
 interface PrimaryButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -46,7 +46,7 @@ export function PrimaryButton({
         <span className="inline-flex items-center justify-center gap-1.5">
           <span
             aria-hidden
-            className="inline-block size-3 animate-spin rounded-full border-2 border-white/45 border-t-white"
+            className="inline-block size-3 animate-spin rounded-full border-2 border-on-accent/45 border-t-on-accent"
           />
           {loadingLabel ?? children}
         </span>
@@ -77,7 +77,7 @@ export function PrimaryLink({
 }
 
 const textLinkClass =
-  "mt-3.5 block min-h-[44px] w-full py-2.5 text-center text-[13px] font-semibold text-secondary-text underline underline-offset-2";
+  "mt-3.5 block min-h-[44px] w-full py-2.5 text-center text-small font-semibold text-secondary-text underline underline-offset-2";
 
 export function TextLink({
   href,

@@ -31,11 +31,11 @@ export default async function ContractorRatesPage() {
           <RatesCard key={specialty.trade} specialty={specialty} />
         ))}
       </div>
-      <p className="mt-3 border-t border-hairline pt-2.5 text-[13px] text-secondary-text">
+      <p className="mt-3 border-t border-hairline pt-2.5 text-small text-secondary-text">
         Call-out covers turning up and your first hour, once per job. Every hour after that is the hourly rate, in
         15-minute blocks.
       </p>
-      <p className="text-[13px] text-secondary-text">Weekend work pays you one and a half times.</p>
+      <p className="text-small text-secondary-text">Weekend work pays you one and a half times.</p>
     </Container>
   );
 }

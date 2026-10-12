@@ -32,7 +32,7 @@ export function StatusTag({ status, label }: { status: JobStatus; label?: string
   return (
     <span
       data-status={status}
-      className={`inline-block shrink-0 rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] whitespace-nowrap uppercase ${PAIRS[status]}`}
+      className={`inline-block shrink-0 rounded px-2 py-0.5 text-field-label font-bold tracking-[0.04em] whitespace-nowrap uppercase ${PAIRS[status]}`}
     >
       {label ?? STATUS_LABELS[status]}
     </span>

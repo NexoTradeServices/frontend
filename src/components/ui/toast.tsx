@@ -24,7 +24,7 @@ export function useToast(): [string | null, (message: string) => void] {
 export function Toast({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <div className="fixed right-5 bottom-5 z-50 max-w-[360px] rounded-lg bg-ink px-4 py-3 text-[13px] text-white shadow-lg">
+    <div className="fixed right-5 bottom-5 z-50 max-w-[360px] rounded-small-box bg-ink px-4 py-3 text-small text-on-ink shadow-lg">
       {message}
     </div>
   );

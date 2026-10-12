@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { StatusTag } from "@/components/ui/status-tag";
+import { FilterRow } from "@/components/ui/filter-row";
 import { SOURCE_LABELS, type QueueResult, type QueueRow, type StatusFilter } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -79,10 +80,10 @@ function QueueTable({ rows }: { rows: QueueRow[] }) {
   // Tighter cells below 1024px: a tablet gets the full width but still has
   // to fit seven columns. The box scrolls on its own if a row ever cannot
   // fit -- a column is never clipped, and the page never scrolls sideways.
-  const th = "border-b border-hairline px-2 py-2.5 text-left align-bottom text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase lg:px-3";
+  const th = "border-b border-hairline px-2 py-2.5 text-left align-bottom text-field-label font-bold tracking-[0.08em] text-muted-text uppercase lg:px-3";
   const td = "border-b border-hairline px-2 py-3 align-top text-secondary-text lg:px-3";
   return (
-    <div className="hidden overflow-x-auto rounded-[10px] border border-hairline bg-surface md:block">
+    <div className="hidden overflow-x-auto rounded-card border border-hairline bg-surface md:block">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
@@ -111,7 +112,7 @@ function QueueTable({ rows }: { rows: QueueRow[] }) {
                 <Link
                   href={jobHref(row)}
                   onClick={(event) => event.stopPropagation()}
-                  className="mb-1 block font-heading text-[13px] font-extrabold text-ink"
+                  className="mb-1 block font-heading text-small font-extrabold text-ink"
                 >
                   {row.reference}
                 </Link>
@@ -158,16 +159,16 @@ function QueueCards({ rows }: { rows: QueueRow[] }) {
           key={row.reference}
           href={jobHref(row)}
           data-ref={row.reference}
-          className="block rounded-[10px] border border-hairline bg-surface p-3.5"
+          className="block rounded-card border border-hairline bg-surface p-3.5"
         >
           <div className="flex items-center justify-between gap-2">
-            <span className="font-heading text-[13px] font-extrabold text-ink">{row.reference}</span>
+            <span className="font-heading text-small font-extrabold text-ink">{row.reference}</span>
             <StatusTag status={row.status} />
           </div>
-          <div className="mt-1.5 mb-0.5 font-heading text-[15px] font-extrabold text-ink">
+          <div className="mt-1.5 mb-0.5 font-heading text-name font-extrabold text-ink">
             {row.customerName} <span className="font-body text-xs font-normal text-muted-text">{row.customerCode}</span>
           </div>
-          <div className="text-[13px] text-secondary-text">
+          <div className="text-small text-secondary-text">
             <span className="block">
               {row.trade} - {row.suburb} {row.postcode}
             </span>
@@ -195,7 +196,7 @@ function QueueCards({ rows }: { rows: QueueRow[] }) {
 
 function EmptyState({ searched }: { searched: string }) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-[10px] border border-hairline bg-surface px-5 py-8 text-center text-sm text-secondary-text">
+    <div className="flex flex-col items-center gap-2 rounded-card border border-hairline bg-surface px-5 py-8 text-center text-sm text-secondary-text">
       <svg aria-hidden viewBox="0 0 24 24" className="size-6 text-muted-text" fill="none">
         <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="2" />
         <path d="M3 13h5l1.5 2h5L16 13h5" stroke="currentColor" strokeWidth="2" />
@@ -312,38 +313,22 @@ export function JobQueue({ initial }: { initial: QueueResult }) {
           placeholder="Search job, customer code, name or phone"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          className="min-h-11 w-full max-w-[420px] min-w-0 flex-[1_1_280px] rounded-md border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
+          className="min-h-11 w-full max-w-[420px] min-w-0 flex-[1_1_280px] rounded-button border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
         />
-        <div
-          role="group"
-          aria-label="Filter by status"
-          className="-mx-4 flex min-w-0 flex-[1_1_100%] flex-nowrap gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:flex-[0_1_auto] md:flex-wrap md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden"
-        >
-          {CHIPS.map((chip) => {
-            const pressed = searched === "" && status === chip.key;
-            return (
-              <button
-                key={chip.key}
-                type="button"
-                aria-pressed={pressed}
-                onClick={() => chooseChip(chip.key)}
-                className={`min-h-11 shrink-0 rounded-full border px-3 text-[13px] font-semibold ${
-                  pressed ? "border-ink bg-ink text-white" : "border-hairline bg-surface text-secondary-text"
-                }`}
-              >
-                {chip.label}
-                <span className="ml-1 tabular-nums opacity-75">{data.counts[chip.key]}</span>
-              </button>
-            );
-          })}
-        </div>
+        <FilterRow
+          label="Filter by status"
+          pills={CHIPS.map((chip) => ({ key: chip.key, label: chip.label, count: data.counts[chip.key] }))}
+          chosen={searched === "" ? status : null}
+          onChoose={(key) => chooseChip(key as StatusFilter)}
+          className="min-w-0 flex-[1_1_100%] md:flex-[0_1_auto]"
+        />
         <span className="text-xs text-muted-text tabular-nums md:ml-auto">
           Updated {data.updatedLabel} - refreshes every 30 seconds
         </span>
       </div>
 
       {error ? (
-        <p role="status" className="mb-3 rounded-md border border-error-border bg-error-bg px-3 py-2 text-[13px] text-brand-destructive">
+        <p role="status" className="mb-3 rounded-button border border-error-border bg-error-bg px-3 py-2 text-small text-brand-destructive">
           {error}
         </p>
       ) : null}
@@ -366,7 +351,7 @@ export function JobQueue({ initial }: { initial: QueueResult }) {
               type="button"
               onClick={() => void loadMore()}
               disabled={loadingMore}
-              className="min-h-11 rounded-md border border-hairline bg-surface px-4 text-sm font-bold text-ink disabled:opacity-60"
+              className="min-h-11 rounded-button border border-hairline bg-surface px-4 text-sm font-bold text-ink disabled:opacity-60"
             >
               {loadingMore ? "Loading..." : "Load 50 more"}
             </button>

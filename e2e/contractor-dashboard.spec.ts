@@ -70,6 +70,10 @@ test.describe(() => {
     await expect(margaretCard.getByText("Applecross")).toBeVisible();
     await expect(margaretCard.getByText("No return date yet")).toBeVisible();
 
+    // 9001 AC8: the Record cards are on the card corner, 10px.
+    await expect(page.getByRole("link", { name: /JOB-1051/ })).toHaveCSS("border-top-left-radius", "10px");
+    await expect(page.getByRole("link", { name: /JOB-1051/ })).toHaveCSS("border-top-color", "rgb(230, 226, 219)");
+
     // AC6: Bob is ready and has nothing missing -- no readiness panel.
     await expect(page.getByText("Not ready to dispatch")).toHaveCount(0);
   });
@@ -78,6 +82,8 @@ test.describe(() => {
     await page.goto("/contractor");
     await login(page, "dave@idelta.com.au");
     await expect(page.getByText("Nothing on your list right now.")).toBeVisible();
+    // 9001 AC8: the empty state is a card, 10px corners.
+    await expect(page.getByText("Nothing on your list right now.").locator("xpath=..")).toHaveCSS("border-top-left-radius", "10px");
   });
 
   test("AC7: Priya's panel -- her own two items, Mike's one, no address/EC nudge", async ({ page }) => {

@@ -364,7 +364,7 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
         {formError ? <Banner kind="error">{formError}</Banner> : null}
 
         {contractor ? (
-          <div className={`rounded-lg p-3.5 text-[13px] ${contractor.ready ? "bg-success-bg text-brand-success" : "bg-warning-bg text-brand-warning"}`}>
+          <div className={`rounded-button p-3.5 text-small ${contractor.ready ? "bg-success-bg text-brand-success" : "bg-warning-bg text-brand-warning"}`}>
             {contractor.ready ? (
               <b>{readyBannerText(contractor)}</b>
             ) : (
@@ -388,7 +388,7 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
           </div>
         ) : null}
 
-        <div className="rounded-[10px] border border-hairline bg-surface p-5">
+        <div className="rounded-card border border-hairline bg-surface p-5">
           <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Contractor</h3>
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
             <Field label="Name" id="f-name" required value={fields.name} onChange={(e) => set("name", e.target.value)} error={fieldErrors["name"]} />
@@ -440,15 +440,15 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
         </div>
 
         {contractor ? (
-          <div className="rounded-[10px] border border-hairline bg-surface p-5">
+          <div className="rounded-card border border-hairline bg-surface p-5">
             <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Login</h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <span className="mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase">Login email</span>
+                <span className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase">Login email</span>
                 <b className="text-ink">{contractor.email}</b>
               </div>
               <div>
-                <span className="text-[13px] text-secondary-text">
+                <span className="text-small text-secondary-text">
                   {contractor.hasCredential && contractor.credentialSetAt
                     ? `Login setup completed: ${fmtDate(contractor.credentialSetAt)}`
                     : "Login setup: not yet completed"}
@@ -460,7 +460,7 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
                     type="button"
                     onClick={() => void handleResend()}
                     disabled={resending}
-                    className="text-[13px] font-semibold text-secondary-text underline underline-offset-2 disabled:opacity-50"
+                    className="text-small font-semibold text-secondary-text underline underline-offset-2 disabled:opacity-50"
                   >
                     Resend welcome email
                   </button>
@@ -470,7 +470,7 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
           </div>
         ) : null}
 
-        <div className="rounded-[10px] border border-hairline bg-surface p-5">
+        <div className="rounded-card border border-hairline bg-surface p-5">
           <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">
             Trades <small className="text-xs font-normal text-muted-text">what we pay this contractor, per trade</small>
           </h3>
@@ -483,7 +483,7 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
           />
         </div>
 
-        <div className="rounded-[10px] border border-hairline bg-surface p-5">
+        <div className="rounded-card border border-hairline bg-surface p-5">
           <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">
             Insurance <small className="text-xs font-normal text-muted-text">one public-liability policy covering all trades</small>
           </h3>
@@ -512,7 +512,7 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
           </div>
         </div>
 
-        <div className="rounded-[10px] border border-hairline bg-surface p-5">
+        <div className="rounded-card border border-hairline bg-surface p-5">
           <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">
             Payout <small className="text-xs font-normal text-muted-text">weekly bank transfer</small>
           </h3>
@@ -575,7 +575,7 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
         </div>
 
         {contractor ? (
-          <div className="rounded-[10px] border border-hairline bg-surface p-5">
+          <div className="rounded-card border border-hairline bg-surface p-5">
             <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Contractor status</h3>
             <label className="flex items-center gap-2.5">
               <ToggleSwitch checked={activeState} onChange={handleStatusToggle} label="Contractor status" />
@@ -601,14 +601,14 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
           <button
             type="button"
             onClick={() => router.push("/ops/contractors")}
-            className="min-h-11 rounded-md border border-hairline bg-surface px-4 py-2.5 text-sm font-bold text-ink"
+            className="min-h-11 rounded-button border border-hairline bg-surface px-4 py-2.5 text-sm font-bold text-ink"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving || addressPicking}
-            className={`min-h-11 min-w-[140px] rounded-md px-5 py-2.5 text-sm font-bold text-on-accent ${
+            className={`min-h-11 min-w-[140px] rounded-button px-5 py-2.5 text-sm font-bold text-on-accent ${
               saving || addressPicking ? "bg-brand-accent-loading" : "bg-brand-accent"
             }`}
           >

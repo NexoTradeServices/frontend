@@ -12,7 +12,7 @@ import { LoadFailed } from "@/components/ui/load-failed";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-const tagClass = "inline-block shrink-0 rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] whitespace-nowrap uppercase";
+const tagClass = "inline-block shrink-0 rounded px-2 py-0.5 text-field-label font-bold tracking-[0.04em] whitespace-nowrap uppercase";
 const TAGS = {
   draft: { label: "Awaiting your approval", colours: "bg-warning-bg text-brand-warning" },
   approved: { label: "Approved", colours: "bg-status-cancelled-bg text-status-cancelled" },
@@ -37,7 +37,7 @@ export default async function ContractorSettlementPage({ params }: { params: Pro
           subtitle="This invoice isn't one of yours."
           breadcrumb={PAYOUTS_CRUMB}
         />
-        <div className="rounded-[10px] border border-hairline bg-surface p-4 text-sm text-secondary-text md:p-5">
+        <div className="rounded-card border border-hairline bg-surface p-4 text-sm text-secondary-text md:p-5">
           We couldn&apos;t find that invoice. Your invoices are on the Payouts page.
         </div>
       </Container>
@@ -71,7 +71,7 @@ export default async function ContractorSettlementPage({ params }: { params: Pro
               type="button"
               disabled
               data-testid="approve-later"
-              className="flex min-h-[52px] w-full items-center justify-center rounded-md bg-hairline px-4 md:self-start text-sm font-bold text-muted-text md:min-h-11 md:w-auto md:min-w-40"
+              className="flex min-h-[52px] w-full items-center justify-center rounded-button bg-hairline px-4 md:self-start text-sm font-bold text-muted-text md:min-h-11 md:w-auto md:min-w-40"
             >
               Approve
             </button>

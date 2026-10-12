@@ -24,7 +24,7 @@ export function JobCard({ job }: { job: JobCardDto }) {
       <p className="text-sm tabular-nums text-secondary-text">{job.slotLabel ?? "No return date yet"}</p>
     </>
   );
-  const cardClass = "block rounded-[9px] border border-hairline bg-surface p-3.5";
+  const cardClass = "block rounded-card border border-hairline bg-surface p-3.5";
   if (!job.opens) return <div className={cardClass}>{body}</div>;
   return (
     <Link

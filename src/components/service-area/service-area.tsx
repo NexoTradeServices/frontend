@@ -266,12 +266,12 @@ export function ServiceArea({
   return (
     <div className="flex flex-col gap-4">
       {formError ? (
-        <div className="rounded-lg border border-error-border bg-error-bg p-3.5 text-[13px] text-brand-destructive">
+        <div className="rounded-button border border-error-border bg-error-bg p-3.5 text-small text-brand-destructive">
           <b>Not saved.</b> {formError.replace(/^Not saved\.\s*/, "")}
         </div>
       ) : null}
 
-      <div className="rounded-[10px] border border-hairline bg-surface p-5">
+      <div className="rounded-card border border-hairline bg-surface p-5">
         <h3 className="mb-1.5 font-heading text-base font-extrabold text-ink">Core location</h3>
         <p className="mb-3.5 text-xs text-muted-text">
           {mode === "ops"
@@ -291,7 +291,7 @@ export function ServiceArea({
         />
       </div>
 
-      <div className="rounded-[10px] border border-hairline bg-surface p-5">
+      <div className="rounded-card border border-hairline bg-surface p-5">
         <h3 className="mb-1.5 font-heading text-base font-extrabold text-ink">Radius</h3>
         <p className="mb-3.5 text-xs text-muted-text">
           {mode === "ops"
@@ -312,18 +312,18 @@ export function ServiceArea({
           onKeyUp={(e) => commitKm(Number(e.currentTarget.value))}
           className="h-11 w-full accent-brand-accent"
         />
-        <div className="flex justify-between text-[11px] text-muted-text">
+        <div className="flex justify-between text-field-label text-muted-text">
           <span>{MIN_KM} km</span>
           <span>{MAX_KM} km</span>
         </div>
       </div>
 
-      <div className="rounded-[10px] border border-hairline bg-surface p-5">
+      <div className="rounded-card border border-hairline bg-surface p-5">
         <h3 className="mb-1.5 font-heading text-base font-extrabold text-ink">
           Postcodes
         </h3>
         {!pin ? (
-          <div className="rounded-lg bg-warning-bg p-3.5 text-[13px] text-brand-warning">
+          <div className="rounded-button bg-warning-bg p-3.5 text-small text-brand-warning">
             <b>Pick the suburb first.</b> The postcodes in range appear here once there is a pin.
           </div>
         ) : (
@@ -335,29 +335,29 @@ export function ServiceArea({
               <div className="flex flex-wrap gap-4">
                 <div>
                   <div className="font-heading text-lg font-extrabold text-ink">{inRange.length}</div>
-                  <div className="text-[11px] text-muted-text">in range</div>
+                  <div className="text-field-label text-muted-text">in range</div>
                 </div>
                 <div>
                   <div className="font-heading text-lg font-extrabold text-brand-success">{kept.length}</div>
-                  <div className="text-[11px] text-muted-text">kept</div>
+                  <div className="text-field-label text-muted-text">kept</div>
                 </div>
                 <div>
                   <div className="font-heading text-lg font-extrabold text-muted-text">{crossedCount}</div>
-                  <div className="text-[11px] text-muted-text">crossed off</div>
+                  <div className="text-field-label text-muted-text">crossed off</div>
                 </div>
               </div>
               <div className="flex gap-3">
                 <button
                   type="button"
                   onClick={keepAllInRange}
-                  className="text-[12px] font-semibold text-secondary-text underline underline-offset-2"
+                  className="text-caption font-semibold text-secondary-text underline underline-offset-2"
                 >
                   Tick all
                 </button>
                 <button
                   type="button"
                   onClick={crossAllInRange}
-                  className="text-[12px] font-semibold text-secondary-text underline underline-offset-2"
+                  className="text-caption font-semibold text-secondary-text underline underline-offset-2"
                 >
                   Untick all
                 </button>
@@ -372,7 +372,7 @@ export function ServiceArea({
                     type="button"
                     aria-pressed={!off}
                     onClick={() => toggleChip(row.postcode)}
-                    className={`min-h-9 rounded-full px-3.5 py-2 text-left text-[13px] font-semibold ${
+                    className={`min-h-11 rounded-full px-3.5 py-2 text-left text-small font-semibold ${
                       off
                         ? "border border-dashed border-hairline text-muted-text line-through"
                         : "border border-transparent bg-success-bg text-brand-success"
@@ -392,7 +392,7 @@ export function ServiceArea({
         <button
           type="button"
           onClick={handleCancel}
-          className="min-h-11 rounded-md border border-hairline bg-surface px-4 py-2.5 text-sm font-bold text-ink"
+          className="min-h-11 rounded-button border border-hairline bg-surface px-4 py-2.5 text-sm font-bold text-ink"
         >
           {mode === "ops" ? "Cancel" : "Undo changes"}
         </button>
@@ -400,7 +400,7 @@ export function ServiceArea({
           type="button"
           onClick={() => void handleSave()}
           disabled={saving || addressPicking}
-          className={`min-h-11 min-w-[180px] rounded-md px-5 py-2.5 text-sm font-bold text-on-accent ${
+          className={`min-h-11 min-w-[180px] rounded-button px-5 py-2.5 text-sm font-bold text-on-accent ${
             saving || addressPicking ? "bg-brand-accent-loading" : "bg-brand-accent"
           }`}
         >

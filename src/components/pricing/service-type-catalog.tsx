@@ -26,7 +26,7 @@ export function ServiceTypeCatalog({ serviceTypes }: { serviceTypes: ServiceType
       </div>
 
       {serviceTypes.length === 0 ? (
-        <div className="rounded-[10px] border border-hairline bg-surface p-5 text-sm text-muted-text">
+        <div className="rounded-card border border-hairline bg-surface p-5 text-sm text-muted-text">
           No trades yet. Add one to get started.
         </div>
       ) : (
@@ -34,10 +34,10 @@ export function ServiceTypeCatalog({ serviceTypes }: { serviceTypes: ServiceType
           {serviceTypes.map((serviceType) => (
             <div
               key={serviceType.id}
-              className="flex items-center justify-between rounded-[10px] border border-hairline bg-surface p-4"
+              className="flex items-center justify-between rounded-card border border-hairline bg-surface p-4"
             >
               <div>
-                <b className="block font-heading text-[15px] font-extrabold text-ink">{serviceType.trade}</b>
+                <b className="block font-heading text-name font-extrabold text-ink">{serviceType.trade}</b>
                 <span className="text-xs text-muted-text">
                   Call-out ${dollars(serviceType.customerCalloutRate)} / standard $
                   {dollars(serviceType.customerStandardRate)} per hour
@@ -46,7 +46,7 @@ export function ServiceTypeCatalog({ serviceTypes }: { serviceTypes: ServiceType
               <Link
                 href={`/ops/pricing/${serviceType.id}`}
                 aria-label={`Edit ${serviceType.trade}`}
-                className="text-[13px] font-semibold text-secondary-text underline underline-offset-2"
+                className="text-small font-semibold text-secondary-text underline underline-offset-2"
               >
                 Edit
               </Link>

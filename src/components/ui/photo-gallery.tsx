@@ -25,7 +25,7 @@ export interface ReadOnlyPhoto {
 }
 
 const gridClass = "grid grid-cols-3 gap-3.5 md:grid-cols-5";
-const cellClass = "relative aspect-square overflow-hidden rounded-md border border-hairline bg-ground";
+const cellClass = "relative aspect-square overflow-hidden rounded-button border border-hairline bg-ground";
 const captionClass = "mt-1 block text-xs text-muted-text";
 
 const NAME_LIMIT = 14;
@@ -49,7 +49,7 @@ function Spinner() {
     <span
       role="status"
       aria-label="Uploading"
-      className="inline-block size-4 animate-spin rounded-full border-2 border-white/45 border-t-white"
+      className="inline-block size-4 animate-spin rounded-full border-2 border-on-ink/45 border-t-on-ink"
     />
   );
 }
@@ -86,7 +86,7 @@ function EditableCell({ photo, onRemove }: { photo: GalleryPhoto; onRemove: (id:
           aria-label={`Remove ${photo.fileName}`}
           className="absolute top-0 right-0 flex size-11 items-start justify-end p-1.5"
         >
-          <span className="flex size-5 items-center justify-center rounded-full bg-ink/75 text-white">
+          <span className="flex size-5 items-center justify-center rounded-full bg-ink/75 text-on-ink">
             <X aria-hidden className="size-3" />
           </span>
         </button>
@@ -132,7 +132,7 @@ export function PhotoGallery({
         {photos.length < limit ? (
           <li className="min-w-0">
             <label
-              className={`${cellClass} flex flex-col items-center justify-center gap-1 border-dashed text-[13px] font-semibold text-secondary-text focus-within:ring-2 focus-within:ring-ink/30 ${
+              className={`${cellClass} flex flex-col items-center justify-center gap-1 border-dashed text-small font-semibold text-secondary-text focus-within:ring-2 focus-within:ring-ink/30 ${
                 addDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
               }`}
             >

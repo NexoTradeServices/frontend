@@ -1,65 +1,22 @@
-// The approve page's Message cards -- Feature 6003, settlement run.
+// The approve page's Message cards -- Feature 6003, settlement run; the shared Message card by 9001.
 //
 // frontend-conventions.md: Templates / Shells (Focused shell: the Wordmark bar, no menu -- drawn
 // by the shell's layout file since Feature 1018, with the width from the Container), Organisms / Cards (Message card: up to 420px, an optional icon, a
 // Page title, one line of text, one Primary, an optional Link), Pages / Link pages and dead links
 // (a dead link names why and carries the fix as its one Primary).
-import Link from "next/link";
-import type { ReactNode } from "react";
+import { MessageCard, type MessagePrimary } from "@/components/ui/message-card";
 import { telHref } from "./money";
 import type { ApproveDead } from "./types";
 
-const bigButton =
-  "flex min-h-[52px] w-full items-center justify-center rounded-md px-4 text-center text-sm font-bold md:min-h-11";
+const SEE_YOUR_PAYOUTS: MessagePrimary = { label: "See your payouts", href: "/contractor/payouts" };
 
-/** A Message card: the page has one thing to say. */
-export function MessageCard({
-  title,
-  success = false,
-  children,
-  action,
-}: {
-  title: string;
-  /** the green tick in a soft green circle above the title */
-  success?: boolean;
-  children: ReactNode;
-  action?: ReactNode;
-}) {
-  return (
-    <section data-testid="message-card" className="flex w-full flex-col items-center gap-2.5 rounded-[10px] border border-hairline bg-surface p-5 text-center">
-      {success ? (
-        <span aria-hidden className="flex size-12 items-center justify-center rounded-full bg-success-bg text-brand-success">
-          <svg viewBox="0 0 24 24" className="size-6" fill="none">
-            <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
-      ) : null}
-      <h1 className="font-heading text-xl font-extrabold text-ink md:text-[22px]">{title}</h1>
-      <p className="text-sm text-secondary-text">{children}</p>
-      {action}
-    </section>
-  );
-}
-
-export function SeeYourSettlements() {
-  return (
-    <Link href="/contractor/payouts" className={`${bigButton} bg-brand-accent text-on-accent`}>
-      See your payouts
-    </Link>
-  );
-}
-
-export function RingTheOffice({ phone }: { phone: string }) {
-  return (
-    <a href={telHref(phone)} className={`${bigButton} bg-brand-accent text-on-accent`}>
-      Ring the office - {phone}
-    </a>
-  );
+function ringTheOffice(phone: string): MessagePrimary {
+  return { label: `Ring the office - ${phone}`, href: telHref(phone) };
 }
 
 export function ApprovedCard({ payDay }: { payDay: string }) {
   return (
-    <MessageCard title="Approved" success action={<SeeYourSettlements />}>
+    <MessageCard title="Approved" success primary={SEE_YOUR_PAYOUTS}>
       You&apos;ll be paid on {payDay}.
     </MessageCard>
   );
@@ -72,14 +29,14 @@ export function DeadApproveCard({ dead }: { dead: ApproveDead }) {
   }
   if (dead.state === "approved") {
     return (
-      <MessageCard title="Already approved" action={<SeeYourSettlements />}>
+      <MessageCard title="Already approved" primary={SEE_YOUR_PAYOUTS}>
         You approved {dead.reference} on {dead.approvedLabel}.{" "}
         {dead.paid ? "It has been paid." : `You'll be paid on ${dead.payDay}.`}
       </MessageCard>
     );
   }
   return (
-    <MessageCard title="This link doesn't work" action={<RingTheOffice phone={dead.officePhone} />}>
+    <MessageCard title="This link doesn't work" primary={ringTheOffice(dead.officePhone)}>
       Use the link in your latest email, or ring the office.
     </MessageCard>
   );

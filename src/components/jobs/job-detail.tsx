@@ -31,7 +31,7 @@ import type { ApiError, CustomerRating, EarlierBooking, InvoiceView, JobDetail, 
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-const labelClass = "block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
+const labelClass = "block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase";
 
 function Card({
   title,
@@ -46,7 +46,7 @@ function Card({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[10px] border border-hairline bg-surface p-5">
+    <section className="rounded-card border border-hairline bg-surface p-5">
       <h2 className="font-heading text-base font-extrabold text-ink">
         {title}
         {aside ? <small className="ml-1.5 font-body text-xs font-normal text-muted-text">{aside}</small> : null}
@@ -105,14 +105,14 @@ function RequestCard({ job }: { job: JobDetail }) {
               ))}
             </ul>
           ) : (
-            <p className="text-[13px] font-normal text-muted-text">None answered</p>
+            <p className="text-small font-normal text-muted-text">None answered</p>
           )}
         </Fact>
         <Fact label="Photos" wide>
           {job.photos.length > 0 ? (
             <ReadOnlyPhotoGallery photos={job.photos} />
           ) : (
-            <p className="text-[13px] font-normal text-muted-text">No photos</p>
+            <p className="text-small font-normal text-muted-text">No photos</p>
           )}
         </Fact>
       </div>
@@ -151,7 +151,7 @@ function ActionPlaceholders({ job }: { job: JobDetail }) {
           key={action.label}
           type="button"
           disabled
-          className="min-h-11 rounded-md border border-hairline bg-transparent px-3.5 text-[13px] font-bold text-muted-text"
+          className="min-h-11 rounded-button border border-hairline bg-transparent px-3.5 text-small font-bold text-muted-text"
         >
           {action.label} - coming in {action.feature}
         </button>
@@ -167,7 +167,7 @@ function EarlierBookings({ bookings }: { bookings: EarlierBooking[] }) {
     <div className="mt-3.5 flex flex-col gap-2 border-t border-hairline pt-3" data-testid="earlier-bookings">
       <span className={labelClass}>Earlier bookings</span>
       {bookings.map((booking, index) => (
-        <div key={index} className="text-[13px]">
+        <div key={index} className="text-small">
           <div className="text-ink">
             <b>{booking.contractorName}</b> <span className="text-secondary-text">{booking.contractorCode}</span> -{" "}
             {booking.what.toLowerCase()} <span className="tabular-nums">{booking.whenLabel}</span>
@@ -183,7 +183,7 @@ function EarlierBookings({ bookings }: { bookings: EarlierBooking[] }) {
 }
 
 const outlinedButton =
-  "inline-flex min-h-11 items-center rounded-md border border-hairline bg-surface px-3.5 text-[13px] font-bold text-ink";
+  "inline-flex min-h-11 items-center rounded-button border border-hairline bg-surface px-3.5 text-small font-bold text-ink";
 
 const CANCEL_REASON_OPTIONS = [
   { value: "", label: "Choose a reason" },
@@ -362,7 +362,7 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
             <div>
               <label
                 htmlFor="cancel-note"
-                className={`mb-[5px] block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase ${
+                className={`mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase ${
                   reason === "other" ? "after:ml-0.5 after:text-brand-destructive after:content-['*']" : ""
                 }`}
               >
@@ -379,7 +379,7 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
                   setNote(event.target.value);
                   setNoteError(undefined);
                 }}
-                className={`w-full rounded-md border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
+                className={`w-full rounded-button border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
                   noteError ? "border-brand-destructive" : "border-hairline"
                 }`}
               />
@@ -414,7 +414,7 @@ function ContractorCard({ job, onChanged }: { job: JobDetail; onChanged: (next: 
         </div>
       ) : job.canDispatch ? (
         <>
-          <p className="mb-2 text-[13px] text-muted-text">Not dispatched yet.</p>
+          <p className="mb-2 text-small text-muted-text">Not dispatched yet.</p>
           <PrimaryLink
             href={`/ops/jobs/${encodeURIComponent(job.reference)}/dispatch`}
             className="md:mt-0 md:inline-block md:min-h-11 md:w-auto md:px-[18px] md:py-2.5"
@@ -424,18 +424,18 @@ function ContractorCard({ job, onChanged }: { job: JobDetail; onChanged: (next: 
         </>
       ) : job.dispatchBlockedReason ? (
         <div className="flex flex-col gap-2">
-          <p className="text-[13px] text-muted-text">Not dispatched yet.</p>
+          <p className="text-small text-muted-text">Not dispatched yet.</p>
           <p className="text-xs text-brand-warning">{job.dispatchBlockedReason}</p>
           <button
             type="button"
             disabled
-            className="min-h-[52px] w-full rounded-md border border-hairline bg-ground px-4 text-sm font-bold text-muted-text md:min-h-11 md:w-auto md:px-[18px]"
+            className="min-h-[52px] w-full rounded-button border border-hairline bg-ground px-4 text-sm font-bold text-muted-text md:min-h-11 md:w-auto md:px-[18px]"
           >
             Dispatch
           </button>
         </div>
       ) : (
-        <p className="text-[13px] text-muted-text">Not dispatched yet.</p>
+        <p className="text-small text-muted-text">Not dispatched yet.</p>
       )}
       <EarlierBookings bookings={job.earlierBookings} />
       <JobActions job={job} onChanged={onChanged} />
@@ -518,7 +518,7 @@ function TimeOnSiteCard({
         <div className="mt-3.5 border-t border-hairline pt-3.5">
           <span className={labelClass}>Parts</span>
           {visit.parts.length === 0 ? (
-            <p className="mt-1 text-[13px] text-muted-text">No parts.</p>
+            <p className="mt-1 text-small text-muted-text">No parts.</p>
           ) : (
             <table className="mt-1.5 w-full text-sm">
               <thead>
@@ -570,7 +570,7 @@ function TimeOnSiteCard({
             setErrors({});
             setFormError(undefined);
           }}
-          className="min-h-[52px] w-full rounded-md border border-hairline bg-surface px-4 text-sm font-bold text-ink disabled:opacity-50 md:min-h-11 md:w-auto md:px-[18px]"
+          className="min-h-[52px] w-full rounded-button border border-hairline bg-surface px-4 text-sm font-bold text-ink disabled:opacity-50 md:min-h-11 md:w-auto md:px-[18px]"
         >
           Cancel
         </button>
@@ -588,7 +588,7 @@ function TimeOnSiteCard({
           <button
             type="button"
             disabled
-            className="min-h-[52px] w-full rounded-md border border-hairline bg-ground px-4 text-sm font-bold text-muted-text md:min-h-11 md:w-auto md:px-[18px]"
+            className="min-h-[52px] w-full rounded-button border border-hairline bg-ground px-4 text-sm font-bold text-muted-text md:min-h-11 md:w-auto md:px-[18px]"
           >
             Save
           </button>
@@ -627,7 +627,7 @@ function CustomerRatingCard({ job }: { job: JobDetail }) {
     <Card title="Customer rating" aside={job.customer.code}>
       <span
         data-testid="rating-label"
-        className={`inline-block rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] whitespace-nowrap uppercase ${label.pair}`}
+        className={`inline-block rounded px-2 py-0.5 text-field-label font-bold tracking-[0.04em] whitespace-nowrap uppercase ${label.pair}`}
       >
         {label.text}
       </span>
@@ -997,7 +997,7 @@ function AddressesCard({
           <button
             type="button"
             disabled
-            className="min-h-[52px] w-full rounded-md border border-hairline bg-ground px-4 text-sm font-bold text-muted-text md:min-h-11 md:w-auto md:px-[18px]"
+            className="min-h-[52px] w-full rounded-button border border-hairline bg-ground px-4 text-sm font-bold text-muted-text md:min-h-11 md:w-auto md:px-[18px]"
           >
             {picking ? "Picking address..." : "Save"}
           </button>
@@ -1018,7 +1018,7 @@ function MessageTag({ message }: { message: MessageView }) {
   return (
     <span
       data-message-status={message.status}
-      className={`inline-block shrink-0 rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] whitespace-nowrap uppercase ${MESSAGE_TAGS[message.status]}`}
+      className={`inline-block shrink-0 rounded px-2 py-0.5 text-field-label font-bold tracking-[0.04em] whitespace-nowrap uppercase ${MESSAGE_TAGS[message.status]}`}
     >
       {message.statusLabel}
     </span>
@@ -1038,7 +1038,7 @@ function BilledTo({ billedTo }: { billedTo: InvoiceView["billedTo"] }) {
   return (
     <>
       {billedTo.businessName}
-      <span className="block text-[13px] font-normal text-secondary-text">Attn: {billedTo.name}</span>
+      <span className="block text-small font-normal text-secondary-text">Attn: {billedTo.name}</span>
     </>
   );
 }
@@ -1073,7 +1073,7 @@ function InvoiceCard({
   const [error, setError] = useState<string | undefined>();
   const tag = INVOICE_TAGS[invoice.waitingForPayLink ? "waiting" : invoice.status];
   // A table header cell: the Field label look without its `block`, which would take the cell out of the row.
-  const th = "pb-1.5 text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
+  const th = "pb-1.5 text-field-label font-bold tracking-[0.08em] text-muted-text uppercase";
 
   async function resend() {
     setError(undefined);
@@ -1140,19 +1140,19 @@ function InvoiceCard({
       <div className="mb-3.5">
         <span
           data-testid="invoice-status"
-          className={`inline-block shrink-0 rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] whitespace-nowrap uppercase ${tag.pair}`}
+          className={`inline-block shrink-0 rounded px-2 py-0.5 text-field-label font-bold tracking-[0.04em] whitespace-nowrap uppercase ${tag.pair}`}
         >
           {tag.label}
         </span>
         {invoice.waitingForPayLink ? (
-          <p className="mt-1.5 text-[13px] text-muted-text">
+          <p className="mt-1.5 text-small text-muted-text">
             Stripe has not answered yet. The invoice goes out by email and text as soon as it does.
           </p>
         ) : null}
 
       </div>
       {error ? (
-        <p role="alert" className="mb-3.5 rounded-md border border-error-border bg-error-bg px-3 py-2.5 text-[13px] text-brand-destructive">
+        <p role="alert" className="mb-3.5 rounded-button border border-error-border bg-error-bg px-3 py-2.5 text-small text-brand-destructive">
           {error}
         </p>
       ) : null}
@@ -1212,11 +1212,11 @@ function InvoiceCard({
         <div className="mt-3.5 border-t border-hairline pt-3">
           {/* Check payment's answer sits right above its button (the owner's call at UAT). */}
           {checkError ? (
-            <p role="alert" data-testid="payment-check-error" className="mb-1 rounded-md border border-error-border bg-error-bg px-3 py-2.5 text-[13px] text-brand-destructive">
+            <p role="alert" data-testid="payment-check-error" className="mb-1 rounded-button border border-error-border bg-error-bg px-3 py-2.5 text-small text-brand-destructive">
               {checkError}
             </p>
           ) : checkedLine !== null ? (
-            <p data-testid="payment-check" role="status" className="mb-1 rounded-md border border-brand-warning/30 bg-warning-bg px-3 py-2.5 text-[13px] text-brand-warning">
+            <p data-testid="payment-check" role="status" className="mb-1 rounded-button border border-brand-warning/30 bg-warning-bg px-3 py-2.5 text-small text-brand-warning">
               {checkedLine}
             </p>
           ) : null}
@@ -1251,12 +1251,12 @@ function InvoiceCard({
 
 /** Feature 4008: every message sent about the job, newest first -- a table from 768px, cards below (Patterns / Table to cards). */
 function MessagesCard({ job }: { job: JobDetail }) {
-  const th = "border-b border-hairline px-2 py-2.5 text-left align-bottom text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
+  const th = "border-b border-hairline px-2 py-2.5 text-left align-bottom text-field-label font-bold tracking-[0.08em] text-muted-text uppercase";
   const td = "border-b border-hairline px-2 py-3 align-top text-secondary-text";
   return (
     <Card title="Messages">
       {job.messages.length === 0 ? (
-        <p className="text-[13px] text-muted-text">No messages yet.</p>
+        <p className="text-small text-muted-text">No messages yet.</p>
       ) : (
         <>
           <div className="hidden overflow-x-auto md:block">
@@ -1326,7 +1326,7 @@ function NoteTypeTag({ type }: { type: string }) {
   const warn = type === "dispute" || type === "complaint";
   return (
     <span
-      className={`inline-block rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] uppercase ${
+      className={`inline-block rounded px-2 py-0.5 text-field-label font-bold tracking-[0.04em] uppercase ${
         warn ? "bg-warning-bg text-brand-warning" : "bg-secondary text-secondary-text"
       }`}
     >
@@ -1336,7 +1336,7 @@ function NoteTypeTag({ type }: { type: string }) {
 }
 
 const textareaClass =
-  "min-h-[72px] w-full resize-y rounded-md border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10";
+  "min-h-[72px] w-full resize-y rounded-button border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10";
 
 function NotesCard({
   job,
@@ -1457,7 +1457,7 @@ function NotesCard({
             type="button"
             onClick={() => void add()}
             disabled={adding}
-            className="min-h-11 rounded-md border border-hairline bg-surface px-4 text-sm font-bold text-ink disabled:opacity-60"
+            className="min-h-11 rounded-button border border-hairline bg-surface px-4 text-sm font-bold text-ink disabled:opacity-60"
           >
             {adding ? "Adding..." : "Add note"}
           </button>
@@ -1465,7 +1465,7 @@ function NotesCard({
       </div>
 
       {job.notes.length === 0 ? (
-        <p className="mt-3.5 border-t border-hairline pt-3 text-[13px] text-muted-text">No notes yet.</p>
+        <p className="mt-3.5 border-t border-hairline pt-3 text-small text-muted-text">No notes yet.</p>
       ) : (
         <ul className="mt-3.5">
           {job.notes.map((note, index) => (
@@ -1510,7 +1510,7 @@ function NotesCard({
                       type="button"
                       onClick={() => void saveEdit(note.id ?? "")}
                       disabled={savingEdit}
-                      className="min-h-11 rounded-md border border-hairline bg-surface px-4 text-sm font-bold text-ink disabled:opacity-60"
+                      className="min-h-11 rounded-button border border-hairline bg-surface px-4 text-sm font-bold text-ink disabled:opacity-60"
                     >
                       {savingEdit ? "Saving..." : "Save note"}
                     </button>

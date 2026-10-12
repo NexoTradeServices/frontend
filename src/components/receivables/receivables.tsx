@@ -21,8 +21,8 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 const PAGE_SIZE = 50;
 const REFRESH_MS = 30_000;
 
-const labelClass = "block text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
-const tagClass = "inline-block shrink-0 rounded px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] whitespace-nowrap uppercase";
+const labelClass = "block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase";
+const tagClass = "inline-block shrink-0 rounded px-2 py-0.5 text-field-label font-bold tracking-[0.04em] whitespace-nowrap uppercase";
 const warningTag = `${tagClass} bg-warning-bg text-brand-warning`;
 
 async function fetchReceivables(params: { after?: string; limit?: number }): Promise<ReceivablesResult> {
@@ -64,7 +64,7 @@ function WhereItStands({ row }: { row: ReceivableRow }) {
 
 function ReceivablesTable({ rows }: { rows: ReceivableRow[] }) {
   const router = useRouter();
-  const th = "border-b border-hairline px-3 py-2.5 text-left align-bottom text-[11px] font-bold tracking-[0.08em] text-muted-text uppercase";
+  const th = "border-b border-hairline px-3 py-2.5 text-left align-bottom text-field-label font-bold tracking-[0.08em] text-muted-text uppercase";
   const td = "border-b border-hairline px-3 py-2.5 align-top text-secondary-text";
   return (
     <div className="hidden overflow-x-auto md:block">
@@ -96,7 +96,7 @@ function ReceivablesTable({ rows }: { rows: ReceivableRow[] }) {
                 <Link
                   href={jobHref(row)}
                   onClick={(event) => event.stopPropagation()}
-                  className="font-heading text-[13px] font-extrabold text-ink"
+                  className="font-heading text-small font-extrabold text-ink"
                 >
                   {row.invoiceReference}
                 </Link>
@@ -127,16 +127,16 @@ function ReceivableCards({ rows }: { rows: ReceivableRow[] }) {
           key={row.invoiceReference}
           href={jobHref(row)}
           data-ref={row.invoiceReference}
-          className="block rounded-[10px] border border-hairline bg-surface p-3.5"
+          className="block rounded-card border border-hairline bg-surface p-3.5"
         >
           <div className="flex items-center justify-between gap-2">
-            <span className="font-heading text-[13px] font-extrabold text-ink">{row.invoiceReference}</span>
+            <span className="font-heading text-small font-extrabold text-ink">{row.invoiceReference}</span>
             <WhereItStands row={row} />
           </div>
-          <div className="mt-1.5 mb-0.5 font-heading text-[15px] font-extrabold text-ink">
+          <div className="mt-1.5 mb-0.5 font-heading text-name font-extrabold text-ink">
             {row.billedTo.businessName ?? row.billedTo.name}
           </div>
-          <div className="text-[13px] text-muted-text">
+          <div className="text-small text-muted-text">
             {row.billedTo.businessName !== null ? <span className="block">Attn: {row.billedTo.name}</span> : null}
             <span className="block tabular-nums">
               {formatDollars(row.amount)} - due {row.dueLabel}
@@ -236,12 +236,12 @@ export function Receivables({ initial }: { initial: ReceivablesResult }) {
       </div>
 
       {error ? (
-        <p role="status" className="rounded-md border border-error-border bg-error-bg px-3 py-2 text-[13px] text-brand-destructive">
+        <p role="status" className="rounded-button border border-error-border bg-error-bg px-3 py-2 text-small text-brand-destructive">
           {error}
         </p>
       ) : null}
 
-      <section className="rounded-[10px] border border-hairline bg-surface p-4 md:p-5">
+      <section className="rounded-card border border-hairline bg-surface p-4 md:p-5">
         <h2 className="font-heading text-base font-extrabold text-ink">Still owed</h2>
         <div className="mt-3.5">
           {data.rows.length === 0 ? (
@@ -262,7 +262,7 @@ export function Receivables({ initial }: { initial: ReceivablesResult }) {
               type="button"
               onClick={() => void loadMore()}
               disabled={loadingMore}
-              className="min-h-11 w-full rounded-md border border-hairline bg-surface px-4 text-sm font-bold text-ink disabled:opacity-60 md:w-auto"
+              className="min-h-11 w-full rounded-button border border-hairline bg-surface px-4 text-sm font-bold text-ink disabled:opacity-60 md:w-auto"
             >
               {loadingMore ? "Loading..." : "Load 50 more"}
             </button>

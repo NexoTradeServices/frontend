@@ -47,7 +47,7 @@ export function CalendarDayView({
   onStepDay,
   loading = false,
 }: {
-  /** e.g. "Bob's Monday 14/09" -- the caller composes it, this component only draws the grid. */
+  /** e.g. "Bob's Mon 14 Sep" -- the caller composes it, this component only draws the grid. */
   dayLabel: string;
   blocks: DayBlock[];
   proposedStart: number;
@@ -73,7 +73,7 @@ export function CalendarDayView({
   for (let m = DAY_START; m < DAY_END; m += 30) rows.push(m);
 
   return (
-    <div className="mt-2 rounded-[10px] border border-hairline bg-surface p-3">
+    <div className="mt-2 rounded-card border border-hairline bg-surface p-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-heading text-sm font-extrabold text-ink">{dayLabel}</h3>
         <div className="flex gap-1.5">
@@ -81,7 +81,7 @@ export function CalendarDayView({
             type="button"
             onClick={() => onStepDay(-1)}
             aria-label="Previous day"
-            className="flex min-h-11 min-w-11 items-center justify-center rounded-md border border-hairline bg-surface text-base font-bold text-ink"
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-button border border-hairline bg-surface text-base font-bold text-ink"
           >
             <span aria-hidden>&#8249;</span>
           </button>
@@ -89,7 +89,7 @@ export function CalendarDayView({
             type="button"
             onClick={() => onStepDay(1)}
             aria-label="Next day"
-            className="flex min-h-11 min-w-11 items-center justify-center rounded-md border border-hairline bg-surface text-base font-bold text-ink"
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-button border border-hairline bg-surface text-base font-bold text-ink"
           >
             <span aria-hidden>&#8250;</span>
           </button>
@@ -99,7 +99,7 @@ export function CalendarDayView({
       <div
         ref={scrollRef}
         aria-busy={loading}
-        className="relative max-h-[440px] overflow-y-auto rounded-md border border-hairline"
+        className="relative max-h-[440px] overflow-y-auto rounded-small-box border border-hairline"
       >
         <div className="relative grid grid-cols-[58px_1fr]">
           {rows.map((minutes) => {
@@ -107,7 +107,7 @@ export function CalendarDayView({
             return (
               <div key={minutes} className="contents">
                 <div
-                  className={`h-11 pt-0.5 pl-1 text-[11px] tabular-nums ${half ? "text-transparent" : "text-muted-text"}`}
+                  className={`h-11 pt-0.5 pl-1 text-field-label tabular-nums ${half ? "text-transparent" : "text-muted-text"}`}
                   aria-hidden
                 >
                   {timeLabelFor(minutes)}
@@ -128,7 +128,7 @@ export function CalendarDayView({
               <div
                 key={`${String(block.startMinutes)}-${String(index)}`}
                 style={{ top: `${String(topOf(block.startMinutes) + 2)}px`, height: `${String(topOf(block.endMinutes) - topOf(block.startMinutes) - 4)}px` }}
-                className={`absolute inset-x-1.5 overflow-hidden rounded-md border px-2 py-1 text-xs ${
+                className={`absolute inset-x-1.5 overflow-hidden rounded-small-box border px-2 py-1 text-xs ${
                   block.kind === "hold"
                     ? "border-dashed border-status-assigned bg-status-assigned-bg text-status-assigned"
                     : "border-status-scheduled bg-status-scheduled-bg text-status-scheduled"
@@ -140,7 +140,7 @@ export function CalendarDayView({
             ))}
             <div
               style={{ top: `${String(topOf(proposedStart) + 2)}px`, height: `${String(Math.max(topOf(proposedEnd) - topOf(proposedStart) - 4, ROW_HEIGHT - 4))}px` }}
-              className={`absolute inset-x-6 overflow-hidden rounded-md border-2 border-dashed px-2 py-1 text-xs font-semibold ${
+              className={`absolute inset-x-6 overflow-hidden rounded-small-box border-2 border-dashed px-2 py-1 text-xs font-semibold ${
                 clashes ? "border-brand-destructive bg-error-bg text-brand-destructive" : "border-brand-accent bg-brand-accent/10 text-ink"
               }`}
             >

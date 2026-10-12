@@ -120,6 +120,10 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     const trade = nonPlumbing(formData.serviceTypes);
 
     await page.goto("/request-a-job");
+    // 9001 AC4: the page title is the Page title token -- heading font, 800, 22px from Tablet up.
+    const pageTitle = page.getByRole("heading", { level: 1 });
+    await expect(pageTitle).toHaveCSS("font-size", "22px");
+    await expect(pageTitle).toHaveCSS("font-weight", "800");
     // AC8: required fields carry a star; the word "(optional)" is never used.
     expect(await hasRequiredStar(page, "Suburb")).toBe(true);
     await expect(page.getByText("(optional)")).toHaveCount(0);
@@ -156,6 +160,14 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     const businessName = page.getByLabel("Business name");
     await expect(businessName).toBeVisible();
     await expect(businessName).toHaveValue("");
+    // 9001 AC7: every checkbox is 20px, and its whole row is a 44px-tall tap area.
+    for (const name of ["Send me offers and updates by email", "Send me offers and updates by SMS"]) {
+      const box = await page.getByLabel(name).boundingBox();
+      expect(box?.width).toBe(20);
+      expect(box?.height).toBe(20);
+      const row = await page.locator("label", { hasText: name }).boundingBox();
+      expect(row?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
     expect(await hasRequiredStar(page, "Business name")).toBe(false);
     await expect(page.getByText("Only if this job is for a business", { exact: true })).toBeVisible();
     const phoneBox = await page.getByLabel("Phone").boundingBox();
@@ -167,10 +179,21 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     await expect(page.getByText("Standard Rate")).toBeVisible();
     await expect(page.getByText(formatDollars(trade.customerCalloutRate), { exact: true })).toBeVisible();
     await expect(page.getByText(`then ${formatDollars(trade.customerStandardRate)} per additional hour`)).toBeVisible();
+    // 9001 AC8: the Price box is on ground fill, small-box corners (8px), no orange border or ring.
+    const priceBox = page.getByTestId("price-box");
+    await expect(priceBox).toHaveCSS("background-color", "rgb(250, 249, 247)");
+    await expect(priceBox).toHaveCSS("border-top-width", "0px");
+    await expect(priceBox).toHaveCSS("border-top-left-radius", "8px");
+    await expect(priceBox).toHaveCSS("box-shadow", "none");
 
     await page.getByRole("button", { name: "Request a job" }).click();
     await expect(page).toHaveURL(/\/request-a-job\/confirmed\?ref=JOB-/, { timeout: 20_000 });
     await expect(page.getByRole("heading", { name: "We've got it." })).toBeVisible();
+    // 9001 AC4/AC5: the one Message card in the Narrow container, its title at 22px, 800, with the green tick.
+    await expect(page.locator('[data-container="narrow"]').getByTestId("message-card")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "We've got it." })).toHaveCSS("font-size", "22px");
+    await expect(page.getByRole("heading", { name: "We've got it." })).toHaveCSS("font-weight", "800");
+    await expect(page.getByTestId("message-card").locator("span.bg-success-bg svg")).toBeVisible();
     await expect(page.getByText("We'll call you shortly to confirm a time.")).toBeVisible();
     await expect(page.getByText(/^JOB-\d+$/)).toBeVisible();
     // AC4: no "Set a password" offer -- that ships with 3004.
