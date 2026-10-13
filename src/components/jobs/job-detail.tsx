@@ -1202,16 +1202,6 @@ function InvoiceCard({
             Stripe has not answered yet. The invoice goes out by email and text as soon as it does.
           </p>
         ) : null}
-        {invoice.voided ? (
-          <div className="mt-2.5 grid grid-cols-2 gap-x-4.5 gap-y-3.5 sm:grid-cols-4" data-testid="invoice-voided">
-            <Fact label="Voided">
-              {invoice.voided.atLabel} by {invoice.voided.byName}
-            </Fact>
-            <Fact label="Reason" wide>
-              <span className="font-normal whitespace-pre-wrap">{invoice.voided.reason}</span>
-            </Fact>
-          </div>
-        ) : null}
       </div>
       {error ? (
         <p role="alert" className="mb-3.5 rounded-button border border-error-border bg-error-bg px-3 py-2.5 text-small text-brand-destructive">
@@ -1270,6 +1260,14 @@ function InvoiceCard({
           )}
         </tfoot>
       </table>
+      {invoice.voided ? (
+        <div className="mt-3.5 border-t border-hairline pt-3 text-small text-secondary-text" data-testid="invoice-voided">
+          <p className="font-bold text-ink">
+            Voided {invoice.voided.atLabel} by {invoice.voided.byName}
+          </p>
+          <p className="mt-1 whitespace-pre-wrap">Reason: {invoice.voided.reason}</p>
+        </div>
+      ) : null}
       {invoice.canResend || invoice.canCheckPayment || invoice.canVoid ? (
         <div className="mt-3.5 border-t border-hairline pt-3">
           {voidRefusal ? (
