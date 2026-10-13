@@ -1057,12 +1057,14 @@ function InvoiceCard({
   invoice,
   onSent,
   onPaid,
+  onRefreshed,
   onToast,
 }: {
   job: JobDetail;
   invoice: InvoiceView;
   onSent: (next: JobDetail, message: string) => void;
   onPaid: (next: JobDetail) => void;
+  onRefreshed: (next: JobDetail) => void;
   onToast: (message: string) => void;
 }) {
   const [resending, setResending] = useState(false);
@@ -1071,7 +1073,15 @@ function InvoiceCard({
   const [checkedLine, setCheckedLine] = useState<string | null>(null);
   const [checkError, setCheckError] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();
+  // Feature 6008: Void invoice -- the destructive dialog, its required reason, and a refusal shown above the buttons.
+  const [voidOpen, setVoidOpen] = useState(false);
+  const [voidReason, setVoidReason] = useState("");
+  const [voidReasonError, setVoidReasonError] = useState<string | undefined>();
+  const [voiding, setVoiding] = useState(false);
+  const [voidRefusal, setVoidRefusal] = useState<string | undefined>();
   const tag = INVOICE_TAGS[invoice.waitingForPayLink ? "waiting" : invoice.status];
+  const customerFirst = firstNameOf(invoice.billedTo.name);
+  const contractorFirst = job.contractor ? firstNameOf(job.contractor.name) : "the contractor";
   // A table header cell: the Field label look without its `block`, which would take the cell out of the row.
   const th = "pb-1.5 text-field-label font-bold tracking-[0.08em] text-muted-text uppercase";
 
@@ -1125,6 +1135,49 @@ function InvoiceCard({
     }
   }
 
+  function closeVoid() {
+    setVoidOpen(false);
+    setVoidReason("");
+    setVoidReasonError(undefined);
+  }
+
+  async function confirmVoid() {
+    if (voidReason.trim() === "") {
+      setVoidReasonError("Give a reason for voiding.");
+      return;
+    }
+    setVoidReasonError(undefined);
+    setVoiding(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(job.reference)}/invoice/void`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: voidReason.trim() }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as Partial<JobDetail> & Partial<ApiError>;
+      if (res.ok) {
+        closeVoid();
+        setVoidRefusal(undefined);
+        onSent(payload as JobDetail, "Invoice voided");
+        return;
+      }
+      if (res.status === 400) {
+        setVoidReasonError(payload.error ?? "Give a reason for voiding.");
+        return;
+      }
+      // Refused (paid meanwhile, already void): the server's words above the buttons, and the card refreshes.
+      closeVoid();
+      setVoidRefusal(payload.error ?? "This invoice can't be voided.");
+      const fresh = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(job.reference)}`, { credentials: "include", cache: "no-store" });
+      if (fresh.ok) onRefreshed((await fresh.json()) as JobDetail);
+    } catch {
+      setVoidReasonError("Couldn't void the invoice - check your connection and try again.");
+    } finally {
+      setVoiding(false);
+    }
+  }
+
   async function copyLink() {
     if (invoice.payLinkUrl === null) return;
     try {
@@ -1149,7 +1202,16 @@ function InvoiceCard({
             Stripe has not answered yet. The invoice goes out by email and text as soon as it does.
           </p>
         ) : null}
-
+        {invoice.voided ? (
+          <div className="mt-2.5 grid grid-cols-2 gap-x-4.5 gap-y-3.5 sm:grid-cols-4" data-testid="invoice-voided">
+            <Fact label="Voided">
+              {invoice.voided.atLabel} by {invoice.voided.byName}
+            </Fact>
+            <Fact label="Reason" wide>
+              <span className="font-normal whitespace-pre-wrap">{invoice.voided.reason}</span>
+            </Fact>
+          </div>
+        ) : null}
       </div>
       {error ? (
         <p role="alert" className="mb-3.5 rounded-button border border-error-border bg-error-bg px-3 py-2.5 text-small text-brand-destructive">
@@ -1208,8 +1270,13 @@ function InvoiceCard({
           )}
         </tfoot>
       </table>
-      {invoice.canResend || invoice.canCheckPayment ? (
+      {invoice.canResend || invoice.canCheckPayment || invoice.canVoid ? (
         <div className="mt-3.5 border-t border-hairline pt-3">
+          {voidRefusal ? (
+            <p role="alert" data-testid="void-refused" className="mb-1 rounded-button border border-error-border bg-error-bg px-3 py-2.5 text-small text-brand-destructive">
+              {voidRefusal}
+            </p>
+          ) : null}
           {/* Check payment's answer sits right above its button (the owner's call at UAT). */}
           {checkError ? (
             <p role="alert" data-testid="payment-check-error" className="mb-1 rounded-button border border-error-border bg-error-bg px-3 py-2.5 text-small text-brand-destructive">
@@ -1221,17 +1288,21 @@ function InvoiceCard({
             </p>
           ) : null}
           <div className="flex flex-wrap gap-x-4">
-          <button
-            type="button"
-            onClick={() => void resend()}
-            disabled={resending}
-            className="min-h-11 text-sm font-semibold text-ink underline underline-offset-2 disabled:opacity-60"
-          >
-            {resending ? "Sending..." : "Resend invoice"}
-          </button>
-          <button type="button" onClick={() => void copyLink()} className="min-h-11 text-sm font-semibold text-ink underline underline-offset-2">
-            Copy pay link
-          </button>
+          {invoice.canResend ? (
+            <>
+              <button
+                type="button"
+                onClick={() => void resend()}
+                disabled={resending}
+                className="min-h-11 text-sm font-semibold text-ink underline underline-offset-2 disabled:opacity-60"
+              >
+                {resending ? "Sending..." : "Resend invoice"}
+              </button>
+              <button type="button" onClick={() => void copyLink()} className="min-h-11 text-sm font-semibold text-ink underline underline-offset-2">
+                Copy pay link
+              </button>
+            </>
+          ) : null}
           {invoice.canCheckPayment ? (
             <button
               type="button"
@@ -1242,9 +1313,59 @@ function InvoiceCard({
               {checking ? "Checking..." : "Check payment with Stripe"}
             </button>
           ) : null}
+          {invoice.canVoid ? (
+            <button
+              type="button"
+              onClick={() => {
+                setVoidRefusal(undefined);
+                setVoidOpen(true);
+              }}
+              className="min-h-11 text-sm font-semibold text-ink underline underline-offset-2"
+            >
+              Void invoice
+            </button>
+          ) : null}
           </div>
         </div>
       ) : null}
+      <ConfirmDialog
+        open={voidOpen}
+        title={`Void ${invoice.reference}?`}
+        severity="destructive"
+        confirmLabel="Void invoice"
+        loading={voiding}
+        loadingLabel="Voiding..."
+        onConfirm={() => void confirmVoid()}
+        onCancel={closeVoid}
+        fields={
+          <div>
+            <label
+              htmlFor="void-reason"
+              className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']"
+            >
+              Reason
+            </label>
+            <textarea
+              id="void-reason"
+              rows={3}
+              maxLength={500}
+              value={voidReason}
+              aria-required
+              aria-invalid={voidReasonError ? true : undefined}
+              onChange={(event) => {
+                setVoidReason(event.target.value);
+                setVoidReasonError(undefined);
+              }}
+              className={`w-full rounded-button border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
+                voidReasonError ? "border-brand-destructive" : "border-hairline"
+              }`}
+            />
+            {voidReasonError ? <p className="mt-[5px] text-xs text-brand-destructive">{voidReasonError}</p> : null}
+          </div>
+        }
+      >
+        {customerFirst} can no longer pay it, and it leaves Receivables. {contractorFirst}&apos;s pay is not affected. This can&apos;t be undone.
+      </ConfirmDialog>
     </Card>
   );
 }
@@ -1615,6 +1736,7 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
                 showToast(message);
               }}
               onPaid={setJob}
+              onRefreshed={setJob}
             />
           </div>
         ) : null}
