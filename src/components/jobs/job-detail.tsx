@@ -1028,7 +1028,7 @@ function MessageTag({ message }: { message: MessageView }) {
 const INVOICE_TAGS: Record<InvoiceView["status"] | "waiting", { label: string; pair: string }> = {
   sent: { label: "Sent", pair: "bg-status-cancelled-bg text-status-cancelled" },
   paid: { label: "Paid", pair: "bg-success-bg text-brand-success" },
-  void: { label: "Void", pair: "bg-status-cancelled-bg text-status-cancelled" },
+  void: { label: "Void", pair: "bg-error-bg text-brand-destructive" },
   waiting: { label: "Waiting for pay link", pair: "bg-warning-bg text-brand-warning" },
 };
 
@@ -1261,7 +1261,7 @@ function InvoiceCard({
         </tfoot>
       </table>
       {invoice.voided ? (
-        <div className="mt-3.5 border-t border-hairline pt-3 text-small text-secondary-text" data-testid="invoice-voided">
+        <div className="mt-3.5 rounded-button border border-error-border bg-error-bg px-3 py-2.5 text-small text-secondary-text" data-testid="invoice-voided">
           <p className="font-bold text-ink">
             Voided {invoice.voided.atLabel} by {invoice.voided.byName}
           </p>
