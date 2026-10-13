@@ -29,6 +29,10 @@
 //      with Stripe at ... - no payment yet." while nobody has paid; the card's error Banner when
 //      Stripe cannot be reached
 // 6002 AC9  once paid, the Invoice card shows Paid with its Fact, and Resend, Copy and Check payment are gone
+// 6008 AC8, AC9, AC11  Void invoice: the destructive dialog, its required reason, the card turning
+//      Void with who, when and why and its buttons going, the invoice leaving Receivables; a
+//      refusal (paid meanwhile) as the card's error Banner; no button on a paid invoice; the
+//      reminders listed among the job's messages
 //
 // Runs against the seeded dev database. The seeded jobs are only read.
 // Every enquiry this file posts is a genuine, permanent Customer + Job row
@@ -527,6 +531,95 @@ test("6002 AC6 / AC9: Check payment with Stripe answers in the Invoice card; onc
   // The receipt and the office's notice are listed with the job's messages.
   await expect(page.getByTestId("message-row").filter({ hasText: "Payment receipt" })).toHaveCount(1);
   await expect(page.getByTestId("message-row").filter({ hasText: "Payment received" })).toHaveCount(1);
+});
+
+test("6008 AC8 / AC9 / AC11: Mike voids an unpaid invoice with a reason; the card turns Void with who, when and why; it leaves Receivables; the reminder is among the messages", async ({
+  page,
+  browser,
+  request,
+}) => {
+  test.setTimeout(240_000);
+  const job = await acceptedJobForBob(browser, request, "void");
+  await completeJobAsBob(browser, job);
+  await giveInvoiceItsPayLink(request, job);
+  const due = await request.post(`${apiUrl}/api/test-data/jobs/${job.reference}/due`, { data: { days: -1 } });
+  expect(due.status()).toBe(200);
+  // The morning run (this test's own work): reminder 1 goes, and shows among the job's messages (AC11).
+  const run = await request.post(`${apiUrl}/api/test-data/daily/run`, { data: {} });
+  expect(run.status()).toBe(200);
+
+  await page.goto(`/ops/jobs/${job.reference}`);
+  await login(page, "mike@idelta.com.au");
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: /^InvoiceINV-\d+$/ }) });
+  await expect(card.getByTestId("invoice-status")).toHaveText(/^sent$/i);
+  const reminderRows = page.getByTestId("message-row").filter({ hasText: "Invoice reminder" });
+  await expect(reminderRows).toHaveCount(1);
+  await expect(reminderRows.first()).toContainText("E2E");
+
+  // AC9: the dialog is destructive, and the reason is required.
+  await card.getByRole("button", { name: "Void invoice" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog.getByRole("heading", { name: /^Void INV-\d+\?$/ })).toBeVisible();
+  await expect(dialog).toContainText("can no longer pay it, and it leaves Receivables.");
+  await expect(dialog).toContainText("Bob's pay is not affected. This can't be undone.");
+  await expect(dialog.getByLabel("Reason")).toBeVisible();
+  await dialog.getByRole("button", { name: "Void invoice" }).click();
+  await expect(dialog.getByText("Give a reason for voiding.")).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(card.getByTestId("invoice-status")).toHaveText(/^sent$/i);
+
+  // AC8: voiding with a reason.
+  const ref = ((await (await page.request.get(`${apiUrl}/api/jobs/${job.reference}`)).json()) as { invoice: { reference: string } }).invoice.reference;
+  await card.getByRole("button", { name: "Void invoice" }).click();
+  await dialog.getByLabel("Reason").fill("Billed to the wrong customer.");
+  await dialog.getByRole("button", { name: "Void invoice" }).click();
+  await expect(page.getByText("Invoice voided")).toBeVisible();
+  await expect(card.getByTestId("invoice-status")).toHaveText(/^void$/i);
+  const voided = card.getByTestId("invoice-voided");
+  await expect(voided).toContainText(/\d{1,2} \w{3} \d{4}, \d{1,2}:\d{2}(am|pm) by Mike/);
+  await expect(voided).toContainText("Billed to the wrong customer.");
+  for (const name of ["Resend invoice", "Copy pay link", "Check payment with Stripe", "Void invoice"]) {
+    await expect(card.getByRole("button", { name })).toHaveCount(0);
+  }
+
+  // Gone from Receivables.
+  const receivables = await page.request.get(`${apiUrl}/api/receivables?limit=500`);
+  const rows = ((await receivables.json()) as { rows: { invoiceReference: string }[] }).rows;
+  expect(rows.map((r) => r.invoiceReference)).not.toContain(ref);
+});
+
+test("6008 AC9: paid meanwhile -> the card's error Banner with the server's words and the card refreshes; a paid invoice has no Void invoice button", async ({
+  page,
+  browser,
+  request,
+}) => {
+  test.setTimeout(240_000);
+  const job = await acceptedJobForBob(browser, request, "voidpaid");
+  await completeJobAsBob(browser, job);
+  await giveInvoiceItsPayLink(request, job);
+
+  await page.goto(`/ops/jobs/${job.reference}`);
+  await login(page, "mike@idelta.com.au");
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: /^InvoiceINV-\d+$/ }) });
+  await expect(card.getByTestId("invoice-status")).toHaveText(/^sent$/i);
+
+  await card.getByRole("button", { name: "Void invoice" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await dialog.getByLabel("Reason").fill("Duplicate of another invoice");
+  // She pays while the dialog is open.
+  const paid = await request.post(`${apiUrl}/api/test-data/jobs/${job.reference}/paid`);
+  expect(paid.status()).toBe(200);
+  await dialog.getByRole("button", { name: "Void invoice" }).click();
+
+  await expect(card.getByTestId("void-refused")).toHaveText("This invoice is already paid - it can't be voided.");
+  await expect(card.getByTestId("invoice-status")).toHaveText(/^paid$/i);
+  await expect(card.getByRole("button", { name: "Void invoice" })).toHaveCount(0);
+
+  // The refusal is not left behind.
+  await page.reload();
+  await expect(card.getByTestId("void-refused")).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "Void invoice" })).toHaveCount(0);
 });
 
 /** "#b4531a" -> "rgb(180, 83, 26)", as getComputedStyle reports a color. */

@@ -104,6 +104,10 @@ export interface InvoiceView {
   canResend: boolean;
   /** Feature 6002: Check payment with Stripe is shown only when this is true. */
   canCheckPayment: boolean;
+  /** Feature 6008: Void invoice is shown only when this is true (sent, not zero-dollar). */
+  canVoid: boolean;
+  /** Feature 6008: who voided it, when and why; null unless void. */
+  voided: { byName: string; atLabel: string; reason: string } | null;
   /** Feature 6002: "15 Oct 2026, card" once paid; null otherwise. */
   paidLabel: string | null;
   billedTo: { name: string; businessName: string | null; address: PickedAddress | null };

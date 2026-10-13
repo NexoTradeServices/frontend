@@ -62,6 +62,28 @@ function WhereItStands({ row }: { row: ReceivableRow }) {
   );
 }
 
+/** "None yet", "1 sent - 9 Oct 2026", "2 sent - 16 Oct 2026" -- read from the reminder messages the backend counted. */
+function reminderLine(row: ReceivableRow): string {
+  if (row.reminders.sent === 0 || row.reminders.lastLabel === null) return "None yet";
+  return `${String(row.reminders.sent)} sent - ${row.reminders.lastLabel}`;
+}
+
+/** The reminders, and after the second the warning Tag "Your turn to ring". */
+function Reminders({ row }: { row: ReceivableRow }) {
+  return (
+    <span className="flex flex-wrap items-center gap-1.5">
+      <span data-testid="reminders" className="text-secondary-text">
+        {reminderLine(row)}
+      </span>
+      {row.yourTurn ? (
+        <span data-testid="your-turn" className={warningTag}>
+          Your turn to ring
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 function ReceivablesTable({ rows }: { rows: ReceivableRow[] }) {
   const router = useRouter();
   const th = "border-b border-hairline px-3 py-2.5 text-left align-bottom text-field-label font-bold tracking-[0.08em] text-muted-text uppercase";
@@ -78,6 +100,7 @@ function ReceivablesTable({ rows }: { rows: ReceivableRow[] }) {
             <th className={`${th} text-right`}>Amount</th>
             <th className={th}>Due</th>
             <th className={th}>Where it stands</th>
+            <th className={th}>Reminders</th>
           </tr>
         </thead>
         <tbody>
@@ -111,6 +134,9 @@ function ReceivablesTable({ rows }: { rows: ReceivableRow[] }) {
               <td className={td}>
                 <WhereItStands row={row} />
               </td>
+              <td className={td}>
+                <Reminders row={row} />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -131,7 +157,14 @@ function ReceivableCards({ rows }: { rows: ReceivableRow[] }) {
         >
           <div className="flex items-center justify-between gap-2">
             <span className="font-heading text-small font-extrabold text-ink">{row.invoiceReference}</span>
-            <WhereItStands row={row} />
+            <span className="flex flex-wrap items-center justify-end gap-1.5">
+              <WhereItStands row={row} />
+              {row.yourTurn ? (
+                <span data-testid="your-turn" className={warningTag}>
+                  Your turn to ring
+                </span>
+              ) : null}
+            </span>
           </div>
           <div className="mt-1.5 mb-0.5 font-heading text-name font-extrabold text-ink">
             {row.billedTo.businessName ?? row.billedTo.name}
@@ -142,6 +175,9 @@ function ReceivableCards({ rows }: { rows: ReceivableRow[] }) {
               {formatDollars(row.amount)} - due {row.dueLabel}
             </span>
             <span className="block">{row.jobReference}</span>
+            <span data-testid="reminders" className="block">
+              Reminders: {reminderLine(row)}
+            </span>
             {row.phone ? <span className="block tabular-nums">{row.phone}</span> : null}
           </div>
         </Link>

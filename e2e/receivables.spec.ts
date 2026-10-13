@@ -3,6 +3,8 @@
 // AC8 every invoice still owed, most overdue first: the rows in order with their tags,
 //     the count and the total, a row opening its job, a paid invoice leaving the list by
 //     itself, the empty state; at 390px the Record cards
+// 6008 AC7 the Reminders column: "None yet", "1 sent - <date>", "2 sent - <date>" and the
+//     "Your turn to ring" Tag after the second; at 390px the same in the Record card
 //
 // The order, the due states on the business clock, billed to, paid / void / zero-dollar
 // left out and paging are proven in the backend (tests/stripe-payment.test.ts); the browser
@@ -130,4 +132,56 @@ test("6002 AC8: Receivables lists what is owed, most overdue first, with the cou
   await expect(page.getByText("Nobody owes anything right now.")).toBeVisible();
   await expect(page.getByTestId("unpaid-count")).toHaveText("0");
   await expect(page.getByTestId("owed-total")).toHaveText("$0");
+});
+
+/** A business day (Perth) `days` from now, YYYY-MM-DD -- what the daily-run hook's `today` takes. */
+function businessDayIn(days: number): string {
+  return new Date(Date.now() + days * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Australia/Perth" });
+}
+
+test("6008 AC7: Receivables shows each invoice's reminders and, after the second, the 'Your turn to ring' Tag; the Record card at 390px says the same", async ({
+  page,
+  browser,
+  request,
+}) => {
+  test.setTimeout(240_000);
+  const job = await owedJob(browser, request, "rem", -1);
+
+  await page.goto("/ops/receivables");
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "Receivables", level: 1 })).toBeVisible();
+  const ref = await invoiceReferenceOf(page, job);
+  const row = page.locator(`table tr[data-ref="${ref}"]`);
+  await expect(row.getByTestId("reminders")).toHaveText("None yet");
+  await expect(row.getByTestId("your-turn")).toHaveCount(0);
+  await expect(page.getByRole("columnheader", { name: "Reminders" })).toBeVisible();
+
+  // The first morning: reminder 1 (the run is the test's own labelled work only).
+  const first = await request.post(`${apiUrl}/api/test-data/daily/run`, { data: {} });
+  expect(first.status()).toBe(200);
+  await nudgeRefresh(page);
+  await expect(row.getByTestId("reminders")).toHaveText(/^1 sent - \d{1,2} \w{3} \d{4}$/);
+  await expect(row.getByTestId("your-turn")).toHaveCount(0);
+
+  // Eight days later: the second, and it is Mike's turn to ring.
+  const second = await request.post(`${apiUrl}/api/test-data/daily/run`, { data: { today: businessDayIn(8) } });
+  expect(second.status()).toBe(200);
+  await nudgeRefresh(page);
+  await expect(row.getByTestId("reminders")).toHaveText(/^2 sent - \d{1,2} \w{3} \d{4}$/);
+  await expect(row.getByTestId("your-turn")).toHaveText("Your turn to ring");
+  await expect(row.getByTestId("your-turn")).toHaveCSS("text-transform", "uppercase");
+
+  // At 390px the Record card carries the reminder line, and the Tag beside the due-state Tag.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const card = page.locator(`a[data-ref="${ref}"]`);
+  await expect(card.getByTestId("reminders")).toHaveText(/^Reminders: 2 sent - \d{1,2} \w{3} \d{4}$/);
+  await expect(card.getByTestId("your-turn")).toHaveText("Your turn to ring");
+  const tag = await card.getByTestId("your-turn").boundingBox();
+  const due = await card.getByTestId("due-state").boundingBox();
+  expect(Math.abs((tag?.y ?? 0) - (due?.y ?? 0))).toBeLessThan(40);
+  const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
 });
