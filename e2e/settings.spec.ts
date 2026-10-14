@@ -166,6 +166,13 @@ async function restoreSeededSettings(page: Page): Promise<void> {
     await expect(page.getByText("Saved.")).toBeVisible();
   }
 
+  // Feature 8002: the public web address always goes back to blank.
+  if ((await page.getByLabel("Public web address").inputValue()) !== "") {
+    await page.getByLabel("Public web address").fill("");
+    await page.getByRole("button", { name: "Save settings" }).click();
+    await expect(page.getByText("Saved.")).toBeVisible();
+  }
+
   const abn = await page.getByLabel("ABN").inputValue();
   const paymentTerms = await page.getByLabel("Payment terms").inputValue();
   const businessInbox = await page.getByLabel("Business inbox").inputValue();
@@ -223,6 +230,31 @@ test.describe(() => {
       });
     },
   );
+  test("8002 AC2: the Public web address saves lower case and reloads; a bad value shows the field error and saves nothing", async ({
+    page,
+  }) => {
+    await withPlatformSettingsLock(async () => {
+      await page.goto("/ops/settings");
+      await login(page, "owner@idelta.com.au");
+      const field = page.getByLabel("Public web address");
+      await expect(field).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText(/Leave blank until launch\./)).toBeVisible();
+      await expect(field).toHaveValue("");
+
+      await field.fill("https://example.com.au");
+      await page.getByRole("button", { name: "Save settings" }).click();
+      await expect(page.getByText("Type the address only, like example.com.au.")).toBeVisible();
+      await page.reload();
+      await expect(page.getByLabel("Public web address")).toHaveValue("");
+
+      await page.getByLabel("Public web address").fill("Example.COM.au");
+      await page.getByRole("button", { name: "Save settings" }).click();
+      await expect(page.getByText("Saved.")).toBeVisible({ timeout: 10_000 });
+      await page.reload();
+      await expect(page.getByLabel("Public web address")).toHaveValue("example.com.au");
+    });
+  });
+
   test("2006 AC2: the Legal identity card saves the legal name and a picked address; both come back on reload", async ({
     page,
   }) => {
