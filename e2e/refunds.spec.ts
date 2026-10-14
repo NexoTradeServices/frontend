@@ -76,7 +76,7 @@ test("6006 AC1-3, AC11: Mike refunds part, sees the line and the credit note, th
   // and the PDF answer the page fetched, not the tab's address.)
   const popup = page.waitForEvent("popup");
   const pdf = page.waitForResponse((res) => res.url().includes("/credit-note"));
-  await lines.first().getByRole("button", { name: "Credit note (PDF)" }).click();
+  await lines.first().getByRole("button", { name: "Refund receipt (PDF)" }).click();
   const tab = await popup;
   const answer = await pdf;
   expect(answer.status()).toBe(200);

@@ -1264,7 +1264,7 @@ function InvoiceCard({
       else window.open(url, "_blank");
     } catch {
       tab?.close();
-      onToast("Couldn't open the credit note - try again.");
+      onToast("Couldn't open the refund receipt - try again.");
     }
   }
 
@@ -1375,7 +1375,7 @@ function InvoiceCard({
                 onClick={() => void openCreditNote(refund.reference)}
                 className="min-h-11 text-small font-semibold text-ink underline underline-offset-2"
               >
-                Credit note (PDF)
+                Refund receipt (PDF)
               </button>
             </li>
           ))}

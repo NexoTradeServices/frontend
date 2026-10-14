@@ -36,7 +36,7 @@ function RefundsTable({ rows }: { rows: RefundRow[] }) {
       <table className="w-full border-collapse text-sm" data-testid="refunds-table">
         <thead>
           <tr>
-            <th className={th}>Credit note</th>
+            <th className={th}>Receipt</th>
             <th className={th}>Date</th>
             <th className={th}>Customer</th>
             <th className={th}>Job</th>
