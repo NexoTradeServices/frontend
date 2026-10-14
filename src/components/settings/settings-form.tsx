@@ -38,11 +38,16 @@ export interface SettingsDto {
   operatorPhone: string;
   operatorEmail: string;
   timezone: string;
+  approvedPublicDomain: string | null;
   payoutCycle: "weekly" | "fortnightly";
   payoutDay: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun" | null;
   emailProvider: string;
   smsProvider: string;
 }
+
+// Feature 8002: a bare host name, mirrored from the server's rule.
+const PUBLIC_DOMAIN_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+const PUBLIC_DOMAIN_ERROR = "Type the address only, like example.com.au.";
 
 const TIMEZONE_OPTIONS = [
   { value: "Australia/Perth", label: "Australia/Perth (AWST)" },
@@ -114,6 +119,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
   const [operatorPhone, setOperatorPhone] = useState(initial.operatorPhone);
   const [operatorEmail, setOperatorEmail] = useState(initial.operatorEmail);
   const [timezone, setTimezone] = useState(initial.timezone);
+  const [approvedPublicDomain, setApprovedPublicDomain] = useState(initial.approvedPublicDomain ?? "");
   const [payoutCycle, setPayoutCycle] = useState(initial.payoutCycle);
   const [payoutDay, setPayoutDay] = useState(initial.payoutDay ?? "fri");
   const [emailProvider, setEmailProvider] = useState(initial.emailProvider);
@@ -148,6 +154,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
       operatorPhone,
       operatorEmail,
       timezone,
+      approvedPublicDomain: approvedPublicDomain.trim() === "" ? null : approvedPublicDomain.trim(),
       payoutCycle,
       payoutDay,
       emailProvider,
@@ -177,6 +184,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
       }
       setSettings(body);
       setGstRegistered(body.gstRegistered);
+      setApprovedPublicDomain(body.approvedPublicDomain ?? "");
       setSaved(true);
     } catch {
       setFormError("Save failed -- check your connection and try again.");
@@ -193,6 +201,11 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
     setFormError(undefined);
 
     // Decision 7, mirrored client-side (the server enforces it for real).
+    const domain = approvedPublicDomain.trim().toLowerCase();
+    if (domain !== "" && (domain.length > 253 || !PUBLIC_DOMAIN_PATTERN.test(domain))) {
+      setFieldErrors({ approvedPublicDomain: PUBLIC_DOMAIN_ERROR });
+      return;
+    }
     if (displayName.trim() === "") {
       setFieldErrors({ displayName: "Enter a business name." });
       return;
@@ -302,6 +315,20 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
               error={fieldErrors["timezone"]}
               helper={
                 fieldErrors["timezone"] ? undefined : 'The business clock: payout weeks, daily sweeps, "today".'
+              }
+            />
+          </div>
+          <div className="min-w-[200px] flex-1">
+            <Field
+              id="approvedPublicDomain"
+              label="Public web address"
+              value={approvedPublicDomain}
+              onChange={(e) => setApprovedPublicDomain(e.target.value)}
+              error={fieldErrors["approvedPublicDomain"]}
+              helper={
+                fieldErrors["approvedPublicDomain"]
+                  ? undefined
+                  : "Leave blank until launch. While blank, search engines never list the site. The address only, like example.com.au."
               }
             />
           </div>

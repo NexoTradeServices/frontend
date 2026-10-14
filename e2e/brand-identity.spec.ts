@@ -13,6 +13,12 @@
 // projects each time only tripled a source-file scan and two function
 // calls for nothing.
 //
+// 8002 AC4 / AC5 / AC6  the Google-visibility fail-safe: a robots meta tag
+//      saying noindex unless the host is exactly the approved public domain.
+//      (8002 AC7 -- identity read fails -- is in tests/identity.test.ts: the
+//      fetch is server-side, so a browser test cannot fail it; same reason
+//      as 1014 AC7 above.)
+//
 // AC6 writes the shared PlatformSettings row -- same "leave it as we found
 // it" discipline as settings.spec.ts, and the same withPlatformSettingsLock
 // exclusion (see that helper) as settings.spec.ts's own writer test, since
@@ -46,9 +52,30 @@ async function setBusinessName(page: Page, name: string): Promise<void> {
   await ensureLoggedInAs(page, "/ops/settings", "owner@idelta.com.au");
   await expect(page.getByLabel("Business name")).toBeVisible({ timeout: 10_000 });
   await page.getByLabel("Business name").fill(name);
+  // 8002: every restore also puts the public web address back to blank.
+  await page.getByLabel("Public web address").fill("");
   await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByText("Saved.")).toBeVisible();
 }
+
+/** 8002: types the approved public domain on Settings, as the owner would. */
+async function setPublicDomain(page: Page, domain: string): Promise<void> {
+  await ensureLoggedInAs(page, "/ops/settings", "owner@idelta.com.au");
+  await expect(page.getByLabel("Public web address")).toBeVisible({ timeout: 10_000 });
+  await page.getByLabel("Public web address").fill(domain);
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByText("Saved.")).toBeVisible();
+  await logout(page);
+}
+
+/** The robots meta content of the page now open, or null when it has none. */
+async function robotsMeta(page: Page): Promise<string | null> {
+  const tag = page.locator('meta[name="robots"]');
+  if ((await tag.count()) === 0) return null;
+  return tag.first().getAttribute("content");
+}
+
+const CAPABILITY_PAGES = ["/a/uat-no-such-link", "/approve/uat-no-such-link"];
 
 test.afterEach(async ({ page }) => {
   // Idempotent by design -- runs after a clean pass too (the test leaves
@@ -100,3 +127,47 @@ test(
     });
   },
 );
+
+test.describe("8002 -- the Google-visibility fail-safe", () => {
+  test("AC4: with the domain blank, the home page, a portal gate and capability pages all say noindex, nofollow", async ({
+    page,
+  }) => {
+    await withPlatformSettingsLock(async () => {
+      for (const path of ["/", "/ops", ...CAPABILITY_PAGES]) {
+        await page.goto(path);
+        expect(await robotsMeta(page), path).toBe("noindex, nofollow");
+      }
+    });
+  });
+
+  test("AC5: with the domain set to some other host, every page says noindex, nofollow", async ({ page }) => {
+    await withPlatformSettingsLock(async () => {
+      await setPublicDomain(page, "somewhere-else.example.com.au");
+      for (const path of ["/", "/ops", ...CAPABILITY_PAGES]) {
+        await page.goto(path);
+        expect(await robotsMeta(page), path).toBe("noindex, nofollow");
+      }
+    });
+  });
+
+  test("AC6: with the domain set to this very host, the home page opens to search and capability pages stay hidden", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const host = new URL(page.url()).hostname;
+    // The settings rule wants a dot, so a bare "localhost" (CI's own server)
+    // cannot be typed in; isIndexableHost's host match is unit-tested in
+    // tests/identity.test.ts for that case.
+    test.skip(!host.includes("."), "this server's host has no dot, so it cannot be typed on Settings");
+
+    await withPlatformSettingsLock(async () => {
+      await setPublicDomain(page, host);
+      await page.goto("/");
+      expect(await robotsMeta(page)).toBeNull();
+      for (const path of CAPABILITY_PAGES) {
+        await page.goto(path);
+        expect(await robotsMeta(page), path).toBe("noindex, nofollow");
+      }
+    });
+  });
+});

@@ -16,16 +16,29 @@ export interface Identity {
   displayName: string;
   /** The support phone, as the owner typed it on Settings. */
   operatorPhone: string | null;
+  /**
+   * Feature 8002: the one host search engines may list, as the owner typed it
+   * on Settings. null = blank = every site stays invisible.
+   */
+  approvedPublicDomain: string | null;
 }
 
 export const getIdentity = cache(async (): Promise<Identity | null> => {
   try {
     const res = await fetch(`${apiUrl}/api/identity`, { cache: "no-store" });
     if (res.status !== 200) return null;
-    const body = (await res.json()) as { displayName: string; operatorPhone?: string };
+    const body = (await res.json()) as {
+      displayName: string;
+      operatorPhone?: string;
+      approvedPublicDomain?: unknown;
+    };
     return {
       displayName: body.displayName,
       operatorPhone: typeof body.operatorPhone === "string" && body.operatorPhone !== "" ? body.operatorPhone : null,
+      approvedPublicDomain:
+        typeof body.approvedPublicDomain === "string" && body.approvedPublicDomain !== ""
+          ? body.approvedPublicDomain
+          : null,
     };
   } catch {
     return null;
@@ -34,4 +47,18 @@ export const getIdentity = cache(async (): Promise<Identity | null> => {
 
 export async function getDisplayName(): Promise<string | null> {
   return (await getIdentity())?.displayName ?? null;
+}
+
+/**
+ * Feature 8002, the Google-visibility fail-safe: true ONLY when the identity
+ * was read, the owner has typed an approved domain, and the host the page was
+ * served on is exactly that domain (lower-cased, port stripped). Blank, a
+ * mismatch, or a failed identity read all mean false -- never the other way.
+ * `www.` is not special: only the exact domain typed opens up.
+ */
+export function isIndexableHost(host: string | null | undefined, identity: Identity | null): boolean {
+  if (identity === null || identity.approvedPublicDomain === null) return false;
+  if (typeof host !== "string" || host === "") return false;
+  const bare = host.trim().toLowerCase().replace(/:\d+$/, "");
+  return bare !== "" && bare === identity.approvedPublicDomain.trim().toLowerCase();
 }

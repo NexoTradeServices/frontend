@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { getDisplayName } from "@/lib/identity";
+import { headers } from "next/headers";
+import { getIdentity, isIndexableHost } from "@/lib/identity";
 import "./globals.css";
 
 // Foundations typography (frontend-conventions.md, section B): Archivo for
@@ -23,11 +24,20 @@ const publicSans = localFont({
 // home. Decision 6 -- if the identity read fails, the title falls back to
 // nothing brand-bearing (an empty string) rather than holding a name of its
 // own; the page still loads either way.
+//
+// Feature 8002, the Google-visibility fail-safe: every page says noindex,
+// nofollow unless the host it was served on is exactly the approved public
+// domain the owner typed on Settings. Blank, a mismatch, or a failed identity
+// read all stay hidden. Child pages may only hide MORE (the capability pages
+// set their own noindex); no page sets index: true. There is no robots.txt on
+// purpose: a file that blocked crawling would stop Google ever seeing this.
 export async function generateMetadata(): Promise<Metadata> {
-  const displayName = await getDisplayName();
+  const identity = await getIdentity();
+  const host = (await headers()).get("host");
   return {
-    title: displayName ?? "",
+    title: identity?.displayName ?? "",
     description: "Managed trades platform for Perth, WA.",
+    ...(isIndexableHost(host, identity) ? {} : { robots: { index: false, follow: false } }),
   };
 }
 
