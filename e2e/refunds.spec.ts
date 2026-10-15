@@ -5,7 +5,7 @@
 // AC3  refunding what is left removes Refund; the invoice stays Paid
 // AC4  Stripe's refusal shown above the buttons, nothing changed
 // AC10 the Refunds list: menu entry, columns, Refunded tag, a row opens its job, Record cards at
-//      390px, the Empty-state wording is the backend's; Page numbers (the control's own page)
+//      390px, the Empty-state wording is the backend's; the Page numbers rules are in tests/page-numbers.test.ts
 // AC11 the credit note link opens a PDF; Bob gets nothing from the refund endpoints
 //
 // The refund provider is a pretend one behind the backend's seam outside production (a payment made by
@@ -138,29 +138,4 @@ test("6006 AC11: Bob gets nothing from the refund endpoints", async ({ page }) =
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   expect((await page.request.get(`${apiUrl}/api/refunds`)).status()).toBe(403);
   expect((await page.request.get(`${apiUrl}/api/refunds/CN-1001/credit-note`)).status()).toBe(403);
-});
-
-test("6006 AC10: Page numbers -- first and last jumps, the window, the caption, and one line at 390px", async ({ page }) => {
-  // The preview page is dev only (it answers 404 in production, which is how CI runs); tests/page-numbers.test.ts holds the rules.
-  test.skip(!!process.env.CI, "the Page numbers preview page does not exist in a production build");
-  await page.goto("/dev/page-numbers?page=6");
-  const nav = page.getByTestId("page-numbers");
-  await expect(page.getByTestId("page-numbers-caption")).toHaveText("Showing 251 to 300 of 1,240");
-  await expect(nav.getByRole("link", { name: "Previous page" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "First page" })).toBeVisible();
-  await expect(nav.locator('[aria-current="page"]')).toHaveText("6");
-  await nav.getByRole("link", { name: "Last page" }).click();
-  await expect(page).toHaveURL(/page=25$/);
-  await expect(page.getByTestId("page-numbers-caption")).toHaveText("Showing 1,201 to 1,240 of 1,240");
-  await expect(nav.locator('[aria-label="Next page"]')).toHaveAttribute("aria-disabled", "true");
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/dev/page-numbers?page=6");
-  const list = nav.locator("ul");
-  const box = await list.boundingBox();
-  const first = await nav.getByRole("link", { name: "First page" }).boundingBox();
-  const last = await nav.getByRole("link", { name: "Last page" }).boundingBox();
-  expect(box).not.toBeNull();
-  expect(first?.y).toBe(last?.y);
-  expect((box?.width ?? 0)).toBeLessThanOrEqual(390);
 });
