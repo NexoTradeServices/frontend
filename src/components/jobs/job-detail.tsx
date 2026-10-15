@@ -27,6 +27,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TimeEntryRows, isBlankRow, rowsFromEntries, type TimeEntryRow } from "@/components/ui/time-entry-rows";
 import { formatHours } from "@/lib/billed-hours";
 import { formatDollars } from "@/components/request-a-job/money";
+import { REFUND_TAGS, centsToField, refundMoney, typedDollarsToCents } from "@/components/refunds/money";
 import type { ApiError, CustomerRating, EarlierBooking, InvoiceView, JobDetail, MessageView, NoteView, VisitView } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -1079,6 +1080,14 @@ function InvoiceCard({
   const [voidReasonError, setVoidReasonError] = useState<string | undefined>();
   const [voiding, setVoiding] = useState(false);
   const [voidRefusal, setVoidRefusal] = useState<string | undefined>();
+  // Feature 6006: Refund -- the destructive dialog, its amount and required reason, and Stripe's refusal above the buttons.
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundReason, setRefundReason] = useState("");
+  const [refundAmountError, setRefundAmountError] = useState<string | undefined>();
+  const [refundReasonError, setRefundReasonError] = useState<string | undefined>();
+  const [refundRefusal, setRefundRefusal] = useState<string | undefined>();
+  const [refunding, setRefunding] = useState(false);
   const tag = INVOICE_TAGS[invoice.waitingForPayLink ? "waiting" : invoice.status];
   const customerFirst = firstNameOf(invoice.billedTo.name);
   const contractorFirst = job.contractor ? firstNameOf(job.contractor.name) : "the contractor";
@@ -1178,6 +1187,87 @@ function InvoiceCard({
     }
   }
 
+  function openRefund() {
+    setRefundAmount(centsToField(invoice.refundableLeft));
+    setRefundReason("");
+    setRefundAmountError(undefined);
+    setRefundReasonError(undefined);
+    setRefundRefusal(undefined);
+    setRefundOpen(true);
+  }
+
+  function closeRefund() {
+    setRefundOpen(false);
+  }
+
+  async function confirmRefund() {
+    const cents = typedDollarsToCents(refundAmount);
+    let bad = false;
+    if (cents === null || cents <= 0) {
+      setRefundAmountError("Enter an amount more than $0.");
+      bad = true;
+    } else if (cents > invoice.refundableLeft) {
+      setRefundAmountError(`That is more than is left to refund (${refundMoney(invoice.refundableLeft)}).`);
+      bad = true;
+    } else {
+      setRefundAmountError(undefined);
+    }
+    if (refundReason.trim() === "") {
+      setRefundReasonError("Give a reason for the refund.");
+      bad = true;
+    } else {
+      setRefundReasonError(undefined);
+    }
+    if (bad || cents === null) return;
+    setRefundRefusal(undefined);
+    setRefunding(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(job.reference)}/invoice/refund`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: cents, reason: refundReason.trim() }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as Partial<JobDetail> & Partial<ApiError> & { field?: string; refundReference?: string };
+      if (res.ok) {
+        closeRefund();
+        onSent(payload as JobDetail, `Refund made - ${payload.refundReference ?? ""}.`);
+        return;
+      }
+      if (payload.field === "amount") {
+        setRefundAmountError(payload.error);
+        return;
+      }
+      if (payload.field === "reason") {
+        setRefundReasonError(payload.error);
+        return;
+      }
+      // Stripe's refusal, or nothing left meanwhile: the words above the buttons; the card is re-read.
+      setRefundRefusal(payload.error ?? "The refund was not made. Nothing was changed.");
+      const fresh = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(job.reference)}`, { credentials: "include", cache: "no-store" });
+      if (fresh.ok) onRefreshed((await fresh.json()) as JobDetail);
+    } catch {
+      setRefundRefusal("Couldn't reach the server - check your connection. Nothing was changed.");
+    } finally {
+      setRefunding(false);
+    }
+  }
+
+  /** The credit note opens in a new tab: fetched with the session, so the tab is opened first (a popup blocker allows that). */
+  async function openCreditNote(reference: string) {
+    const tab = window.open("", "_blank");
+    try {
+      const res = await fetch(`${apiUrl}/api/refunds/${encodeURIComponent(reference)}/credit-note`, { credentials: "include" });
+      if (!res.ok) throw new Error("credit note read failed");
+      const url = URL.createObjectURL(await res.blob());
+      if (tab) tab.location.href = url;
+      else window.open(url, "_blank");
+    } catch {
+      tab?.close();
+      onToast("Couldn't open the refund receipt - try again.");
+    }
+  }
+
   async function copyLink() {
     if (invoice.payLinkUrl === null) return;
     try {
@@ -1268,7 +1358,30 @@ function InvoiceCard({
           <p className="mt-1 whitespace-pre-wrap">Reason: {invoice.voided.reason}</p>
         </div>
       ) : null}
-      {invoice.canResend || invoice.canCheckPayment || invoice.canVoid ? (
+      {invoice.refunds.length > 0 ? (
+        <ul className="mt-3.5 flex flex-col gap-1.5 border-t border-hairline pt-3" data-testid="invoice-refunds">
+          {invoice.refunds.map((refund) => (
+            <li key={refund.reference} data-refund={refund.reference} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-secondary-text">
+              <span className="font-semibold text-ink">{refund.reference}</span>
+              <span>- {refund.dateLabel} - {refundMoney(refund.amount)} -</span>
+              <span
+                data-refund-status={refund.status}
+                className={`inline-block shrink-0 rounded px-2 py-0.5 text-field-label font-bold tracking-[0.04em] whitespace-nowrap uppercase ${REFUND_TAGS[refund.status].pair}`}
+              >
+                {REFUND_TAGS[refund.status].label}
+              </span>
+              <button
+                type="button"
+                onClick={() => void openCreditNote(refund.reference)}
+                className="min-h-11 text-small font-semibold text-ink underline underline-offset-2"
+              >
+                Refund receipt (PDF)
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {invoice.canResend || invoice.canCheckPayment || invoice.canVoid || invoice.canRefund ? (
         <div className="mt-3.5 border-t border-hairline pt-3">
           {voidRefusal ? (
             <p role="alert" data-testid="void-refused" className="mb-1 rounded-button border border-error-border bg-error-bg px-3 py-2.5 text-small text-brand-destructive">
@@ -1323,6 +1436,16 @@ function InvoiceCard({
               Void invoice
             </button>
           ) : null}
+          {invoice.canRefund ? (
+            <button
+              type="button"
+              onClick={openRefund}
+              data-testid="refund-button"
+              className="min-h-11 rounded-button border border-hairline bg-surface px-4 text-sm font-bold text-ink"
+            >
+              Refund
+            </button>
+          ) : null}
           </div>
         </div>
       ) : null}
@@ -1363,6 +1486,67 @@ function InvoiceCard({
         }
       >
         {customerFirst} can no longer pay it, and it leaves Receivables. {contractorFirst}&apos;s pay is not affected. This can&apos;t be undone.
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={refundOpen}
+        title={`Refund ${invoice.reference}?`}
+        severity="destructive"
+        confirmLabel="Refund"
+        loading={refunding}
+        loadingLabel="Refunding..."
+        onConfirm={() => void confirmRefund()}
+        onCancel={closeRefund}
+        fields={
+          <div>
+            {refundRefusal ? (
+              <p role="alert" data-testid="refund-refused" className="mb-3 rounded-button border border-error-border bg-error-bg px-3 py-2.5 text-small text-brand-destructive">
+                {refundRefusal}
+              </p>
+            ) : null}
+            <Field
+              id="refund-amount"
+              label="Amount"
+              inputMode="decimal"
+              prefix="$"
+              required
+              value={refundAmount}
+              onChange={(event) => {
+                setRefundAmount(event.target.value);
+                setRefundAmountError(undefined);
+              }}
+              error={refundAmountError}
+              helper={`Up to ${refundMoney(invoice.refundableLeft)}.`}
+            />
+            <label
+              htmlFor="refund-reason"
+              className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']"
+            >
+              Reason
+            </label>
+            <textarea
+              id="refund-reason"
+              rows={3}
+              maxLength={500}
+              value={refundReason}
+              aria-required
+              aria-invalid={refundReasonError ? true : undefined}
+              onChange={(event) => {
+                setRefundReason(event.target.value);
+                setRefundReasonError(undefined);
+              }}
+              className={`w-full rounded-button border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
+                refundReasonError ? "border-brand-destructive" : "border-hairline"
+              }`}
+            />
+            {refundReasonError ? (
+              <p className="mt-[5px] text-xs text-brand-destructive">{refundReasonError}</p>
+            ) : (
+              <p className="mt-[5px] text-xs text-muted-text">Sent to the customer as written.</p>
+            )}
+          </div>
+        }
+      >
+        The money goes back to how they paid. This cannot be undone.
       </ConfirmDialog>
     </Card>
   );

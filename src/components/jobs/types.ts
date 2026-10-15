@@ -110,6 +110,12 @@ export interface InvoiceView {
   voided: { byName: string; atLabel: string; reason: string } | null;
   /** Feature 6002: "15 Oct 2026, card" once paid; null otherwise. */
   paidLabel: string | null;
+  /** Feature 6006: Refund is shown only when this is true (money received and not all given back). */
+  canRefund: boolean;
+  /** Feature 6006: cents received and not yet refunded. */
+  refundableLeft: number;
+  /** Feature 6006: every refund on the invoice, oldest first. */
+  refunds: { reference: string; dateLabel: string; amount: number; status: "pending" | "succeeded" | "failed" }[];
   billedTo: { name: string; businessName: string | null; address: PickedAddress | null };
   issuedLabel: string;
   dueLabel: string;
