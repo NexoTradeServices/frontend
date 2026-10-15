@@ -255,6 +255,33 @@ test.describe(() => {
     });
   });
 
+  test("6015 AC11: Accounts phone sits after Operator phone, saves, reloads and clears", async ({ page }) => {
+    await withPlatformSettingsLock(async () => {
+      await page.goto("/ops/settings");
+      await login(page, "owner@idelta.com.au");
+      const field = page.getByLabel("Accounts phone");
+      await expect(field).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText("For questions about a bill. Leave blank to use the operator phone.")).toBeVisible();
+      await expect(field).not.toHaveAttribute("aria-required", "true");
+      // It sits straight after Operator phone.
+      const operator = await page.getByLabel("Operator phone").boundingBox();
+      const accounts = await field.boundingBox();
+      expect(accounts!.y).toBeGreaterThan(operator!.y);
+
+      await field.fill("08 9111 2222");
+      await page.getByRole("button", { name: "Save settings" }).click();
+      await expect(page.getByText("Saved.")).toBeVisible({ timeout: 10_000 });
+      await page.reload();
+      await expect(page.getByLabel("Accounts phone")).toHaveValue("08 9111 2222");
+
+      await page.getByLabel("Accounts phone").fill("");
+      await page.getByRole("button", { name: "Save settings" }).click();
+      await expect(page.getByText("Saved.")).toBeVisible({ timeout: 10_000 });
+      await page.reload();
+      await expect(page.getByLabel("Accounts phone")).toHaveValue("");
+    });
+  });
+
   test("2006 AC2: the Legal identity card saves the legal name and a picked address; both come back on reload", async ({
     page,
   }) => {
