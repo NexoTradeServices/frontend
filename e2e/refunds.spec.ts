@@ -7,6 +7,9 @@
 // AC10 the Refunds list: menu entry, columns, Refunded tag, a row opens its job, Record cards at
 //      390px, the Empty-state wording is the backend's; the Page numbers rules are in tests/page-numbers.test.ts
 // AC11 the credit note link opens a PDF; Bob gets nothing from the refund endpoints
+// 6015 AC12 the Amount hint reads "Up to $610." on a plain invoice (above) and "Up to $610, GST
+//      included." on one that carried GST; AC13 the same card reads Total (includes GST) /
+//      GST included / Amount due, and Amount due falls to $0 once paid
 //
 // The refund provider is a pretend one behind the backend's seam outside production (a payment made by
 // the test-only paid hook has the intent `pi_test_<invoice>`); each job is a throwaway, labelled `e2e`
@@ -14,6 +17,7 @@
 import { test, expect, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 import { acceptedJobForBob, completeJobAsBob, giveInvoiceItsPayLink } from "./helpers/accepted-job";
 import { login } from "./helpers/login";
+import { withPlatformSettingsLock } from "./helpers/singleton-lock";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
 
@@ -138,4 +142,45 @@ test("6006 AC11: Bob gets nothing from the refund endpoints", async ({ page }) =
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   expect((await page.request.get(`${apiUrl}/api/refunds`)).status()).toBe(403);
   expect((await page.request.get(`${apiUrl}/api/refunds/CN-1001/credit-note`)).status()).toBe(403);
+});
+
+test("6015 AC12, AC13: a GST invoice's refund hint says GST included, and its card reads the GST rows", async ({ page, browser, request }) => {
+  test.setTimeout(300_000);
+  const job = await acceptedJobForBob(browser, request, "ref-gst");
+
+  // The invoice is stamped with the GST switch as it is the moment the job completes: the owner
+  // flips it on for that moment only, under the settings lock, and puts it back straight after.
+  await page.goto("/ops/settings");
+  await login(page, "owner@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible({ timeout: 10_000 });
+  const settingsUrl = `${apiUrl}/api/settings`;
+  await withPlatformSettingsLock(async () => {
+    const before = (await (await page.request.get(settingsUrl)).json()) as Record<string, unknown>;
+    const body = (gst: boolean, abn: unknown) => ({
+      ...before,
+      gstRatePercent: Number(before["gstRatePercent"]),
+      gstRegistered: gst,
+      businessAbn: abn,
+    });
+    expect((await page.request.put(settingsUrl, { data: body(true, "51 824 753 556") })).status()).toBe(200);
+    try {
+      await completeJobAsBob(browser, job);
+    } finally {
+      expect((await page.request.put(settingsUrl, { data: body(before["gstRegistered"] === true, before["businessAbn"]) })).status()).toBe(200);
+    }
+  });
+
+  await giveInvoiceItsPayLink(request, job);
+  const paid = await request.post(`${apiUrl}/api/test-data/jobs/${job.reference}/paid`, { data: {} });
+  expect(paid.status()).toBe(200);
+
+  await page.goto(`/ops/jobs/${job.reference}`);
+  await expect(page.getByTestId("invoice-status")).toHaveText("Paid");
+  const lines = page.getByTestId("invoice-lines");
+  await expect(lines.getByRole("row", { name: /^Total \(includes GST\).*\$610$/ })).toBeVisible();
+  await expect(lines.getByRole("row", { name: /^GST included.*\$55\.45$/ })).toBeVisible();
+  await expect(lines.getByRole("row", { name: /^Amount due.*\$0$/ })).toBeVisible();
+
+  await page.getByTestId("refund-button").click();
+  await expect(page.getByRole("alertdialog").getByText("Up to $610, GST included.")).toBeVisible();
 });

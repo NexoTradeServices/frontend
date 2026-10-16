@@ -116,7 +116,7 @@ export interface InvoiceView {
   refundableLeft: number;
   /** Feature 6006: every refund on the invoice, oldest first. */
   refunds: { reference: string; dateLabel: string; amount: number; status: "pending" | "succeeded" | "failed" }[];
-  billedTo: { name: string; businessName: string | null; address: PickedAddress | null };
+  billedTo: { name: string; businessName: string | null; abn: string | null; address: PickedAddress | null };
   issuedLabel: string;
   dueLabel: string;
   lines: { kind: "labour" | "part" | "callout"; description: string; qty: number; unitPrice: number; lineTotal: number }[];
@@ -158,6 +158,10 @@ export interface JobDetail {
     code: string;
     name: string;
     businessName: string | null;
+    /** Feature 6015: digits only; null for a home customer or none on file. */
+    abn: string | null;
+    /** Feature 6015: her answer, null = not asked. */
+    gstRegistered: "yes" | "no" | null;
     phone: string | null;
     email: string;
     billingAddress: PickedAddress | null;

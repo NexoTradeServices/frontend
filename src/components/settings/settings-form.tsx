@@ -36,6 +36,7 @@ export interface SettingsDto {
   returnVisitMinimumMinutes: number;
   maxContractorPartAmount: number;
   operatorPhone: string;
+  accountsPhone: string | null;
   operatorEmail: string;
   timezone: string;
   approvedPublicDomain: string | null;
@@ -117,6 +118,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
     centsToDollarsInput(initial.maxContractorPartAmount),
   );
   const [operatorPhone, setOperatorPhone] = useState(initial.operatorPhone);
+  const [accountsPhone, setAccountsPhone] = useState(initial.accountsPhone ?? "");
   const [operatorEmail, setOperatorEmail] = useState(initial.operatorEmail);
   const [timezone, setTimezone] = useState(initial.timezone);
   const [approvedPublicDomain, setApprovedPublicDomain] = useState(initial.approvedPublicDomain ?? "");
@@ -152,6 +154,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
       returnVisitMinimumMinutes: Number(returnVisitMinimumMinutes),
       maxContractorPartAmount: maxPartCents,
       operatorPhone,
+      accountsPhone: accountsPhone.trim() === "" ? null : accountsPhone.trim(),
       operatorEmail,
       timezone,
       approvedPublicDomain: approvedPublicDomain.trim() === "" ? null : approvedPublicDomain.trim(),
@@ -284,6 +287,16 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
               onChange={(e) => setOperatorPhone(e.target.value)}
               error={fieldErrors["operatorPhone"]}
               helper={fieldErrors["operatorPhone"] ? undefined : "The single number customers ring."}
+            />
+            <Field
+              id="accountsPhone"
+              label="Accounts phone"
+              value={accountsPhone}
+              onChange={(e) => setAccountsPhone(e.target.value)}
+              error={fieldErrors["accountsPhone"]}
+              helper={
+                fieldErrors["accountsPhone"] ? undefined : "For questions about a bill. Leave blank to use the operator phone."
+              }
             />
           </div>
         </div>

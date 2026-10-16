@@ -10,6 +10,11 @@
 //      "Rossi's Cafe" to a customer with none, Save keeps it, then he clears it
 //      (the dispatched-job and other-jobs cases are proven at the backend,
 //      tests/ops-jobs.test.ts 1017 AC3)
+// 6015 AC1, AC2 under Business name: ABN and Registered for GST? show only once a business name is
+//      there; a wrong ABN is refused on its own field and nothing is saved; a good one and a Yes
+//      save and come back on reload; clearing the business name hides and clears them
+// 6015 AC13 the Invoice card names the business, Attn and ABN when the invoice froze one, and
+//      reads Total / Amount due (the GST rows are proven at the backend and in refunds.spec.ts)
 // AC24 the email's job link opened logged out: the ops login, then that job
 //      (the link itself is proven at the backend, ops-jobs.test.ts AC24)
 // AC25 (BKLG-022) Assigned renders #6b4fa3 on #efeafa through the one
@@ -189,6 +194,85 @@ test("1017 AC3: Mike adds Rossi's Cafe as the business name beside the billing a
   await expect(page.getByText(`Saved ${reference}.`)).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("Business name")).toHaveValue("");
+});
+
+test("6015 AC1, AC2: ABN and Registered for GST? appear under a business name, refuse a wrong ABN on the field, save, and clear with the name", async ({
+  page,
+  request,
+}) => {
+  if (MOCKS_GOOGLE_PLACES) await installMockGooglePlaces(page);
+  const reference = await postEnquiry(request, "6015", "Nina Rossi");
+
+  await page.goto(`/ops/jobs/${reference}`);
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: reference, exact: true })).toBeVisible();
+
+  // AC2: a home customer sees neither field.
+  await expect(page.getByLabel("ABN", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("Registered for GST?")).toHaveCount(0);
+
+  await page.getByLabel("Business name").fill("Rossi's Cafe");
+  const abn = page.getByLabel("ABN", { exact: true });
+  const gst = page.getByLabel("Registered for GST?");
+  await expect(abn).toBeVisible();
+  await expect(page.getByText("11 digits, if the business has one.")).toBeVisible();
+  await expect(gst).toHaveValue("");
+  await expect(gst.locator("option")).toHaveText(["Not asked yet", "Yes", "No"]);
+
+  // AC1: a wrong ABN is refused on the field and nothing is saved.
+  await abn.fill("12 345 678 901");
+  await gst.selectOption("yes");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("An ABN is 11 digits with a valid check digit.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Business name")).toHaveValue("");
+
+  await page.getByLabel("Business name").fill("Rossi's Cafe");
+  await page.getByLabel("ABN", { exact: true }).fill("51 824 753 556");
+  await page.getByLabel("Registered for GST?").selectOption("yes");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText(`Saved ${reference}.`)).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("ABN", { exact: true })).toHaveValue("51 824 753 556");
+  await expect(page.getByLabel("Registered for GST?")).toHaveValue("yes");
+
+  // AC2: clearing the business name hides both and clears them for good.
+  await page.getByLabel("Business name").fill("");
+  await expect(page.getByLabel("ABN", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText(`Saved ${reference}.`)).toBeVisible();
+  await page.getByLabel("Business name").fill("Rossi's Cafe");
+  await expect(page.getByLabel("ABN", { exact: true })).toHaveValue("");
+  await expect(page.getByLabel("Registered for GST?")).toHaveValue("");
+});
+
+test("6015 AC13: the Invoice card shows the business, Attn and ABN the invoice froze, and Total / Amount due", async ({
+  page,
+  browser,
+  request,
+}) => {
+  test.setTimeout(240_000);
+  const job = await acceptedJobForBob(browser, request, "6015-inv");
+  // Mike gives the customer her business name and ABN before the invoice is issued.
+  await page.goto(`/ops/jobs/${job.reference}`);
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: job.reference, exact: true })).toBeVisible();
+  const saved = await page.request.put(`${apiUrl}/api/jobs/${job.reference}/addresses`, {
+    data: { businessName: "Rossi's Cafe", abn: "51 824 753 556", gstRegistered: "no" },
+  });
+  expect(saved.status()).toBe(200);
+  await completeJobAsBob(browser, job);
+
+  await page.goto(`/ops/jobs/${job.reference}`);
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: /^InvoiceINV-\d+$/ }) });
+  await expect(card).toBeVisible();
+  await expect(card.getByText("Rossi's Cafe")).toBeVisible();
+  await expect(card.getByText(/^Attn: /)).toBeVisible();
+  await expect(card.getByText("ABN 51 824 753 556")).toBeVisible();
+  const lines = card.getByTestId("invoice-lines");
+  await expect(lines.getByRole("row", { name: /^Total.*\$610$/ })).toBeVisible();
+  await expect(lines.getByRole("row", { name: /^Amount due.*\$610$/ })).toBeVisible();
+  await expect(card.getByText("GST included")).toHaveCount(0);
 });
 
 test("AC24: the email's job link, opened logged out, shows the ops login and then that job", async ({ page, request }) => {

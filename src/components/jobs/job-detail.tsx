@@ -719,6 +719,10 @@ function AddressesCard({
   const [billingChanged, setBillingChanged] = useState(false);
   // Feature 1017: the customer's own, fixable on any job like the billing address.
   const [businessName, setBusinessName] = useState(job.customer.businessName ?? "");
+  // Feature 6015: her ABN and GST answer ride the same Save, under the business name.
+  const [abn, setAbn] = useState(formatAbnForField(job.customer.abn));
+  const [abnError, setAbnError] = useState<string | undefined>();
+  const [gstAnswer, setGstAnswer] = useState<"" | "yes" | "no">(job.customer.gstRegistered ?? "");
   const [billingError, setBillingError] = useState<string | undefined>();
   const [sameAsBilling, setSameAsBilling] = useState(job.siteSameAsBilling);
   const [site, setSite] = useState<PickedAddress | null>(job.siteSameAsBilling ? null : job.siteAddress);
@@ -751,7 +755,10 @@ function AddressesCard({
       contact.phone.trim() !== stored.phone ||
       contact.email.trim() !== stored.email);
   const businessNameWouldChange = businessName.trim() !== (job.customer.businessName ?? "");
-  const pending = billingWouldChange || siteWouldChange || contactWouldChange || businessNameWouldChange;
+  const isBusiness = businessName.trim() !== "";
+  const abnWouldChange = isBusiness && abn.replace(/\s/g, "") !== (job.customer.abn ?? "");
+  const gstWouldChange = isBusiness && gstAnswer !== (job.customer.gstRegistered ?? "");
+  const pending = billingWouldChange || siteWouldChange || contactWouldChange || businessNameWouldChange || abnWouldChange || gstWouldChange;
   // The group shows no stars while it is empty; the moment any field holds a
   // value the star appears on each field the group needs (Validation timing).
   const contactStarted = contact.name.trim() !== "" || contact.phone.trim() !== "" || contact.email.trim() !== "";
@@ -792,6 +799,9 @@ function AddressesCard({
     if (billingChanged && billing) body["billingAddress"] = billing;
     // Empty clears it; the server trims.
     if (businessNameWouldChange) body["businessName"] = businessName.trim();
+    // The server clears both with an emptied business name; sent only while there is one.
+    if (abnWouldChange) body["abn"] = abn.trim() === "" ? null : abn;
+    if (gstWouldChange) body["gstRegistered"] = gstAnswer === "" ? null : gstAnswer;
     // Once dispatched the site is frozen -- it is never sent (Ops job actions - Edit).
     if (!job.siteLocked) {
       body["site"] = sameAsBilling ? { sameAsBilling: true } : { sameAsBilling: false, address: site };
@@ -806,7 +816,8 @@ function AddressesCard({
       });
       const payload = (await res.json()) as { job: JobDetail; moved: { from: string; to: string } | null } & ApiError;
       if (!res.ok) {
-        if (payload.field === "billingAddress") setBillingError(payload.error);
+        if (payload.field === "abn") setAbnError(payload.error);
+        else if (payload.field === "billingAddress") setBillingError(payload.error);
         else if (payload.field === "siteAddress") setSiteError(payload.error);
         else if (payload.field === "siteContactName") setContactErrors({ name: payload.error });
         else if (payload.field === "siteContactPhone") setContactErrors({ phone: payload.error });
@@ -849,6 +860,34 @@ function AddressesCard({
         onChange={(event) => setBusinessName(event.target.value)}
         autoComplete="off"
       />
+      {isBusiness ? (
+        <>
+          <Field
+            id="customer-abn"
+            label="ABN"
+            inputMode="numeric"
+            value={abn}
+            onChange={(event) => {
+              setAbn(event.target.value);
+              setAbnError(undefined);
+            }}
+            error={abnError}
+            helper="11 digits, if the business has one."
+            autoComplete="off"
+          />
+          <SelectField
+            id="customer-gst-registered"
+            label="Registered for GST?"
+            value={gstAnswer}
+            onChange={(event) => setGstAnswer(event.target.value as "" | "yes" | "no")}
+            options={[
+              { value: "", label: "Not asked yet" },
+              { value: "yes", label: "Yes" },
+              { value: "no", label: "No" },
+            ]}
+          />
+        </>
+      ) : null}
 
       {job.siteLocked ? (
         <LockedField
@@ -1033,13 +1072,22 @@ const INVOICE_TAGS: Record<InvoiceView["status"] | "waiting", { label: string; p
   waiting: { label: "Waiting for pay link", pair: "bg-warning-bg text-brand-warning" },
 };
 
-/** "Rossi's Cafe / Attn: Nina Rossi", or the name alone. */
+/** "12 345 678 901" for eleven digits; empty for none. */
+function formatAbnForField(abn: string | null): string {
+  if (abn === null || !/^\d{11}$/.test(abn)) return abn ?? "";
+  return `${abn.slice(0, 2)} ${abn.slice(2, 5)} ${abn.slice(5, 8)} ${abn.slice(8)}`;
+}
+
+/** "Rossi's Cafe / Attn: Nina Rossi / ABN 51 824 753 556", or the name alone. */
 function BilledTo({ billedTo }: { billedTo: InvoiceView["billedTo"] }) {
   if (billedTo.businessName === null) return <>{billedTo.name}</>;
   return (
     <>
       {billedTo.businessName}
       <span className="block text-small font-normal text-secondary-text">Attn: {billedTo.name}</span>
+      {billedTo.abn ? (
+        <span className="block text-small font-normal text-secondary-text">ABN {formatAbnForField(billedTo.abn)}</span>
+      ) : null}
     </>
   );
 }
@@ -1327,27 +1375,24 @@ function InvoiceCard({
           ))}
         </tbody>
         <tfoot>
+          <tr className="border-t-2 border-ink">
+            <td colSpan={3} className="pt-2 pr-2 text-right text-secondary-text">
+              {invoice.gstApplied ? "Total (includes GST)" : "Total"}
+            </td>
+            <td className="pt-2 text-right tabular-nums text-ink">{formatDollars(invoice.amount)}</td>
+          </tr>
           {invoice.gstApplied ? (
-            <>
-              <tr className="border-t-2 border-ink">
-                <td colSpan={3} className="pt-2 pr-2 text-right text-secondary-text">Subtotal</td>
-                <td className="pt-2 text-right tabular-nums text-ink">{formatDollars(invoice.amount - invoice.gstAmount)}</td>
-              </tr>
-              <tr>
-                <td colSpan={3} className="pr-2 text-right text-secondary-text">Includes GST</td>
-                <td className="text-right tabular-nums text-ink">{formatDollars(invoice.gstAmount)}</td>
-              </tr>
-              <tr>
-                <td colSpan={3} className="pt-1 pr-2 text-right font-bold text-ink">Total</td>
-                <td className="pt-1 text-right font-bold tabular-nums text-ink">{formatDollars(invoice.amount)}</td>
-              </tr>
-            </>
-          ) : (
-            <tr className="border-t-2 border-ink">
-              <td colSpan={3} className="pt-2 pr-2 text-right font-bold text-ink">Total</td>
-              <td className="pt-2 text-right font-bold tabular-nums text-ink">{formatDollars(invoice.amount)}</td>
+            <tr>
+              <td colSpan={3} className="pr-2 text-right text-secondary-text">GST included</td>
+              <td className="text-right tabular-nums text-ink">{formatDollars(invoice.gstAmount)}</td>
             </tr>
-          )}
+          ) : null}
+          <tr>
+            <td colSpan={3} className="pt-1 pr-2 text-right font-bold text-ink">Amount due</td>
+            <td className="pt-1 text-right font-bold tabular-nums text-ink">
+              {formatDollars(invoice.status === "paid" ? 0 : invoice.amount)}
+            </td>
+          </tr>
         </tfoot>
       </table>
       {invoice.voided ? (
@@ -1515,7 +1560,7 @@ function InvoiceCard({
                 setRefundAmountError(undefined);
               }}
               error={refundAmountError}
-              helper={`Up to ${refundMoney(invoice.refundableLeft)}.`}
+              helper={`Up to ${refundMoney(invoice.refundableLeft)}${invoice.gstApplied ? ", GST included" : ""}.`}
             />
             <label
               htmlFor="refund-reason"
