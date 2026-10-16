@@ -70,6 +70,21 @@ export interface ContractorJobDto {
   frozen: boolean;
   canOnSite: boolean;
   timezone: string;
+  /** Feature 6004: the original's reference when this job is a callback, else null. */
+  callbackOn: string | null;
+  /** Feature 6004: "Callback on" is a link while his booking is open, plain text after. */
+  callbackOnLinked: boolean;
+  /** Feature 6004: his pick on a callback; null until he picks. */
+  callbackChargeable: boolean | null;
+}
+
+/** Feature 6004: the original job a callback is about, read-only for the contractor. */
+export interface OriginalJobDto {
+  reference: string;
+  description: string;
+  finished: string;
+  workSummary: string;
+  parts: { name: string; description: string; qty: number }[];
 }
 
 export interface ApiError {

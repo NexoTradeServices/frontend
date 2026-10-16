@@ -85,6 +85,7 @@ export async function warmRoutes(): Promise<void> {
       "/ops/payouts",
       "/contractor/payouts",
       "/contractor/payouts/CINV-0",
+      "/contractor/jobs/JOB-0/original",
       "/approve/warm-up",
       "/request-a-job",
       "/forgot-password",

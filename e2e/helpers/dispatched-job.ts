@@ -124,6 +124,14 @@ export async function dispatchThrowawayJob(
   });
   expect(saved.status()).toBe(200);
 
+  return dispatchExistingJob(page, request, reference);
+}
+
+/**
+ * Feature 6004: dispatch a job that already exists (a callback Mike raised) to Bob and read his
+ * respond link from his text. `page` must be signed in as ops.
+ */
+export async function dispatchExistingJob(page: Page, request: APIRequestContext, reference: string): Promise<DispatchedJob> {
   // Two of this file's tests run at once and may pick the same slot for
   // Bob: a busy answer (409) just means pick another.
   let dispatchedStatus = 0;
