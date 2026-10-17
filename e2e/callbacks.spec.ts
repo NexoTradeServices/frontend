@@ -64,7 +64,7 @@ test("AC1, AC2, AC5: Mike raises a callback from a completed job and lands on it
 test.describe("Bob's callback, on a phone", () => {
   test.use(MOBILE_VIEWPORT);
 
-  test("AC5a: the original's notes sit under the issue description, read-only, with no link away", async ({ page, browser, request }) => {
+  test("AC5a: the original's notes sit under the issue description; the job number opens it read-only", async ({ page, browser, request }) => {
     const callback = await acceptedCallbackForBob(browser, request, "cbk2");
     await openJobScreen(page, callback);
 
@@ -76,7 +76,16 @@ test.describe("Bob's callback, on a phone", () => {
     await expect(notes.getByText("No parts.")).toBeVisible();
     await expect(notes.getByText(/Finished /)).toBeVisible();
     await expect(notes.getByText(/\$|Time on site|Mike|Bob/)).toHaveCount(0);
-    await expect(notes.getByRole("link")).toHaveCount(0);
+
+    // The job number in the heading opens that job read-only, and the breadcrumb comes back.
+    await notes.getByRole("link", { name: callback.originalReference, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/contractor/jobs/${callback.reference}/original\\?job=${callback.originalReference}$`), { timeout: 30_000 });
+    const card = page.getByTestId("original-job");
+    await expect(card.getByRole("heading", { name: "Last time" })).toBeVisible();
+    await expect(card.getByText("Replaced the cartridge.")).toBeVisible();
+    await expect(card.getByText(/\$|Time on site|Mike|Bob/)).toHaveCount(0);
+    await page.getByRole("link", { name: `< ${callback.reference}` }).click();
+    await expect(page).toHaveURL(new RegExp(`/contractor/jobs/${callback.reference}$`));
   });
 
   test("AC6: This callback is -- the hint, Complete refused without a pick, frozen with the choice after", async ({

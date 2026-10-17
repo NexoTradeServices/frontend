@@ -1,8 +1,79 @@
-// Retired -- Feature 6004. A callback's earlier notes now sit on the job page itself, under
-// the issue description. This route only sends an old link there. The owner may delete this file.
-import { redirect } from "next/navigation";
+// An earlier job a callback is about -- Feature 6004, callbacks and no-shows.
+// Pages / Page map: `/contractor/jobs/[ref]/original`, contractor only, Portal shell, Medium container.
+// `[ref]` is HIS callback and `?job=` the earlier job (the original, or an earlier callback). The page
+// reads it read-only: what was wrong, when it was finished, what was done and the parts - never
+// prices, time on site or who did it. Not his callback, or his booking no longer open, reads as the
+// page-could-not-be-read Message page.
+import { cookies } from "next/headers";
+import { Container } from "@/components/frame/container";
+import { PageHeader } from "@/components/ui/page-header";
+import { LoadFailed } from "@/components/ui/load-failed";
+import type { EarlierNotesDto } from "@/components/contractor-job/types";
 
-export default async function OriginalJobPage({ params }: { params: Promise<{ ref: string }> }) {
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+
+const labelClass = "block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase";
+
+function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <span className={labelClass}>{label}</span>
+      <div className="mt-[5px] font-semibold text-ink">{children}</div>
+    </div>
+  );
+}
+
+export default async function OriginalJobPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ ref: string }>;
+  searchParams: Promise<{ job?: string }>;
+}) {
   const { ref } = await params;
-  redirect(`/contractor/jobs/${encodeURIComponent(ref)}`);
+  const { job } = await searchParams;
+  if (!job) return <LoadFailed />;
+  const cookieStore = await cookies();
+  const res = await fetch(
+    `${apiUrl}/api/contractor/jobs/${encodeURIComponent(ref)}/earlier/${encodeURIComponent(job)}`,
+    { headers: { cookie: cookieStore.toString() }, cache: "no-store" },
+  );
+  if (res.status !== 200) return <LoadFailed />;
+  const earlier = (await res.json()) as EarlierNotesDto;
+
+  return (
+    <Container width="medium">
+      <PageHeader title={earlier.reference} breadcrumb={{ label: ref, href: `/contractor/jobs/${encodeURIComponent(ref)}` }} />
+      <section className="rounded-card border border-hairline bg-surface p-4 md:p-5" data-testid="original-job">
+        <h2 className="font-heading text-base font-extrabold text-ink">
+          {earlier.kind === "original" ? "Last time" : "Earlier callback"}
+        </h2>
+        <div className="mt-3 flex flex-col gap-3.5">
+          <Fact label="Problem">
+            <p className="max-w-[62ch] font-normal whitespace-pre-wrap">{earlier.description || "-"}</p>
+          </Fact>
+          <Fact label="Finished">
+            <span className="font-normal tabular-nums">{earlier.finished || "-"}</span>
+          </Fact>
+          <Fact label="Work summary">
+            <p className="max-w-[62ch] font-normal whitespace-pre-wrap">{earlier.workSummary || "-"}</p>
+          </Fact>
+          <Fact label="Parts">
+            {earlier.parts.length === 0 ? (
+              <p className="font-normal text-muted-text">No parts.</p>
+            ) : (
+              <ul className="font-normal">
+                {earlier.parts.map((part, index) => (
+                  <li key={index}>
+                    {part.name}
+                    {part.description ? ` - ${part.description}` : ""} x{part.qty}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Fact>
+        </div>
+      </section>
+    </Container>
+  );
 }

@@ -9,6 +9,7 @@
 // the Bottom action bar fixed to the bottom of the phone.
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -157,7 +158,7 @@ function PaymentBody({ payment, customerName }: { payment: PaymentDto; customerN
   );
 }
 
-function Fact({ label, children }: { label: string; children: ReactNode }) {
+function Fact({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="min-w-0">
       <span className={labelClass}>{label}</span>
@@ -610,7 +611,19 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               </div>
               {job.earlierNotes.map((earlier) => (
                 <div key={earlier.reference} className="col-span-2" data-testid="earlier-notes">
-                  <Fact label={`Job notes from ${earlier.kind === "original" ? "original job" : "callback"} ${earlier.reference}`}>
+                  <Fact
+                    label={
+                      <>
+                        Job notes from {earlier.kind === "original" ? "original job" : "callback"}{" "}
+                        <Link
+                          href={`/contractor/jobs/${encodeURIComponent(job.reference)}/original?job=${encodeURIComponent(earlier.reference)}`}
+                          className="inline-flex min-h-11 items-center normal-case underline underline-offset-2"
+                        >
+                          {earlier.reference}
+                        </Link>
+                      </>
+                    }
+                  >
                     <div className="mt-0.5 flex flex-col gap-2 rounded-small-box border border-hairline bg-ground px-3 py-2.5 font-normal">
                       <p className="whitespace-pre-wrap">{earlier.workSummary || "-"}</p>
                       <p className="text-small text-muted-text">
