@@ -2,7 +2,7 @@
 //
 // AC1, AC2, AC5 Mike's Raise callback dialog, its required message, landing on the new job, and the
 //               Callback on / Callbacks links between the two pages
-// AC5a          Bob taps Callback on, reads the original (no prices, no time, no name) and goes back
+// AC5a          Bob reads the original's notes under the issue description (no prices, no time, no name)
 // AC6           Bob's "This callback is" field: the hint, Complete refused without it, frozen after
 //
 // The rest is proven in the backend (tests/callbacks.test.ts, contractor-job.test.ts,
@@ -64,25 +64,19 @@ test("AC1, AC2, AC5: Mike raises a callback from a completed job and lands on it
 test.describe("Bob's callback, on a phone", () => {
   test.use(MOBILE_VIEWPORT);
 
-  test("AC5a: Callback on opens the original read-only, and the breadcrumb goes back", async ({ page, browser, request }) => {
+  test("AC5a: the original's notes sit under the issue description, read-only, with no link away", async ({ page, browser, request }) => {
     const callback = await acceptedCallbackForBob(browser, request, "cbk2");
     await openJobScreen(page, callback);
 
-    await expect(page.getByText("Callback on", { exact: true })).toBeVisible();
-    await page.getByRole("link", { name: callback.originalReference, exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`/contractor/jobs/${callback.reference}/original$`), { timeout: 30_000 });
-    await expect(page.getByRole("heading", { name: callback.originalReference, exact: true })).toBeVisible();
-
-    const card = page.getByTestId("original-job");
-    await expect(card.getByRole("heading", { name: "Last time" })).toBeVisible();
-    await expect(card.getByText("Problem", { exact: true })).toBeVisible();
-    await expect(card.getByText("Finished", { exact: true })).toBeVisible();
-    await expect(card.getByText("Replaced the cartridge.")).toBeVisible();
-    await expect(card.getByText("No parts.")).toBeVisible();
-    await expect(card.getByText(/\$|Time on site|Mike|Bob/)).toHaveCount(0);
-
-    await page.getByRole("link", { name: `< ${callback.reference}` }).click();
-    await expect(page).toHaveURL(new RegExp(`/contractor/jobs/${callback.reference}$`));
+    await expect(page.getByText("Callback on", { exact: true })).toHaveCount(0);
+    const notes = page.getByTestId("earlier-notes");
+    await expect(notes).toHaveCount(1);
+    await expect(notes.getByText(`Job notes from original job ${callback.originalReference}`)).toBeVisible();
+    await expect(notes.getByText("Replaced the cartridge.")).toBeVisible();
+    await expect(notes.getByText("No parts.")).toBeVisible();
+    await expect(notes.getByText(/Finished /)).toBeVisible();
+    await expect(notes.getByText(/\$|Time on site|Mike|Bob/)).toHaveCount(0);
+    await expect(notes.getByRole("link")).toHaveCount(0);
   });
 
   test("AC6: This callback is -- the hint, Complete refused without a pick, frozen with the choice after", async ({

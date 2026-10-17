@@ -72,14 +72,15 @@ export interface ContractorJobDto {
   timezone: string;
   /** Feature 6004: the original's reference when this job is a callback, else null. */
   callbackOn: string | null;
-  /** Feature 6004: "Callback on" is a link while his booking is open, plain text after. */
-  callbackOnLinked: boolean;
+  /** Feature 6004: the original's notes, then each earlier finished callback's; empty once his booking is over. */
+  earlierNotes: EarlierNotesDto[];
   /** Feature 6004: his pick on a callback; null until he picks. */
   callbackChargeable: boolean | null;
 }
 
-/** Feature 6004: the original job a callback is about, read-only for the contractor. */
-export interface OriginalJobDto {
+/** Feature 6004: an earlier job's notes (the original, or a finished callback), read-only for the contractor. */
+export interface EarlierNotesDto {
+  kind: "original" | "callback";
   reference: string;
   description: string;
   finished: string;

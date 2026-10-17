@@ -11,7 +11,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock, QrCode as QrCodeIcon } from "lucide-react";
 import { Field } from "@/components/auth/field";
@@ -594,22 +593,6 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
             <div className="grid grid-cols-2 gap-x-4.5 gap-y-3.5">
               <Fact label="Appointment">{job.slotLabel ?? "No date yet"}</Fact>
               <Fact label={job.contactIsSiteContact ? "Site contact" : "Customer"}>{job.contactLine}</Fact>
-              {job.callbackOn ? (
-                <div className="col-span-2">
-                  <Fact label="Callback on">
-                    {job.callbackOnLinked ? (
-                      <Link
-                        href={`/contractor/jobs/${encodeURIComponent(job.reference)}/original`}
-                        className="inline-flex min-h-11 items-center text-muted-text underline underline-offset-2"
-                      >
-                        {job.callbackOn}
-                      </Link>
-                    ) : (
-                      job.callbackOn
-                    )}
-                  </Fact>
-                </div>
-              ) : null}
               <div className="col-span-2">
                 <Fact label="Job address">{job.addressLine}</Fact>
               </div>
@@ -625,6 +608,21 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                   ) : null}
                 </Fact>
               </div>
+              {job.earlierNotes.map((earlier) => (
+                <div key={earlier.reference} className="col-span-2" data-testid="earlier-notes">
+                  <Fact label={`Job notes from ${earlier.kind === "original" ? "original job" : "callback"} ${earlier.reference}`}>
+                    <div className="mt-0.5 flex flex-col gap-2 rounded-small-box border border-hairline bg-ground px-3 py-2.5 font-normal">
+                      <p className="whitespace-pre-wrap">{earlier.workSummary || "-"}</p>
+                      <p className="text-small text-muted-text">
+                        {earlier.parts.length === 0
+                          ? "No parts."
+                          : `Parts: ${earlier.parts.map((part) => `${part.name}${part.description ? ` - ${part.description}` : ""} x${String(part.qty)}`).join(", ")}`}
+                      </p>
+                      <p className="text-small text-muted-text">Finished {earlier.finished || "-"}</p>
+                    </div>
+                  </Fact>
+                </div>
+              ))}
             </div>
             {job.instructions.length > 0 ? (
               <>
