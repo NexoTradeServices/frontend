@@ -37,7 +37,8 @@ export interface InvoiceView {
   dateLabel: string;
   weekendMultiplier: number;
   lines: PayLine[];
-  adjustments: { reason: string; amount: number; jobReference: string | null }[];
+  /** Feature 6007: `label` is the line as it prints ("Pay adjustment - ..." / "Correction - JOB-1042: ...") */
+  adjustments: { reason: string; label: string; kind: "adjustment" | "correction"; amount: number; jobReference: string | null }[];
   subtotal: number;
   gst: number | null;
   materials: { jobReference: string; name: string; amount: number }[];
@@ -45,6 +46,8 @@ export interface InvoiceView {
   total: number;
   /** the next payout shown as the invoice it will become: no number, no approval */
   preview?: boolean;
+  /** Feature 6007: a deduction the run cannot take yet, on the next payout only */
+  stillToDeduct?: { amount: number; jobReferences: string[] } | null;
 }
 
 // ---- the approve link -----------------------------------------------------
@@ -70,6 +73,7 @@ export interface NextPayout {
   amount: number;
   jobs: number;
   adjustments: number;
+  stillToDeduct: { amount: number; jobReferences: string[] } | null;
   plusGst: boolean;
   payDay: string;
   invoicedOn: string;
@@ -115,15 +119,18 @@ export interface OpsRow {
   madeLabel: string;
   paidLabel: string | null;
   paidBy: string | null;
-  correctedSince: boolean;
   gstNotRecorded: boolean;
 }
 
 export interface UpcomingRow {
   contractor: { code: string; name: string; firstName: string };
   jobs: number;
+  /** Feature 6007: the visits' labour waiting, cents */
+  work: number;
+  /** the plus and minus lines waiting, net, cents (negative = a deduction) */
   adjustments: number;
-  amount: number;
+  /** what the run will pay, cents */
+  payout: number;
   invoicedOn: string;
   paidOn: string;
 }
@@ -142,5 +149,18 @@ export interface OpsDetail {
   contractor: { code: string; name: string };
   amount: number;
   payDay: string;
-  correctedSince: boolean;
+}
+
+// ---- Feature 6007: the Add pay adjustment dialog --------------------------------
+
+export interface AdjustmentContractor {
+  id: string;
+  code: string;
+  name: string;
+  firstName: string;
+}
+
+export interface AdjustmentLanding {
+  landing: "draft" | "approved" | "next_run";
+  sentence: string;
 }

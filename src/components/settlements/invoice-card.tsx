@@ -146,8 +146,7 @@ export function InvoiceCard({ invoice }: { invoice: InvoiceView }) {
             {invoice.adjustments.map((adjustment, index) => (
               <tr key={`adjustment-${String(index)}`} data-testid="adjustment-line" className="border-b border-hairline">
                 <td className={td} colSpan={4}>
-                  {adjustment.reason}
-                  {adjustment.jobReference !== null ? <span className="text-muted-text"> ({adjustment.jobReference})</span> : null}
+                  {adjustment.label}
                 </td>
                 <td className={`${td} text-right font-semibold whitespace-nowrap text-ink tabular-nums`}>{formatPay(adjustment.amount)}</td>
               </tr>
@@ -184,6 +183,14 @@ export function InvoiceCard({ invoice }: { invoice: InvoiceView }) {
                   </tr>
                 ))}
               </>
+            ) : null}
+            {invoice.stillToDeduct ? (
+              <tr data-testid="still-to-deduct">
+                <td className={`${td} text-brand-warning`} colSpan={5}>
+                  Still to deduct: {formatPay(invoice.stillToDeduct.amount)}
+                  {invoice.stillToDeduct.jobReferences.length > 0 ? ` (${invoice.stillToDeduct.jobReferences.join(", ")})` : ""}
+                </td>
+              </tr>
             ) : null}
             <tr data-testid="total-row" className="border-t-2 border-ink">
               <td className={`${td} text-right font-heading font-extrabold text-ink`} colSpan={4}>

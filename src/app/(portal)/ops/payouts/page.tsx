@@ -5,7 +5,6 @@ import { cookies } from "next/headers";
 import { OpsSettlements } from "@/components/settlements/ops-settlements";
 import type { OpsList } from "@/components/settlements/types";
 import { Container } from "@/components/frame/container";
-import { PageHeader } from "@/components/ui/page-header";
 import { LoadFailed } from "@/components/ui/load-failed";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -21,10 +20,6 @@ export default async function SettlementsPage() {
 
   return (
     <Container width="wide">
-      <PageHeader
-        title="Payouts"
-        subtitle="Pay the approved invoices on pay day, then mark each one paid."
-      />
       <OpsSettlements initial={initial} />
     </Container>
   );

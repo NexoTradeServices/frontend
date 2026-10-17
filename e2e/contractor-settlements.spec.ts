@@ -5,6 +5,9 @@
 //       draft it is a Record card tagged "Awaiting your approval", opening to the invoice with each
 //       job's working and the caption pointing at the email; approved and paid change the tag; another
 //       contractor's invoice is not found
+// 6007 AC7/AC8  a correction on a paid week waits for the next run and reads "Correction - JOB-xxxx:
+//       [reason]" on the next draft; what the run cannot take stays on Bob's next payout as
+//       "Still to deduct: $X (JOB-xxxx)"
 //
 // The sums, the lists and the refusals are proven in the backend (tests/contractor-settlements.test.ts,
 // settlements-sweep.test.ts). Bob's jobs here are throwaways labelled `e2e`; the page holds whatever
@@ -108,5 +111,60 @@ test.describe(() => {
         await daves.close();
       }
     });
+  });
+});
+
+test("6007 AC7/AC8: a correction on a paid week reads 'Correction - JOB: reason' on the next draft, and what the run cannot take is 'Still to deduct' on the next payout", async ({
+  page,
+  browser,
+  request,
+}) => {
+  test.setTimeout(360_000);
+  await withSettlementsLock(async () => {
+    const { job } = await finishedJob(browser, request, "cst-correction");
+    const [week] = await runSettlementSweep(request, mondayRun(11));
+    if (week === undefined) throw new Error("the run made no draft");
+    // Bob's week is approved and paid: it is never reopened.
+    for (const status of ["approved", "paid"]) {
+      const res = await request.post(`${apiUrl}/api/test-data/settlements/${week.reference}/status`, { data: { status } });
+      expect(res.status()).toBe(200);
+    }
+
+    // Mike corrects the job: 3.0h was logged, 2.0h were worked. Bob's pay for it falls by $150.
+    const mikes = await browser.newContext({ baseURL: BASE_URL, storageState: testRunStorageState() });
+    try {
+      const mikesPage = await mikes.newPage();
+      await mikesPage.goto("/ops/payouts");
+      await login(mikesPage, "mike@idelta.com.au");
+      await expect(mikesPage.getByRole("heading", { name: "Payouts", level: 1 })).toBeVisible();
+      const corrected = await mikesPage.request.post(`${apiUrl}/api/jobs/${job.reference}/correct`, {
+        data: { timeEntries: [{ date: "2026-10-07", start: "08:07", end: "10:07", note: "" }], reason: "Logged 3h, worked 2h." },
+      });
+      expect(corrected.status()).toBe(200);
+    } finally {
+      await mikes.close();
+    }
+    // ... and a much bigger deduction than any week of work can take.
+    const big = await request.post(`${apiUrl}/api/test-data/jobs/${job.reference}/correction`, { data: { amount: -1_000_000, reason: "A big deduction." } });
+    expect(big.status()).toBe(200);
+
+    // The paid week did not move.
+    await page.goto("/contractor/payouts");
+    await login(page, "bob@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Payouts", level: 1 })).toBeVisible();
+    await expect(page.locator(`[data-testid="settlement-card"][data-ref="${week.reference}"]`).getByTestId("settlement-tag")).toHaveText("Paid");
+
+    // The next run takes the correction onto his next draft, as its own signed line.
+    await finishedJob(browser, request, "cst-correction-work");
+    const [draft] = await runSettlementSweep(request, mondayRun(12));
+    if (draft === undefined) throw new Error("the second run made no draft");
+    await page.goto(`/contractor/payouts/${draft.reference}`);
+    const line = page.getByTestId("adjustment-line").filter({ hasText: `Correction - ${job.reference}: Logged 3h, worked 2h.` });
+    await expect(line).toBeVisible();
+    await expect(line).toContainText("-$150");
+
+    // What the run could not take waits on his next payout, with the job it came from.
+    await page.goto("/contractor/payouts/next");
+    await expect(page.getByTestId("still-to-deduct")).toContainText(new RegExp(`^Still to deduct: \\$[\\d,]+(\\.\\d{2})? \\(${job.reference}\\)$`));
   });
 });

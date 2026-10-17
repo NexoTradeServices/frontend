@@ -133,11 +133,47 @@ describe("AC3 -- Dave's plain Invoice", () => {
 });
 
 describe("pay adjustments", () => {
-  test("follow the job lines as their own lines, the reason as the description", () => {
-    const html = render({ ...BOBS, adjustments: [{ reason: "Missing hour, corrected after approval", amount: 15_000, jobReference: "JOB-1043" }] });
+  test("follow the job lines as their own lines, the label as the description", () => {
+    const html = render({
+      ...BOBS,
+      adjustments: [
+        {
+          reason: "Missing hour, corrected after approval",
+          label: "Pay adjustment - Missing hour, corrected after approval",
+          kind: "adjustment",
+          amount: 15_000,
+          jobReference: "JOB-1043",
+        },
+      ],
+    });
     expect(html).toContain('data-testid="adjustment-line"');
-    expect(html).toContain("Missing hour, corrected after approval");
+    expect(html).toContain("Pay adjustment - Missing hour, corrected after approval");
     expect(html.indexOf("adjustment-line")).toBeGreaterThan(html.lastIndexOf('data-testid="pay-line"'));
+  });
+
+  test("6007: a correction reads 'Correction - JOB-1042: [reason]', its sign kept", () => {
+    const html = render({
+      ...BOBS,
+      adjustments: [
+        { reason: "Logged 5h, worked 2h.", label: "Correction - JOB-1042: Logged 5h, worked 2h.", kind: "correction", amount: -10_000, jobReference: "JOB-1042" },
+      ],
+    });
+    expect(html).toContain("Correction - JOB-1042: Logged 5h, worked 2h.");
+    expect(html).toContain("-$100");
+  });
+});
+
+describe("6007 -- Still to deduct", () => {
+  test("the next payout shows what the run cannot take yet, with the job it came from, under the lines", () => {
+    const html = render({ ...BOBS, preview: true, stillToDeduct: { amount: 7500, jobReferences: ["JOB-1042"] } });
+    expect(html).toContain('data-testid="still-to-deduct"');
+    expect(html).toContain("Still to deduct: $75 (JOB-1042)");
+    expect(html.indexOf("still-to-deduct")).toBeLessThan(html.indexOf('data-testid="total-row"'));
+  });
+
+  test("with nothing carried there is no such line", () => {
+    expect(render({ ...BOBS, stillToDeduct: null })).not.toContain("still-to-deduct");
+    expect(render({ ...BOBS })).not.toContain("still-to-deduct");
   });
 });
 

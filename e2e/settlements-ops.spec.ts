@@ -4,11 +4,14 @@
 //       saves the payout run (Contractor, BSB, Account, Amount, CINV reference)
 // AC10  Mark paid opens its Standard dialog with the bank reference, Cancel changes nothing,
 //       confirming toasts "<CINV> marked paid." and the row moves to Paid with who paid it
-// AC8   an unapproved draft whose job was corrected after it was made carries "Job corrected
-//       since"; Rebuild asks first, replaces it with a fresh draft, and the old link says so
+// AC8   Rebuild asks first, replaces an unapproved draft with a fresh one, and the old link says so
+//       (6007: the "Job corrected since" tag is gone - a correction rebuilds the draft by itself)
 // AC12  a row opens to the invoice's own lines with their working, the weekend line marked T1.5
 //       with its legend; Not yet invoiced lists unswept work with the Monday and the pay day
 //       after; at 390px the table becomes Record cards and the page never scrolls sideways
+// 6007 AC10/AC11  Add pay adjustment in the Page header opens its Standard dialog (Contractor, Amount,
+//       Job, Reason, the muted line saying where it lands), refuses what is wrong where it is typed,
+//       and toasts "Added - on Bob's next payout."; Not yet invoiced shows Work, Adjustments, Payout
 //
 // The sums, the lists, the CSV bytes and the refusals are proven in the backend
 // (tests/settlements-payout.test.ts, settlements-supersede.test.ts). The browser proves what needs
@@ -120,7 +123,7 @@ test("6003 AC9/AC10/AC12: an approved invoice is ready to pay - open its lines, 
   });
 });
 
-test("6003 AC8/AC12: a corrected draft is flagged, Rebuild asks first and replaces it, the old link says so; the weekend line is T1.5; Not yet invoiced lists unswept work", async ({
+test("6003 AC8/AC12: Rebuild asks first and replaces a draft, the old link says so; the weekend line is T1.5; Not yet invoiced lists unswept work", async ({
   page,
   browser,
   request,
@@ -139,6 +142,7 @@ test("6003 AC8/AC12: a corrected draft is flagged, Rebuild asks first and replac
     const row = page.locator(`tr[data-ref="${draft.reference}"]`);
     await expect(row).toBeVisible();
     await expect(row).toContainText("Bob Reilly");
+    // 6007: the "Job corrected since" tag is gone for good.
     await expect(row.getByText("Job corrected since")).toHaveCount(0);
     // Bob's registration is recorded, so no GST warning either.
     await expect(row.getByText("GST not recorded")).toHaveCount(0);
@@ -152,13 +156,8 @@ test("6003 AC8/AC12: a corrected draft is flagged, Rebuild asks first and replac
     await expect(page.getByTestId("weekend-legend")).toHaveText("T1.5 - weekend, time and a half");
     await row.click();
 
-    // Mike corrects the job after the draft was made: the draft says so.
-    const note = await request.post(`${apiUrl}/api/test-data/jobs/${job.reference}/correction-note`);
-    expect(note.status()).toBe(200);
     await page.getByRole("button", { name: /^Ready to pay \d+$/ }).click();
     await page.getByRole("button", { name: /^Awaiting approval \d+$/ }).click();
-    await expect(row.getByText("Job corrected since")).toBeVisible();
-    await expect(row.getByText("Job corrected since")).toHaveCSS("text-transform", "uppercase");
 
     // Rebuild asks first; Cancel changes nothing.
     await row.getByRole("button", { name: "Rebuild" }).click();
@@ -179,8 +178,6 @@ test("6003 AC8/AC12: a corrected draft is flagged, Rebuild asks first and replac
     await expect(row).toHaveCount(0);
     const fresh = page.locator(`tr[data-ref="${rebuilt}"]`);
     await expect(fresh).toBeVisible();
-    // The fresh draft is a new one: nothing corrected since.
-    await expect(fresh.getByText("Job corrected since")).toHaveCount(0);
 
     // The old link explains itself.
     await page.goto(staleLink);
@@ -194,8 +191,60 @@ test("6003 AC8/AC12: a corrected draft is flagged, Rebuild asks first and replac
     const unswept = page.locator('tr[data-ref="CON-014"]');
     await expect(unswept).toBeVisible();
     await expect(unswept).toContainText("Bob Reilly");
-    await expect(unswept.locator("td").nth(3)).toHaveText(/^Mon \d{1,2} [A-Z][a-z]{2}$/);
-    await expect(unswept.locator("td").nth(4)).toHaveText(/^[A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}$/);
+    // 6007 AC11: Work, Adjustments and Payout sit between the job count and the two dates.
+    await expect(page.locator("thead th")).toHaveText(["Contractor", "Jobs", "Work", "Adjustments", "Payout", "Invoiced on", "Paid on"]);
+    await expect(unswept.getByTestId("upcoming-work")).toHaveText(/^\$[\d,]+(\.\d{2})?$/);
+    await expect(unswept.getByTestId("upcoming-adjustments")).toHaveText(/^(\$0|[+-]\$[\d,]+(\.\d{2})?)$/);
+    await expect(unswept.getByTestId("upcoming-payout")).toHaveText(/^-?\$[\d,]+(\.\d{2})?$/);
+    await expect(unswept.locator("td").nth(5)).toHaveText(/^Mon \d{1,2} [A-Z][a-z]{2}$/);
+    await expect(unswept.locator("td").nth(6)).toHaveText(/^[A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}$/);
+  });
+});
+
+test("6007 AC10/AC11: Mike adds a pay adjustment - the dialog says where it lands, refuses what is wrong, and the Toast names Bob", async ({ page, browser, request }) => {
+  test.setTimeout(300_000);
+  await withSettlementsLock(async () => {
+    const { job } = await finishedJob(browser, request, "adj-unswept");
+
+    await page.goto("/ops/payouts");
+    await login(page, "mike@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Payouts", level: 1 })).toBeVisible();
+    // The compact Primary sits in the Page header.
+    await page.getByRole("button", { name: "Add pay adjustment" }).click();
+    const dialog = page.getByRole("alertdialog");
+    await expect(dialog.getByRole("heading", { name: "Add pay adjustment" })).toBeVisible();
+    await expect(dialog.getByTestId("adjustment-landing")).toHaveText("Choose a contractor to see where it will land.");
+
+    // The muted line says which, before Add: Bob's next payout, his draft, or next week's draft.
+    await dialog.getByLabel("Contractor").selectOption({ label: "Bob Reilly" });
+    await expect(dialog.getByTestId("adjustment-landing")).toHaveText(
+      /^(Goes on Bob's next payout - invoiced \w{3} \d{1,2} \w{3}\.|Goes on Bob's draft for \w{3} \d{1,2} \w{3} - their draft is resent to approve\.|Bob has approved this week - it goes on next week's draft\.)$/,
+    );
+    await expect(dialog.getByText("Bob sees this on their pay.")).toBeVisible();
+
+    // Refusals, where they are typed; nothing is saved.
+    await dialog.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(dialog.getByText("Enter an amount more than $0.")).toBeVisible();
+    await expect(dialog.getByText("Required.")).toBeVisible();
+    await dialog.getByLabel("Amount").fill("75");
+    await dialog.getByLabel("Reason").fill(`Missing hour on ${job.reference}`);
+    await dialog.getByLabel("Job").fill("JOB-9999");
+    await dialog.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(dialog.getByText("No job with that number.")).toBeVisible();
+    await expect(dialog).toBeVisible();
+
+    // Add: the Toast names Bob and the page shows it under Not yet invoiced.
+    await dialog.getByLabel("Job").fill(job.reference);
+    await dialog.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(page.getByText("Added - on Bob's next payout.")).toBeVisible();
+    await expect(dialog).toBeHidden();
+
+    // Cancel changes nothing.
+    await page.getByRole("button", { name: "Add pay adjustment" }).click();
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toBeHidden();
+
+    // Where it landed depends on what else of Bob's is waiting; the backend tests prove each case.
   });
 });
 

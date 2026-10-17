@@ -111,6 +111,7 @@ export function TimeEntryRows({
   idPrefix,
   errors = {},
   noteLabel = "Visit note",
+  showNow = true,
   onChange,
 }: {
   rows: TimeEntryRow[];
@@ -121,6 +122,8 @@ export function TimeEntryRows({
   errors?: Record<string, string>;
   /** What the note on each visit is called: "Visit note" on Bob's screen, who wrote it on the ops page. */
   noteLabel?: string;
+  /** Feature 6007: false after the fact (Correct & reissue) -- Finish has no "Now" button. */
+  showNow?: boolean;
   onChange?: (next: TimeEntryRow[]) => void;
 }) {
   if (mode !== "edit") {
@@ -198,7 +201,7 @@ export function TimeEntryRows({
                   invalid={Boolean(at("end"))}
                   muted={row.endIsDefault}
                   onChange={(value) => update(index, { end: value, endIsDefault: false })}
-                  onNow={() => update(index, { end: nowInZone(zone).time, endIsDefault: false })}
+                  {...(showNow ? { onNow: () => update(index, { end: nowInZone(zone).time, endIsDefault: false }) } : {})}
                 />
               </Control>
               <div className="md:col-span-3">

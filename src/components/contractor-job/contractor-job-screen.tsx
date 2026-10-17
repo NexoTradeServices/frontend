@@ -584,7 +584,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
 
         <div className="order-1 flex min-w-0 flex-col gap-4 xl:col-start-2 xl:row-start-1 xl:row-span-3">
           {job.payment === null ? null : (
-            <div ref={paymentRef} className="scroll-mt-4">
+            <div ref={paymentRef} id="payment" className="scroll-mt-4">
               <Card title="Payment">
                 <PaymentBody payment={job.payment} customerName={job.customerName} />
               </Card>

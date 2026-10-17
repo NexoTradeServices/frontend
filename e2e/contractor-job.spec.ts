@@ -154,12 +154,14 @@ test.describe("Bob's job screen, on a phone", () => {
     await expect(page.getByText("Replaced the cartridge.")).toBeVisible();
     await expect(page.getByText("8:07am")).toBeVisible();
 
-    // Still locked after a reload, and the job has left his dashboard.
+    // Still locked after a reload. It has left his live work; its unpaid invoice keeps it on the dashboard
+    // as "Completed - awaiting payment" (6007).
     await page.reload();
     await expect(page.getByText("Locked when the job was completed").first()).toBeVisible();
     await page.goto("/contractor");
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-    await expect(page.getByText(job.reference)).toHaveCount(0);
+    await expect(page.getByText(job.reference)).toHaveCount(1);
+    await expect(page.getByTestId("awaiting-payment-tag")).toHaveText("Completed - awaiting payment");
   });
 
   /** Bob fills the one visit and completes it through the screen. */
