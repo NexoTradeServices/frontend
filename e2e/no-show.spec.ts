@@ -53,7 +53,7 @@ test("AC9, AC10: the dialog's line follows the tick; charged closes the job as a
   await page.getByRole("alertdialog").getByRole("button", { name: "Mark no-show" }).click();
   await expect(page.getByText(`Marked ${job.reference} as a no-show.`)).toBeVisible();
   await expect(page.getByText("Customer no-show")).toBeVisible();
-  await expect(page.getByText(/Call-out fee - missed visit on/)).toBeVisible();
+  await expect(page.getByText("Call-out fee - no access / customer unavailable")).toBeVisible();
   await expect(page.getByRole("button", { name: "Mark no-show" })).toHaveCount(0);
 });
 
@@ -68,6 +68,6 @@ test("AC9, AC11: unticked, the job closes the same way with no invoice", async (
 
   await expect(page.getByText(`Marked ${job.reference} as a no-show.`)).toBeVisible();
   await expect(page.getByText("Customer no-show")).toBeVisible();
-  await expect(page.getByText(/Call-out fee - missed visit on/)).toHaveCount(0);
+  await expect(page.getByText("Call-out fee - no access / customer unavailable")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Mark no-show" })).toHaveCount(0);
 });
