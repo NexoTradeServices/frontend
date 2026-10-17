@@ -184,6 +184,14 @@ export interface JobDetail {
   earlierBookings: EarlierBooking[];
   /** Feature 4006: which of Reschedule, Reassign and Cancel job the page offers. */
   actions: { reschedule: boolean; takeOff: boolean; cancel: boolean };
+  /** Feature 6004: the root original's reference when this job is a callback, else null. */
+  callbackOn: string | null;
+  /** Feature 6004: this job's callbacks, oldest first. */
+  callbacks: string[];
+  /** Feature 6004: Raise callback is offered on a completed job. */
+  canRaiseCallback: boolean;
+  /** Feature 6004: Mark no-show is offered on a scheduled or in-progress job. */
+  canMarkNoShow: boolean;
   /** Feature 4006: set once the job is cancelled. */
   cancelled: { reasonLabel: string; note: string | null; byName: string; atLabel: string } | null;
   /** Feature 4002, AC29: the level and its price, once the job is dispatched. */

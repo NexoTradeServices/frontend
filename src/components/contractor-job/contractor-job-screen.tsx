@@ -9,11 +9,13 @@
 // the Bottom action bar fixed to the bottom of the phone.
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, QrCode as QrCodeIcon } from "lucide-react";
 import { Field } from "@/components/auth/field";
+import { SelectField } from "@/components/ui/select-field";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PhotoGallery, type GalleryPhoto } from "@/components/ui/photo-gallery";
 import { QrCode } from "@/components/ui/qr-code";
@@ -156,7 +158,7 @@ function PaymentBody({ payment, customerName }: { payment: PaymentDto; customerN
   );
 }
 
-function Fact({ label, children }: { label: string; children: ReactNode }) {
+function Fact({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="min-w-0">
       <span className={labelClass}>{label}</span>
@@ -235,9 +237,23 @@ function newPart(): PartRow {
   return { key: freshKey("part"), name: "", qty: "1", price: "", receipt: null, uploading: false, pending: null, failed: false };
 }
 
+/** Feature 6004: "This callback is" -- the two answers, as the dropdown words them. */
+const CALLBACK_OPTIONS = [
+  { value: "", label: "Pick one" },
+  { value: "charged", label: "New fault - charged" },
+  { value: "free", label: "Fixing earlier work - no charge" },
+] as const;
+
+type CallbackPick = "" | "charged" | "free";
+
+function pickOf(value: boolean | null): CallbackPick {
+  return value === null ? "" : value ? "charged" : "free";
+}
+
 /** What would be saved, as one string -- Save stays Quiet until it differs from what is stored. */
-function snapshotOf(rows: TimeEntryRow[], notes: string, parts: PartRow[]): string {
+function snapshotOf(rows: TimeEntryRow[], notes: string, parts: PartRow[], pick: CallbackPick): string {
   return JSON.stringify({
+    pick,
     entries: rows.filter((row) => !isBlankRow(row)).map((row) => [row.date, row.start, row.end, row.note.trim()]),
     notes: notes.trim(),
     parts: parts.filter((part) => !isBlankPart(part)).map((part) => [part.name.trim(), part.qty.trim(), part.price.trim(), part.receipt?.id ?? null]),
@@ -303,8 +319,14 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
   const [rows, setRows] = useState<TimeEntryRow[]>(() => rowsFromEntries(initial.timeEntries, initial.timezone));
   const [notes, setNotes] = useState(initial.completionNotes);
   const [parts, setParts] = useState<PartRow[]>(() => partRowsOf(initial));
+  const [pick, setPick] = useState<CallbackPick>(() => pickOf(initial.callbackChargeable));
   const [saved, setSaved] = useState(() =>
-    snapshotOf(rowsFromEntries(initial.timeEntries, initial.timezone), initial.completionNotes, partRowsOf(initial)),
+    snapshotOf(
+      rowsFromEntries(initial.timeEntries, initial.timezone),
+      initial.completionNotes,
+      partRowsOf(initial),
+      pickOf(initial.callbackChargeable),
+    ),
   );
   const [errors, setErrors] = useState<Errors>({});
   const [banner, setBanner] = useState<string | undefined>();
@@ -316,7 +338,8 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
   const [scrollToPayment, setScrollToPayment] = useState(false);
 
   const frozen = job.frozen;
-  const changed = snapshotOf(rows, notes, parts) !== saved;
+  const isCallback = job.callbackOn !== null;
+  const changed = snapshotOf(rows, notes, parts, pick) !== saved;
   const uploading = parts.some((part) => part.uploading);
   const billed = billedHoursOf(rows, job.returnVisitMinimumMinutes);
   const capLabel = formatDollars(job.maxContractorPartAmount);
@@ -344,7 +367,8 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
         },
       ];
     });
-    return { body: { timeEntries, completionNotes: notes, parts: sentParts }, entryAt, partAt };
+    const callback = isCallback ? { callbackChargeable: pick === "" ? null : pick === "charged" } : {};
+    return { body: { timeEntries, completionNotes: notes, parts: sentParts, ...callback }, entryAt, partAt };
   }
 
   /** The rules a person can see before the server is asked -- the same words the server uses. */
@@ -371,6 +395,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
     if (forComplete) {
       if (filled.length === 0) found["rows"] = "Add at least one visit.";
       if (notes.trim() === "") found["notes"] = "Required.";
+      if (isCallback && pick === "") found["pick"] = "Pick whether this callback is charged.";
     }
     return found;
   }
@@ -413,7 +438,8 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
     setRows(nextRows);
     setNotes(next.completionNotes);
     setParts(nextParts);
-    setSaved(snapshotOf(nextRows, next.completionNotes, nextParts));
+    setPick(pickOf(next.callbackChargeable));
+    setSaved(snapshotOf(nextRows, next.completionNotes, nextParts, pickOf(next.callbackChargeable)));
   }
 
   /** The server's refusal, put on the field it names. */
@@ -425,6 +451,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
     else if (part) setErrors({ [`part.${String(partAt[Number(part[1])] ?? 0)}.${part[2] === "unitPrice" ? "price" : (part[2] ?? "")}`]: error.error });
     else if (field === "timeEntries") setErrors({ rows: error.error });
     else if (field === "completionNotes") setErrors({ notes: error.error });
+    else if (field === "callbackChargeable") setErrors({ pick: error.error });
     else setBanner(error.error);
   }
 
@@ -582,6 +609,33 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                   ) : null}
                 </Fact>
               </div>
+              {job.earlierNotes.map((earlier) => (
+                <div key={earlier.reference} className="col-span-2" data-testid="earlier-notes">
+                  <Fact
+                    label={
+                      <>
+                        Job notes from {earlier.kind === "original" ? "original job" : "callback"}{" "}
+                        <Link
+                          href={`/contractor/jobs/${encodeURIComponent(job.reference)}/original?job=${encodeURIComponent(earlier.reference)}`}
+                          className="inline-flex min-h-11 items-center normal-case underline underline-offset-2"
+                        >
+                          {earlier.reference}
+                        </Link>
+                      </>
+                    }
+                  >
+                    <div className="mt-0.5 flex flex-col gap-2 rounded-small-box border border-hairline bg-ground px-3 py-2.5 font-normal">
+                      <p className="whitespace-pre-wrap">{earlier.workSummary || "-"}</p>
+                      <p className="text-small text-muted-text">
+                        {earlier.parts.length === 0
+                          ? "No parts."
+                          : `Parts: ${earlier.parts.map((part) => `${part.name}${part.description ? ` - ${part.description}` : ""} x${String(part.qty)}`).join(", ")}`}
+                      </p>
+                      <p className="text-small text-muted-text">Finished {earlier.finished || "-"}</p>
+                    </div>
+                  </Fact>
+                </div>
+              ))}
             </div>
             {job.instructions.length > 0 ? (
               <>
@@ -633,7 +687,32 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
           </Card>
         </div>
 
-        <div className="order-3 min-w-0 xl:col-start-1 xl:row-start-2">
+        <div className="order-3 flex min-w-0 flex-col gap-4 xl:col-start-1 xl:row-start-2">
+          {isCallback ? (
+            <Card title="This callback">
+              {frozen ? (
+                <LockedValue
+                  label="This callback is"
+                  value={CALLBACK_OPTIONS.find((option) => option.value === pick)?.label ?? ""}
+                  message
+                />
+              ) : (
+                <SelectField
+                  id="callback-pick"
+                  label="This callback is"
+                  required
+                  value={pick}
+                  options={CALLBACK_OPTIONS}
+                  helper="Charged if it's a new problem. No charge if the earlier work failed."
+                  error={errors["pick"] || undefined}
+                  onChange={(event) => {
+                    setPick(event.target.value as CallbackPick);
+                    setErrors((current) => ({ ...current, pick: "" }));
+                  }}
+                />
+              )}
+            </Card>
+          ) : null}
           <Card title="Work notes">
             {frozen ? (
               <LockedValue label="Work notes" hideLabel value={notes === "" ? "-" : notes} message />

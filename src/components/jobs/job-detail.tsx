@@ -67,6 +67,18 @@ function Fact({ label, wide, children }: { label: string; wide?: boolean; childr
   );
 }
 
+/** A job reference that opens that job's page (Atoms / Text and links: the Link). */
+function ReferenceLink({ reference }: { reference: string }) {
+  return (
+    <Link
+      href={`/ops/jobs/${encodeURIComponent(reference)}`}
+      className="inline-flex min-h-11 items-center font-heading font-bold text-muted-text underline underline-offset-2"
+    >
+      {reference}
+    </Link>
+  );
+}
+
 function RequestCard({ job }: { job: JobDetail }) {
   return (
     <Card title="The request">
@@ -80,6 +92,20 @@ function RequestCard({ job }: { job: JobDetail }) {
           <div className="text-xs font-normal text-muted-text tabular-nums">{job.windowLabel}</div>
         </Fact>
         <Fact label="Arrived by">{job.source === "web" ? "Web form" : "Phone"}</Fact>
+        {job.callbackOn ? (
+          <Fact label="Callback on">
+            <ReferenceLink reference={job.callbackOn} />
+          </Fact>
+        ) : null}
+        {job.callbacks.length > 0 ? (
+          <Fact label="Callbacks">
+            <div className="flex flex-wrap gap-x-3">
+              {job.callbacks.map((reference) => (
+                <ReferenceLink key={reference} reference={reference} />
+              ))}
+            </div>
+          </Fact>
+        ) : null}
         {job.cancelled ? (
           <>
             <Fact label="Cancelled">
@@ -132,13 +158,12 @@ const LEVEL_LABELS: Record<"normal" | "weekend" | "emergency", string> = {
  * each shown only where it would work, outlined, greyed and disabled, naming
  * the feature that switches it on. Architect skill, Writing the plan, step 2a.
  * Feature 4006 took Reassign, Reschedule and Cancel out of
- * this list: they are real buttons (JobActions, below).
+ * this list: they are real buttons (JobActions, below). Feature 6004 did the same for Mark no-show
+ * and Raise callback.
  */
 const ACTION_PLACEHOLDERS: { label: string; feature: string; statuses: JobDetail["status"][] }[] = [
   { label: "Edit", feature: "4004", statuses: ["new"] },
   { label: "On hold", feature: "5002", statuses: ["scheduled", "in_progress"] },
-  { label: "Mark no-show", feature: "6005", statuses: ["scheduled", "in_progress"] },
-  { label: "Raise callback", feature: "6004", statuses: ["completed"] },
   { label: "Correct and reissue", feature: "6007", statuses: ["completed"] },
 ];
 
@@ -223,6 +248,15 @@ export function cancelBodyLine(job: JobDetail, reason: string): string {
   return `${joinNames(told)} ${told.length === 1 ? "is" : "are"} told. Nothing is owed.`;
 }
 
+/** The No-show dialog's Small line: follows the tick. */
+export function noShowLine(job: JobDetail, charge: boolean): string {
+  const contractor = job.contractor ? firstNameOf(job.contractor.name) : "The contractor";
+  const customer = firstNameOf(job.customer.name);
+  return charge
+    ? `${contractor} is paid the call-out. ${customer} is invoiced.`
+    : `${contractor} is paid the call-out. There is no charge to ${customer}.`;
+}
+
 async function postAction(path: string, body: Record<string, unknown>): Promise<{ ok: true; job: JobDetail; toast: string } | { ok: false; error: string; field?: string }> {
   try {
     const res = await fetch(`${apiUrl}${path}`, {
@@ -243,16 +277,21 @@ async function postAction(path: string, body: Record<string, unknown>): Promise<
 
 /** Feature 4006: Reschedule, Reassign and Cancel job, shown by the page's own `actions`. */
 function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobDetail, message: string) => void }) {
-  const [dialog, setDialog] = useState<"take-off" | "cancel" | null>(null);
+  const [dialog, setDialog] = useState<"take-off" | "cancel" | "callback" | "no-show" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [reasonError, setReasonError] = useState<string | undefined>();
   const [noteError, setNoteError] = useState<string | undefined>();
+  const [callbackText, setCallbackText] = useState("");
+  const [callbackError, setCallbackError] = useState<string | undefined>();
+  const [charge, setCharge] = useState(true);
+  const router = useRouter();
 
   const { reschedule, takeOff, cancel } = job.actions;
-  if (!reschedule && !takeOff && !cancel) return null;
+  const { canRaiseCallback, canMarkNoShow } = job;
+  if (!reschedule && !takeOff && !cancel && !canRaiseCallback && !canMarkNoShow) return null;
   const contractorFirst = job.contractor ? firstNameOf(job.contractor.name) : "the contractor";
 
   function close() {
@@ -262,6 +301,53 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
     setNote("");
     setReasonError(undefined);
     setNoteError(undefined);
+    setCallbackText("");
+    setCallbackError(undefined);
+    setCharge(true);
+  }
+
+  async function confirmCallback() {
+    setCallbackError(undefined);
+    setError(undefined);
+    if (callbackText.trim() === "") {
+      setCallbackError("Required.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(job.reference)}/callback`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: callbackText.trim() }),
+      });
+      const payload = (await res.json()) as { jobReference?: string; toast?: string } & Partial<ApiError>;
+      if (!res.ok || !payload.jobReference) {
+        if (payload.field === "description") setCallbackError(payload.error ?? "Required.");
+        else setError(payload.error ?? "That did not go through. Please try again.");
+        return;
+      }
+      const reference = payload.jobReference;
+      close();
+      router.push(`/ops/jobs/${encodeURIComponent(reference)}?toast=${encodeURIComponent(payload.toast ?? "")}`);
+    } catch {
+      setError("That did not go through - check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmNoShow() {
+    setBusy(true);
+    setError(undefined);
+    const result = await postAction(`/api/jobs/${encodeURIComponent(job.reference)}/no-show`, { charge });
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    close();
+    onChanged(result.job, result.toast);
   }
 
   async function confirmTakeOff() {
@@ -320,7 +406,87 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
             Cancel job
           </button>
         ) : null}
+        {canMarkNoShow ? (
+          <button type="button" className={outlinedButton} onClick={() => setDialog("no-show")}>
+            Mark no-show
+          </button>
+        ) : null}
+        {canRaiseCallback ? (
+          <button type="button" className={outlinedButton} onClick={() => setDialog("callback")}>
+            Raise callback
+          </button>
+        ) : null}
       </div>
+
+      <ConfirmDialog
+        open={dialog === "callback"}
+        title={`Raise a callback on ${job.reference}?`}
+        confirmLabel="Raise callback"
+        cancelLabel="Not now"
+        loading={busy}
+        loadingLabel="Raising..."
+        onConfirm={() => void confirmCallback()}
+        onCancel={close}
+        fields={
+          <div>
+            <label
+              htmlFor="callback-description"
+              className={`mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']`}
+            >
+              What needs looking at?
+            </label>
+            <textarea
+              id="callback-description"
+              rows={3}
+              maxLength={2000}
+              value={callbackText}
+              aria-required
+              aria-invalid={callbackError ? true : undefined}
+              onChange={(event) => {
+                setCallbackText(event.target.value);
+                setCallbackError(undefined);
+              }}
+              className={`min-h-[96px] w-full resize-y rounded-button border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
+                callbackError ? "border-brand-destructive" : "border-hairline"
+              }`}
+            />
+            {callbackError ? <p className="mt-[5px] text-xs text-brand-destructive">{callbackError}</p> : null}
+            {error && dialog === "callback" ? <p className="mt-2 text-xs text-brand-destructive">{error}</p> : null}
+          </div>
+        }
+      >
+        A new job is made for {firstNameOf(job.customer.name)}, linked to this one. Nobody is messaged.
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={dialog === "no-show"}
+        title={`Mark ${job.reference} as a no-show?`}
+        confirmLabel="Mark no-show"
+        cancelLabel="Keep the job"
+        loading={busy}
+        loadingLabel="Marking..."
+        onConfirm={() => void confirmNoShow()}
+        onCancel={close}
+        fields={
+          <>
+            <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={charge}
+                onChange={(event) => setCharge(event.target.checked)}
+                className="size-5 accent-brand-accent"
+              />
+              Charge the customer the call-out
+            </label>
+            <p className="text-small text-secondary-text" data-testid="no-show-line">
+              {noShowLine(job, charge)}
+            </p>
+            {error && dialog === "no-show" ? <p className="mt-2 text-xs text-brand-destructive">{error}</p> : null}
+          </>
+        }
+      >
+        The job closes as a customer no-show.
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={dialog === "take-off"}

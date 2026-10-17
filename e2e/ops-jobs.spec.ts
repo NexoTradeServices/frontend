@@ -27,6 +27,8 @@
 // 4010 AC1, AC2, AC7, AC8 the Customer rating card above Customer: a first-time customer's label,
 //      line and plain figures; a customer with a late cancellation sees it in the warning colour;
 //      at 390px it stands right before Customer
+// 6004 the two "coming in" placeholders (Mark no-show, Raise callback) are gone; the real buttons are
+//      proven in callbacks.spec.ts and no-show.spec.ts
 // AC29 at 390px: every action reachable, no sideways scroll, every tap
 //      target at least 44px -- on the queue and on the job page
 // AC30 at 390px the status chips stay one row that scrolls sideways
@@ -779,4 +781,11 @@ test.describe("4010 AC8 at 390px", () => {
     expect(customerBox.y - lastFigure.y).toBeLessThan(120);
     await expectNoSidewaysScroll(page);
   });
+});
+
+test("6004: the Mark no-show and Raise callback placeholders are gone from the job page", async ({ page }) => {
+  await page.goto("/ops/jobs/JOB-1042");
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "JOB-1042", exact: true })).toBeVisible();
+  await expect(page.getByText(/Mark no-show - coming in|Raise callback - coming in/)).toHaveCount(0);
 });
