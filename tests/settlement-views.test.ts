@@ -151,14 +151,14 @@ describe("pay adjustments", () => {
     expect(html.indexOf("adjustment-line")).toBeGreaterThan(html.lastIndexOf('data-testid="pay-line"'));
   });
 
-  test("6007: a correction reads 'Correction - JOB-1042: [reason]', its sign kept", () => {
+  test("6007: a correction reads 'Correction - JOB-1042' without the reason, its sign kept", () => {
     const html = render({
       ...BOBS,
       adjustments: [
-        { reason: "Logged 5h, worked 2h.", label: "Correction - JOB-1042: Logged 5h, worked 2h.", kind: "correction", amount: -10_000, jobReference: "JOB-1042" },
+        { reason: "Logged 5h, worked 2h.", label: "Correction - JOB-1042", kind: "correction", amount: -10_000, jobReference: "JOB-1042" },
       ],
     });
-    expect(html).toContain("Correction - JOB-1042: Logged 5h, worked 2h.");
+    expect(html).toContain("Correction - JOB-1042");
     expect(html).toContain("-$100");
   });
 });

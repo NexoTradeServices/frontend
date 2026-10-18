@@ -65,7 +65,7 @@ test("6007 AC1/AC3: the page, its live What happens card, the price and reason r
   await expect(hourly).toHaveValue("180.00");
   await expect(page.getByText("was $250.00")).toBeVisible();
   await expect(page.getByText("was $180.00")).toBeVisible();
-  await expect(page.getByText("Bob sees this on their pay. Say what was wrong, plainly.")).toBeVisible();
+  await expect(page.getByText("Internal note. Neither the customer nor Bob sees this. Say what happened.")).toBeVisible();
   await expect(page.getByTestId("what-happens")).toContainText("Nothing changes yet");
 
   // AC1: the card follows the time as Mike types it - 3.0h becomes 2.0h.

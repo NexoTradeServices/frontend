@@ -296,7 +296,7 @@ export function CorrectView({ form }: { form: CorrectionForm }) {
         {reasonError ? (
           <p className="mt-[5px] text-xs text-brand-destructive">{reasonError}</p>
         ) : (
-          <p className="mt-[5px] text-xs text-muted-text">{form.contractorFirstName} sees this on their pay. Say what was wrong, plainly.</p>
+          <p className="mt-[5px] text-xs text-muted-text">Internal note. Neither the customer nor {form.contractorFirstName} sees this. Say what happened.</p>
         )}
       </FormCard>
 
