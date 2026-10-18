@@ -1,7 +1,7 @@
 // Feature 6007 -- Correct & reissue, frontend e2e (ADR 0001).
 //
 // AC1   Mike opens Correct & reissue from the Invoice card; the page is framed (Breadcrumb, title, subtitle,
-//       Time on site / Prices / Why? / What happens); changing the time updates the What happens card live,
+//       Time on site / Reduce customer price / Why? / What happens); changing the time updates the What happens card live,
 //       and Correct & reissue goes back to the job with the Toast "Corrected - INV-xxxx sent."
 // AC3   a price above the invoice's is refused where Mike types it ("Can only go down - the most is $250.00."),
 //       the reason is required, Cancel goes back to the job and changes nothing
@@ -52,7 +52,7 @@ test("6007 AC1/AC3: the page, its live What happens card, the price and reason r
   // The frame: Breadcrumb back to the job, the title, the subtitle naming the invoice and its state.
   await expect(page.getByRole("link", { name: `< ${job.reference}` })).toBeVisible();
   await expect(page.getByText(/ - Plumbing - INV-\d+ \(unpaid\)$/)).toBeVisible();
-  for (const heading of ["Time on site", "Prices (can only go down)", "Why?", "What happens"]) {
+  for (const heading of ["Time on site", "Reduce customer price", "Why?", "What happens"]) {
     await expect(page.getByRole("heading", { name: heading, level: 2 })).toBeVisible();
   }
   // After the fact: no "Now" button on Finish.

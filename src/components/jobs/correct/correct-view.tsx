@@ -1,7 +1,7 @@
 // The Correct & reissue form -- Feature 6007.
 //
 // Operations Admin Workflow / Ops job actions / Correct & reissue, On screen. Four Cards: Time on site
-// (Time entry rows, no "Now"), Prices (can only go down), Why?, and What happens -- plain lines that
+// (Time entry rows, no "Now"), Reduce customer price, Why?, and What happens -- plain lines that
 // update as Mike types and say only what will really happen. frontend-conventions.md: Templates /
 // Layouts (Form page), Molecules / Form pieces (Field, Money field, Time entry row), Molecules /
 // Showing values (Value change), Molecules / Actions (Save row, Breadcrumb), Molecules / Messages to
@@ -24,10 +24,11 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 /** How long Mike stops typing before the What happens card asks again. */
 const PREVIEW_DELAY_MS = 300;
 
-function FormCard({ title, children }: { title: string; children: React.ReactNode }) {
+function FormCard({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
     <section className="rounded-card border border-hairline bg-surface p-5">
       <h2 className="font-heading text-base font-extrabold text-ink">{title}</h2>
+      {note ? <p className="mt-1 text-small text-muted-text">{note}</p> : null}
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -221,7 +222,7 @@ export function CorrectView({ form }: { form: CorrectionForm }) {
       ) : null}
 
       {form.prices !== null ? (
-        <FormCard title="Prices (can only go down)">
+        <FormCard title="Reduce customer price" note="Reduce customer price as goodwill. Prices can only go down. Contractor payout is not affected.">
           {form.prices.callout ? (
             <Field
               id="correct-callout"
