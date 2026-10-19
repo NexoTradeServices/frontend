@@ -165,6 +165,6 @@ test("6007 AC7/AC8: a correction on a paid week reads 'JOB-xxxx Correction' on t
 
     // What the run could not take waits on his next payout, with the job it came from.
     await page.goto("/contractor/payouts/next");
-    await expect(page.getByTestId("still-to-deduct")).toContainText(new RegExp(`^Still to deduct: \\$[\\d,]+(\\.\\d{2})? \\(${job.reference}\\)$`));
+    await expect(page.getByTestId("still-to-deduct")).toContainText(new RegExp(`^Note\\s*\\$[\\d,]+(\\.\\d{2})? from ${job.reference} is still to be taken off\\. It will come off your next payout\\.$`));
   });
 });

@@ -147,7 +147,7 @@ describe("pay adjustments", () => {
       ],
     });
     expect(html).toContain('data-testid="adjustment-line"');
-    expect(html).toContain("JOB-1042 Adjustment");
+    expect(html).toContain(">JOB-1042</span> Adjustment");
     expect(html.indexOf("adjustment-line")).toBeGreaterThan(html.lastIndexOf('data-testid="pay-line"'));
   });
 
@@ -158,20 +158,22 @@ describe("pay adjustments", () => {
         { reason: "Logged 5h, worked 2h.", label: "JOB-1042 Correction", kind: "correction", amount: -10_000, jobReference: "JOB-1042" },
       ],
     });
-    expect(html).toContain("JOB-1042 Correction");
+    expect(html).toContain(">JOB-1042</span> Correction");
     expect(html).toContain("-$100");
   });
 });
 
 describe("6007 -- Still to deduct", () => {
-  test("the next payout shows what the run cannot take yet, with the job it came from, under the lines", () => {
+  test("the next payout shows what the run cannot take yet, with the job it came from, in a Note under the table", () => {
     const html = render({ ...BOBS, preview: true, stillToDeduct: { amount: 7500, jobReferences: ["JOB-1042"] } });
     expect(html).toContain('data-testid="still-to-deduct"');
-    expect(html).toContain("Still to deduct: $75 (JOB-1042)");
-    expect(html.indexOf("still-to-deduct")).toBeLessThan(html.indexOf('data-testid="total-row"'));
+    expect(html).toContain("is still to be taken off. It will come off your next payout.");
+    expect(html).toContain("$75");
+    expect(html).toContain("JOB-1042");
+    expect(html.indexOf("still-to-deduct")).toBeGreaterThan(html.indexOf('data-testid="total-row"'));
   });
 
-  test("with nothing carried there is no such line", () => {
+  test("with nothing carried there is no Note", () => {
     expect(render({ ...BOBS, stillToDeduct: null })).not.toContain("still-to-deduct");
     expect(render({ ...BOBS })).not.toContain("still-to-deduct");
   });
