@@ -6,6 +6,7 @@
 import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { StatusTag } from "@/components/ui/status-tag";
+import { Tag } from "@/components/ui/tag";
 import { JobDetailView } from "@/components/jobs/job-detail";
 import type { JobDetail } from "@/components/jobs/types";
 import { Container } from "@/components/frame/container";
@@ -46,7 +47,13 @@ export default async function JobPage({ params }: { params: Promise<{ ref: strin
       <PageHeader
         title={job.reference}
         subtitle={`Received ${job.receivedLabel} via ${job.source === "web" ? "the web form" : "phone"}`}
-        tags={<StatusTag status={job.status} />}
+        tags={
+          <>
+            <StatusTag status={job.status} />
+            {/* Feature 6007: Paid beside the job's own status once its invoice is paid. */}
+            {job.invoice?.status === "paid" ? <Tag tone="success" testId="job-paid-tag">Paid</Tag> : null}
+          </>
+        }
         breadcrumb={JOBS_CRUMB}
       />
       <Suspense>

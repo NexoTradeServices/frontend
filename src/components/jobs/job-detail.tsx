@@ -159,12 +159,11 @@ const LEVEL_LABELS: Record<"normal" | "weekend" | "emergency", string> = {
  * the feature that switches it on. Architect skill, Writing the plan, step 2a.
  * Feature 4006 took Reassign, Reschedule and Cancel out of
  * this list: they are real buttons (JobActions, below). Feature 6004 did the same for Mark no-show
- * and Raise callback.
+ * and Raise callback. Feature 6007 did the same for Correct & reissue: a real link in the Invoice card.
  */
 const ACTION_PLACEHOLDERS: { label: string; feature: string; statuses: JobDetail["status"][] }[] = [
   { label: "Edit", feature: "4004", statuses: ["new"] },
   { label: "On hold", feature: "5002", statuses: ["scheduled", "in_progress"] },
-  { label: "Correct and reissue", feature: "6007", statuses: ["completed"] },
 ];
 
 function ActionPlaceholders({ job }: { job: JobDetail }) {
@@ -1305,6 +1304,8 @@ function InvoiceCard({
   const tag = INVOICE_TAGS[invoice.waitingForPayLink ? "waiting" : invoice.status];
   const customerFirst = firstNameOf(invoice.billedTo.name);
   const contractorFirst = job.contractor ? firstNameOf(job.contractor.name) : "the contractor";
+  // Feature 6007: a completed job, or a no-show whose call-out was charged, can be corrected.
+  const canCorrect = job.status === "completed" || (job.status === "cancelled" && invoice.lines.some((line) => line.kind === "callout"));
   // A table header cell: the Field label look without its `block`, which would take the cell out of the row.
   const th = "pb-1.5 text-field-label font-bold tracking-[0.08em] text-muted-text uppercase";
 
@@ -1592,7 +1593,7 @@ function InvoiceCard({
           ))}
         </ul>
       ) : null}
-      {invoice.canResend || invoice.canCheckPayment || invoice.canVoid || invoice.canRefund ? (
+      {invoice.canResend || invoice.canCheckPayment || invoice.canVoid || invoice.canRefund || canCorrect ? (
         <div className="mt-3.5 border-t border-hairline pt-3">
           {voidRefusal ? (
             <p role="alert" data-testid="void-refused" className="mb-1 rounded-button border border-error-border bg-error-bg px-3 py-2.5 text-small text-brand-destructive">
@@ -1656,6 +1657,16 @@ function InvoiceCard({
             >
               Refund
             </button>
+          ) : null}
+          {/* Feature 6007: its own page, so the figures and the live What happens card have room. */}
+          {canCorrect ? (
+            <Link
+              href={`/ops/jobs/${encodeURIComponent(job.reference)}/correct`}
+              data-testid="correct-button"
+              className="inline-flex min-h-11 items-center rounded-button border border-hairline bg-surface px-4 text-sm font-bold text-ink"
+            >
+              Correct &amp; reissue
+            </Link>
           ) : null}
           </div>
         </div>

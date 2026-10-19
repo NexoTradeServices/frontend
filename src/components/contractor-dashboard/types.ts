@@ -13,6 +13,8 @@ export interface JobCardDto {
   slotLabel: string | null;
   /** Feature 5001: an accepted or in-progress card opens its job screen. */
   opens: boolean;
+  /** Feature 6007: a completed job whose invoice is not yet paid -- "Completed - awaiting payment", opening at its Payment card. */
+  awaitingPayment: boolean;
 }
 
 export type ReadinessPen = "own" | "mikes";

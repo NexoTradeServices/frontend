@@ -32,6 +32,9 @@ import { test, expect } from "@playwright/test";
 import { login } from "./helpers/login";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
+import { acceptedJobForBob, completeJobAsBob, giveInvoiceItsPayLink } from "./helpers/accepted-job";
+
 test.describe(() => {
   test.use(MOBILE_VIEWPORT);
 
@@ -140,5 +143,34 @@ test.describe(() => {
     // Feature 6003 built it.
     await expect(menu.getByRole("link", { name: "Payouts" })).toBeVisible();
     await expect(menu.getByRole("link", { name: "My details" })).toHaveCount(0);
+  });
+
+  test("6007 AC14: a completed job stays on Bob's dashboard as 'Completed - awaiting payment' until its invoice is paid, and opens at its Payment card", async ({ page, browser, request }) => {
+    test.setTimeout(240_000);
+    const job = await acceptedJobForBob(browser, request, "dash-awaiting");
+    await completeJobAsBob(browser, job);
+    await giveInvoiceItsPayLink(request, job);
+
+    await page.goto("/contractor");
+    await login(page, "bob@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+    const card = page.getByRole("link", { name: new RegExp(job.reference) });
+    await expect(card).toBeVisible();
+    await expect(card.getByTestId("awaiting-payment-tag")).toHaveText("Completed - awaiting payment");
+    await expect(card.getByTestId("awaiting-payment-tag")).toHaveCSS("text-transform", "uppercase");
+    // A completed job has no slot to show.
+    await expect(card).not.toContainText("No return date yet");
+
+    // It opens his job screen at its Payment card.
+    await card.click();
+    await expect(page).toHaveURL(new RegExp(`/contractor/jobs/${job.reference}#payment$`));
+    await expect(page.getByRole("heading", { name: "Payment", level: 2 })).toBeVisible();
+
+    // Once it is paid it leaves the dashboard.
+    const paid = await request.post(`${apiUrl}/api/test-data/jobs/${job.reference}/paid`, { data: {} });
+    expect(paid.status()).toBe(200);
+    await page.goto("/contractor");
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+    await expect(page.getByRole("link", { name: new RegExp(job.reference) })).toHaveCount(0);
   });
 });

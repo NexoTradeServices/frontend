@@ -133,11 +133,49 @@ describe("AC3 -- Dave's plain Invoice", () => {
 });
 
 describe("pay adjustments", () => {
-  test("follow the job lines as their own lines, the reason as the description", () => {
-    const html = render({ ...BOBS, adjustments: [{ reason: "Missing hour, corrected after approval", amount: 15_000, jobReference: "JOB-1043" }] });
+  test("follow the job lines as their own lines, the label as the description", () => {
+    const html = render({
+      ...BOBS,
+      adjustments: [
+        {
+          reason: "Missing hour, corrected after approval",
+          label: "JOB-1042 Adjustment",
+          kind: "adjustment",
+          amount: 15_000,
+          jobReference: "JOB-1042",
+        },
+      ],
+    });
     expect(html).toContain('data-testid="adjustment-line"');
-    expect(html).toContain("Missing hour, corrected after approval");
+    expect(html).toContain(">JOB-1042</span> Adjustment");
     expect(html.indexOf("adjustment-line")).toBeGreaterThan(html.lastIndexOf('data-testid="pay-line"'));
+  });
+
+  test("6007: a correction reads 'JOB-1042 Correction' without the reason, its sign kept", () => {
+    const html = render({
+      ...BOBS,
+      adjustments: [
+        { reason: "Logged 5h, worked 2h.", label: "JOB-1042 Correction", kind: "correction", amount: -10_000, jobReference: "JOB-1042" },
+      ],
+    });
+    expect(html).toContain(">JOB-1042</span> Correction");
+    expect(html).toContain("-$100");
+  });
+});
+
+describe("6007 -- Still to deduct", () => {
+  test("the next payout shows what the run cannot take yet, with the job it came from, in a Note under the table", () => {
+    const html = render({ ...BOBS, preview: true, stillToDeduct: { amount: 7500, jobReferences: ["JOB-1042"] } });
+    expect(html).toContain('data-testid="still-to-deduct"');
+    expect(html).toContain("is still to be taken off. It will come off your next payout.");
+    expect(html).toContain("$75");
+    expect(html).toContain("JOB-1042");
+    expect(html.indexOf("still-to-deduct")).toBeGreaterThan(html.indexOf('data-testid="total-row"'));
+  });
+
+  test("with nothing carried there is no Note", () => {
+    expect(render({ ...BOBS, stillToDeduct: null })).not.toContain("still-to-deduct");
+    expect(render({ ...BOBS })).not.toContain("still-to-deduct");
   });
 });
 

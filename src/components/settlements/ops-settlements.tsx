@@ -11,13 +11,18 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Banner } from "@/components/auth/banner";
+import { PrimaryButton } from "@/components/auth/buttons";
+import { Field } from "@/components/auth/field";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FilterRow } from "@/components/ui/filter-row";
+import { PageHeader } from "@/components/ui/page-header";
+import { SelectField } from "@/components/ui/select-field";
+import { typedDollarsToCents } from "@/components/refunds/money";
 import { Toast, useToast } from "@/components/ui/toast";
 import { downloadFile } from "@/lib/download";
 import { InvoiceCard } from "./invoice-card";
 import { formatPay } from "./money";
-import type { OpsDetail, OpsList, OpsRow, OpsView, UpcomingRow } from "./types";
+import type { AdjustmentContractor, AdjustmentLanding, OpsDetail, OpsList, OpsRow, OpsView, UpcomingRow } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -116,7 +121,6 @@ interface RowActions {
 function RowTags({ row }: { row: OpsRow }) {
   return (
     <>
-      {row.correctedSince ? <span className={warningTag}>Job corrected since</span> : null}
       {row.gstNotRecorded ? <span className={warningTag}>GST not recorded</span> : null}
     </>
   );
@@ -308,6 +312,12 @@ function InvoiceCards({ view, rows, actions }: { view: OpsView; rows: OpsRow[]; 
   );
 }
 
+/** A signed amount for the Adjustments column: "+$25", "-$100", "$0" when nothing waits. */
+function formatSigned(cents: number): string {
+  if (cents === 0) return formatPay(0);
+  return `${cents < 0 ? "-" : "+"}${formatPay(Math.abs(cents))}`;
+}
+
 function UpcomingTable({ rows }: { rows: UpcomingRow[] }) {
   return (
     <>
@@ -317,7 +327,9 @@ function UpcomingTable({ rows }: { rows: UpcomingRow[] }) {
             <tr>
               <th className={th}>Contractor</th>
               <th className={th}>Jobs</th>
-              <th className={`${th} text-right`}>Amount</th>
+              <th className={`${th} text-right`}>Work</th>
+              <th className={`${th} text-right`}>Adjustments</th>
+              <th className={`${th} text-right`}>Payout</th>
               <th className={th}>Invoiced on</th>
               <th className={th}>Paid on</th>
             </tr>
@@ -327,7 +339,9 @@ function UpcomingTable({ rows }: { rows: UpcomingRow[] }) {
               <tr key={row.contractor.code} data-ref={row.contractor.code}>
                 <td className={`${td} font-semibold text-ink`}>{row.contractor.name}</td>
                 <td className={`${td} tabular-nums`}>{row.jobs}</td>
-                <td className={`${td} text-right font-semibold whitespace-nowrap text-ink tabular-nums`}>{formatPay(row.amount)}</td>
+                <td className={`${td} text-right whitespace-nowrap tabular-nums`} data-testid="upcoming-work">{formatPay(row.work)}</td>
+                <td className={`${td} text-right whitespace-nowrap tabular-nums`} data-testid="upcoming-adjustments">{formatSigned(row.adjustments)}</td>
+                <td className={`${td} text-right font-semibold whitespace-nowrap text-ink tabular-nums`} data-testid="upcoming-payout">{formatPay(row.payout)}</td>
                 <td className={`${td} whitespace-nowrap`}>{row.invoicedOn}</td>
                 <td className={`${td} whitespace-nowrap`}>{row.paidOn}</td>
               </tr>
@@ -341,7 +355,10 @@ function UpcomingTable({ rows }: { rows: UpcomingRow[] }) {
             <span className="block text-name font-bold text-ink">{row.contractor.name}</span>
             <span className="block text-small text-muted-text">
               <span className="block font-semibold text-secondary-text tabular-nums">
-                {formatPay(row.amount)} - {row.jobs} {row.jobs === 1 ? "job" : "jobs"}
+                {formatPay(row.payout)} - {row.jobs} {row.jobs === 1 ? "job" : "jobs"}
+              </span>
+              <span className="block tabular-nums">
+                Work {formatPay(row.work)}, adjustments {formatSigned(row.adjustments)}
               </span>
               <span className="block">Invoiced {row.invoicedOn}, paid {row.paidOn}</span>
             </span>
@@ -352,6 +369,188 @@ function UpcomingTable({ rows }: { rows: UpcomingRow[] }) {
   );
 }
 
+/**
+ * Feature 6007: Add pay adjustment (Contractor Settlement, Pay adjustments and corrections). A Standard
+ * Dialog: Contractor, Amount, Job (optional), Reason, one muted line saying where it will land, and
+ * Cancel / Add. The landing line is read from the server as soon as a contractor is picked, so Mike knows
+ * which draft it goes on before he presses Add.
+ */
+function AddAdjustmentDialog({
+  open,
+  onClose,
+  onAdded,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onAdded: (firstName: string) => void;
+}) {
+  // Mounted only while open, so every opening starts from empty boxes.
+  return open ? <AdjustmentForm onClose={onClose} onAdded={onAdded} /> : null;
+}
+
+function AdjustmentForm({ onClose, onAdded }: { onClose: () => void; onAdded: (firstName: string) => void }) {
+  const [contractors, setContractors] = useState<AdjustmentContractor[]>([]);
+  const [contractorId, setContractorId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [job, setJob] = useState("");
+  const [reason, setReason] = useState("");
+  const [landing, setLanding] = useState<AdjustmentLanding | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [refusal, setRefusal] = useState<string | undefined>();
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let current = true;
+    fetch(`${apiUrl}/api/settlements/adjustments/contractors`, { credentials: "include", cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok || !current) return;
+        setContractors(((await res.json()) as { contractors: AdjustmentContractor[] }).contractors);
+      })
+      .catch(() => {
+        if (current) setRefusal("The contractors could not be read - close this and try again.");
+      });
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  /** Picking a contractor reads where the line would land, so Mike sees it before he presses Add. */
+  function choose(id: string) {
+    setContractorId(id);
+    setErrors((previous) => ({ ...previous, contractor: "" }));
+    setLanding(null);
+    if (id === "") return;
+    fetch(`${apiUrl}/api/settlements/adjustments/landing?contractorId=${encodeURIComponent(id)}`, {
+      credentials: "include",
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        if (res.ok) setLanding((await res.json()) as AdjustmentLanding);
+      })
+      .catch(() => undefined);
+  }
+
+  const chosen = contractors.find((contractor) => contractor.id === contractorId);
+
+  async function add() {
+    setRefusal(undefined);
+    const next: Record<string, string> = {};
+    if (contractorId === "") next["contractor"] = "Required.";
+    const cents = typedDollarsToCents(amount);
+    if (cents === null || cents <= 0) next["amount"] = "Enter an amount more than $0.";
+    if (reason.trim() === "") next["reason"] = "Required.";
+    setErrors(next);
+    if (Object.keys(next).length > 0) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/settlements/adjustments`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contractorId, amount: cents, reason: reason.trim(), job: job.trim() }),
+      });
+      const payload = (await res.json()) as { error?: string; field?: string; contractorFirstName?: string };
+      if (!res.ok) {
+        if (payload.field !== undefined) setErrors({ [payload.field]: payload.error ?? "Check this." });
+        else setRefusal(payload.error ?? "That did not go through. Please try again.");
+        return;
+      }
+      onAdded(payload.contractorFirstName ?? chosen?.firstName ?? "their");
+    } catch {
+      setRefusal("That did not go through - check your connection and try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <ConfirmDialog
+      open
+      title="Add pay adjustment"
+      confirmLabel="Add"
+      loading={saving}
+      loadingLabel="Adding..."
+      onConfirm={() => void add()}
+      onCancel={onClose}
+      fields={
+        <div data-testid="adjustment-dialog">
+          {refusal ? (
+            <p role="alert" className="mb-3 rounded-button border border-error-border bg-error-bg px-3 py-2.5 text-small text-brand-destructive">
+              {refusal}
+            </p>
+          ) : null}
+          <SelectField
+            id="adjustment-contractor"
+            label="Contractor"
+            required
+            value={contractorId}
+            onChange={(event) => choose(event.target.value)}
+            error={errors["contractor"] || undefined}
+            options={[{ value: "", label: "Choose a contractor" }, ...contractors.map((contractor) => ({ value: contractor.id, label: contractor.name }))]}
+          />
+          <Field
+            id="adjustment-amount"
+            label="Amount"
+            required
+            prefix="$"
+            inputMode="decimal"
+            value={amount}
+            onChange={(event) => {
+              setAmount(event.target.value);
+              setErrors((previous) => ({ ...previous, amount: "" }));
+            }}
+            error={errors["amount"] || undefined}
+          />
+          <Field
+            id="adjustment-job"
+            label="Job"
+            placeholder="JOB-1042"
+            value={job}
+            onChange={(event) => {
+              setJob(event.target.value);
+              setErrors((previous) => ({ ...previous, job: "" }));
+            }}
+            error={errors["job"] || undefined}
+          />
+          <div className="mb-3.5">
+            <label
+              htmlFor="adjustment-reason"
+              className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']"
+            >
+              Reason
+            </label>
+            <textarea
+              id="adjustment-reason"
+              rows={3}
+              maxLength={500}
+              value={reason}
+              aria-required
+              aria-invalid={errors["reason"] ? true : undefined}
+              onChange={(event) => {
+                setReason(event.target.value);
+                setErrors((previous) => ({ ...previous, reason: "" }));
+              }}
+              className={`w-full rounded-button border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
+                errors["reason"] ? "border-brand-destructive" : "border-hairline"
+              }`}
+            />
+            {errors["reason"] ? (
+              <p className="mt-[5px] text-xs text-brand-destructive">{errors["reason"]}</p>
+            ) : chosen ? (
+              <p className="mt-[5px] text-xs text-muted-text">Internal note. {chosen.firstName} does not see this.</p>
+            ) : null}
+          </div>
+          <p data-testid="adjustment-landing" className="text-small text-muted-text">
+            {landing?.sentence ?? "Choose a contractor to see where it will land."}
+          </p>
+        </div>
+      }
+    >
+      Extra pay for something no visit carries - parking, a long drive, a bonus. It only ever adds.
+    </ConfirmDialog>
+  );
+}
+
 export function OpsSettlements({ initial }: { initial: OpsList }) {
   const [data, setData] = useState<OpsList>(initial);
   const [error, setError] = useState<string | null>(null);
@@ -359,6 +558,7 @@ export function OpsSettlements({ initial }: { initial: OpsList }) {
   const [paying, setPaying] = useState<OpsRow | null>(null);
   const [rebuilding, setRebuilding] = useState<OpsRow | null>(null);
   const [working, setWorking] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [toast, showToast] = useToast();
   const requestId = useRef(0);
 
@@ -430,6 +630,16 @@ export function OpsSettlements({ initial }: { initial: OpsList }) {
   const view = data.view;
 
   return (
+    <>
+    <PageHeader
+      title="Payouts"
+      subtitle="Pay the approved invoices on pay day, then mark each one paid."
+      action={
+        <PrimaryButton type="button" size="compact" onClick={() => setAdding(true)}>
+          Add pay adjustment
+        </PrimaryButton>
+      }
+    />
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-x-4.5 gap-y-3.5 sm:grid-cols-4" data-testid="settlements-facts">
         <div>
@@ -527,7 +737,18 @@ export function OpsSettlements({ initial }: { initial: OpsList }) {
         ) : null}
       </ConfirmDialog>
 
+      <AddAdjustmentDialog
+        open={adding}
+        onClose={() => setAdding(false)}
+        onAdded={(firstName) => {
+          setAdding(false);
+          showToast(`Added - on ${firstName}'s next payout.`);
+          void load(data.view);
+        }}
+      />
+
       <Toast message={toast} />
     </div>
+    </>
   );
 }

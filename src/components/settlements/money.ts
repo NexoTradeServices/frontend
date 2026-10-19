@@ -4,9 +4,10 @@
 // otherwise. A contractor's invoice can run past a thousand ("$1,227.50"), so this one adds the
 // thousands comma; the shared formatter of the booking flow mirrors the backend's and stays as it is.
 export function formatPay(cents: number): string {
-  const dollars = cents / 100;
+  // Feature 6007: a correction can be a minus line -- the sign leads the dollar sign, "-$100".
+  const dollars = Math.abs(cents) / 100;
   const whole = Number.isInteger(dollars);
-  return `$${dollars.toLocaleString("en-AU", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 })}`;
+  return `${cents < 0 ? "-" : ""}$${dollars.toLocaleString("en-AU", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 })}`;
 }
 
 /** "3.0h" for a whole number of hours, "1.25h" otherwise. */

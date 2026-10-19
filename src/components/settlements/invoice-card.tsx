@@ -102,6 +102,17 @@ function Fact({ label, children, testId }: { label: string; children: React.Reac
   );
 }
 
+/** "JOB-1042 Adjustment" with the job number in the job rows' weight; a line with no job is the word alone. */
+function AdjustmentLabel({ label, jobReference }: { label: string; jobReference: string | null }) {
+  if (jobReference === null || !label.startsWith(jobReference)) return <>{label}</>;
+  return (
+    <>
+      <span className="font-heading text-small font-extrabold text-ink">{jobReference}</span>
+      {label.slice(jobReference.length)}
+    </>
+  );
+}
+
 export function InvoiceCard({ invoice }: { invoice: InvoiceView }) {
   const anyWeekend = invoice.lines.some((line) => line.weekend);
   const businessName = invoice.from.businessName ?? invoice.from.name;
@@ -146,8 +157,7 @@ export function InvoiceCard({ invoice }: { invoice: InvoiceView }) {
             {invoice.adjustments.map((adjustment, index) => (
               <tr key={`adjustment-${String(index)}`} data-testid="adjustment-line" className="border-b border-hairline">
                 <td className={td} colSpan={4}>
-                  {adjustment.reason}
-                  {adjustment.jobReference !== null ? <span className="text-muted-text"> ({adjustment.jobReference})</span> : null}
+                  <AdjustmentLabel label={adjustment.label} jobReference={adjustment.jobReference} />
                 </td>
                 <td className={`${td} text-right font-semibold whitespace-nowrap text-ink tabular-nums`}>{formatPay(adjustment.amount)}</td>
               </tr>
@@ -198,6 +208,22 @@ export function InvoiceCard({ invoice }: { invoice: InvoiceView }) {
         <p data-testid="weekend-legend" className="mt-2 text-xs text-muted-text">
           {weekendCode(invoice)} - weekend, time and a half
         </p>
+      ) : null}
+      {invoice.stillToDeduct ? (
+        <div data-testid="still-to-deduct" className="mt-3 rounded-card border border-hairline bg-surface px-3 py-2.5 text-small text-muted-text">
+          <span className="block font-heading font-extrabold text-ink">Note</span>
+          <span className="block">
+            {formatPay(invoice.stillToDeduct.amount)}
+            {invoice.stillToDeduct.jobReferences.length > 0 ? " from " : " "}
+            {invoice.stillToDeduct.jobReferences.map((reference, index) => (
+              <span key={reference}>
+                {index > 0 ? ", " : ""}
+                <span className="font-heading font-extrabold text-ink">{reference}</span>
+              </span>
+            ))}{" "}
+            is still to be taken off. It will come off your next payout.
+          </span>
+        </div>
       ) : null}
     </section>
   );
