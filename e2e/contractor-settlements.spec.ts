@@ -159,9 +159,9 @@ test("6007 AC7/AC8: a correction on a paid week reads 'JOB-xxxx Correction' on t
     const [draft] = await runSettlementSweep(request, mondayRun(12));
     if (draft === undefined) throw new Error("the second run made no draft");
     await page.goto(`/contractor/payouts/${draft.reference}`);
-    const line = page.getByTestId("adjustment-line").filter({ hasText: `${job.reference} Correction` });
+    // Two corrections of this job read alike (the reason never prints), so the line is found by its amount.
+    const line = page.getByTestId("adjustment-line").filter({ hasText: `${job.reference} Correction` }).filter({ hasText: "-$150" });
     await expect(line).toBeVisible();
-    await expect(line).toContainText("-$150");
 
     // What the run could not take waits on his next payout, with the job it came from.
     await page.goto("/contractor/payouts/next");
