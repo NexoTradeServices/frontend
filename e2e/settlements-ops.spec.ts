@@ -220,7 +220,7 @@ test("6007 AC10/AC11: Mike adds a pay adjustment - the dialog says where it land
     await expect(dialog.getByTestId("adjustment-landing")).toHaveText(
       /^(Goes on Bob's next payout - invoiced \w{3} \d{1,2} \w{3}\.|Goes on Bob's draft for \w{3} \d{1,2} \w{3} - their draft is resent to approve\.|Bob has approved this week - it goes on next week's draft\.)$/,
     );
-    await expect(dialog.getByText("Bob sees this on their pay.")).toBeVisible();
+    await expect(dialog.getByText("Internal note. Bob does not see this.")).toBeVisible();
 
     // Refusals, where they are typed; nothing is saved.
     await dialog.getByRole("button", { name: "Add", exact: true }).click();

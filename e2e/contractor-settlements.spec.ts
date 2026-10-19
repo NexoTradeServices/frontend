@@ -5,7 +5,7 @@
 //       draft it is a Record card tagged "Awaiting your approval", opening to the invoice with each
 //       job's working and the caption pointing at the email; approved and paid change the tag; another
 //       contractor's invoice is not found
-// 6007 AC7/AC8  a correction on a paid week waits for the next run and reads "Correction - JOB-xxxx"
+// 6007 AC7/AC8  a correction on a paid week waits for the next run and reads "JOB-xxxx Correction"
 //       (no reason) on the next draft; what the run cannot take stays on Bob's next payout as
 //       "Still to deduct: $X (JOB-xxxx)"
 //
@@ -114,7 +114,7 @@ test.describe(() => {
   });
 });
 
-test("6007 AC7/AC8: a correction on a paid week reads 'Correction - JOB' on the next draft, and what the run cannot take is 'Still to deduct' on the next payout", async ({
+test("6007 AC7/AC8: a correction on a paid week reads 'JOB-xxxx Correction' on the next draft, and what the run cannot take is 'Still to deduct' on the next payout", async ({
   page,
   browser,
   request,
@@ -159,7 +159,7 @@ test("6007 AC7/AC8: a correction on a paid week reads 'Correction - JOB' on the 
     const [draft] = await runSettlementSweep(request, mondayRun(12));
     if (draft === undefined) throw new Error("the second run made no draft");
     await page.goto(`/contractor/payouts/${draft.reference}`);
-    const line = page.getByTestId("adjustment-line").filter({ hasText: `Correction - ${job.reference}` });
+    const line = page.getByTestId("adjustment-line").filter({ hasText: `${job.reference} Correction` });
     await expect(line).toBeVisible();
     await expect(line).toContainText("-$150");
 

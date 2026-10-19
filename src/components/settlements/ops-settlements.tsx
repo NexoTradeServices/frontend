@@ -537,7 +537,7 @@ function AdjustmentForm({ onClose, onAdded }: { onClose: () => void; onAdded: (f
             {errors["reason"] ? (
               <p className="mt-[5px] text-xs text-brand-destructive">{errors["reason"]}</p>
             ) : chosen ? (
-              <p className="mt-[5px] text-xs text-muted-text">{chosen.firstName} sees this on their pay.</p>
+              <p className="mt-[5px] text-xs text-muted-text">Internal note. {chosen.firstName} does not see this.</p>
             ) : null}
           </div>
           <p data-testid="adjustment-landing" className="text-small text-muted-text">

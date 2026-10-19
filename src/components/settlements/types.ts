@@ -37,7 +37,7 @@ export interface InvoiceView {
   dateLabel: string;
   weekendMultiplier: number;
   lines: PayLine[];
-  /** Feature 6007: `label` is the line as it prints ("Pay adjustment - ..." / "Correction - JOB-1042: ...") */
+  /** Feature 6007: `label` is the line as it prints ("JOB-1042 Adjustment" / "JOB-1042 Correction") */
   adjustments: { reason: string; label: string; kind: "adjustment" | "correction"; amount: number; jobReference: string | null }[];
   subtotal: number;
   gst: number | null;
