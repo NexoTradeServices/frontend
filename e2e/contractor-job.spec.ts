@@ -161,7 +161,8 @@ test.describe("Bob's job screen, on a phone", () => {
     await page.goto("/contractor");
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
     await expect(page.getByText(job.reference)).toHaveCount(1);
-    await expect(page.getByTestId("awaiting-payment-tag")).toHaveText("Completed - awaiting payment");
+    // Other browser tests leave their own unpaid jobs on Bob's dashboard, so the tag is read on this job's card.
+    await expect(page.getByRole("link", { name: job.reference }).getByTestId("awaiting-payment-tag")).toHaveText("Completed - awaiting payment");
   });
 
   /** Bob fills the one visit and completes it through the screen. */
