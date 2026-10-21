@@ -29,6 +29,10 @@
 //      at 390px it stands right before Customer
 // 6004 the two "coming in" placeholders (Mark no-show, Raise callback) are gone; the real buttons are
 //      proven in callbacks.spec.ts and no-show.spec.ts
+// 6009 AC7, AC9 the Review card under the Invoice card of a completed job: "No review yet." before she
+//      rates, then the stars, "4 / 5", her comment, "Would recommend: 9 / 10", who and when; none on a
+//      job that is not completed; the Customer rating card gains Reviews given and Would recommend,
+//      never in the warning colour
 // AC29 at 390px: every action reachable, no sideways scroll, every tap
 //      target at least 44px -- on the queue and on the job page
 // AC30 at 390px the status chips stay one row that scrolls sideways
@@ -53,6 +57,7 @@ import { login } from "./helpers/login";
 import { expectFilterRowOnPhone, expectFilterRowWraps } from "./helpers/filter-row";
 import { MOCKS_GOOGLE_PLACES, installMockGooglePlaces } from "./helpers/mock-google-places";
 import { installMockPhotoImages } from "./helpers/mock-cloudinary";
+import { reviewLinkFor, rateByLink } from "./helpers/reviews";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
@@ -788,4 +793,52 @@ test("6004: the Mark no-show and Raise callback placeholders are gone from the j
   await login(page, "mike@idelta.com.au");
   await expect(page.getByRole("heading", { name: "JOB-1042", exact: true })).toBeVisible();
   await expect(page.getByText(/Mark no-show - coming in|Raise callback - coming in/)).toHaveCount(0);
+});
+
+test("6009 AC7 / AC9: the Review card says No review yet, then shows her review; the Customer rating card gains Reviews given and Would recommend", async ({
+  page,
+  browser,
+  request,
+}) => {
+  test.setTimeout(240_000);
+  const job = await acceptedJobForBob(browser, request, "review-card");
+  await completeJobAsBob(browser, job);
+  await giveInvoiceItsPayLink(request, job);
+
+  await page.goto(`/ops/jobs/${job.reference}`);
+  await login(page, "mike@idelta.com.au");
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: "Review", exact: true }) });
+  await expect(card.getByTestId("review-empty")).toHaveText("No review yet.");
+  // Under the Invoice card.
+  const invoiceBox = await page.locator("section").filter({ has: page.getByRole("heading", { name: /^InvoiceINV-\d+$/ }) }).boundingBox();
+  const reviewBox = await card.boundingBox();
+  expect(reviewBox?.y).toBeGreaterThan((invoiceBox?.y ?? 0) + (invoiceBox?.height ?? 0) - 1);
+  // No figures on the rating card yet.
+  await expect(page.getByTestId("rating-reviews-given")).toHaveCount(0);
+  await expect(page.getByTestId("rating-would-recommend")).toHaveCount(0);
+
+  await rateByLink(request, await reviewLinkFor(request, job.reference), { rating: 4, reviewText: "Quick and tidy.", recommendScore: 9 });
+  await page.reload();
+  const review = page.getByTestId("review-card");
+  await expect(review.getByTestId("stars-shown")).toHaveAttribute("data-value", "4");
+  await expect(review).toContainText("4 / 5");
+  await expect(review).toContainText("\u201cQuick and tidy.\u201d");
+  await expect(review).toContainText("Would recommend: 9 / 10");
+  await expect(review).toContainText(/ - \d{1,2} [A-Z][a-z]{2} \d{4}$/);
+
+  const given = page.getByTestId("rating-reviews-given");
+  await expect(given).toHaveText("4 from 1");
+  await expect(given).toHaveAttribute("data-attention", "false");
+  const recommend = page.getByTestId("rating-would-recommend");
+  await expect(recommend).toHaveText("9 / 10");
+  await expect(recommend).toHaveAttribute("data-attention", "false");
+});
+
+test("6009 AC7: a job that is not completed has no Review card", async ({ page, request }) => {
+  test.setTimeout(180_000);
+  const reference = await postEnquiry(request, "no-review", "Review None");
+  await page.goto(`/ops/jobs/${reference}`);
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: reference, exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Review", exact: true })).toHaveCount(0);
 });

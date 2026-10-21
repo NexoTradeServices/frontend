@@ -138,6 +138,21 @@ export interface CustomerRating {
   overdueInvoices: number;
   /** Cents. */
   totalDue: number;
+  /** Feature 6009: the stars she has given; null until she has given any. */
+  reviewsGiven: { average: number; count: number } | null;
+  /** Feature 6009: the average of her answered 0-10 scores; null until she has answered one. */
+  wouldRecommend: number | null;
+}
+
+/** Feature 6009: what the customer said about the visit. */
+export interface ReviewView {
+  rating: number;
+  reviewText: string | null;
+  recommendScore: number | null;
+  customerName: string;
+  createdAt: string;
+  /** "16 Oct 2026" */
+  createdLabel: string;
 }
 
 export interface JobDetail {
@@ -180,6 +195,8 @@ export interface JobDetail {
   visit: VisitView | null;
   /** Feature 6001: null until Complete has issued one. */
   invoice: InvoiceView | null;
+  /** Feature 6009: the customer's review of this job; null until she rates. */
+  review: ReviewView | null;
   /** Feature 4003: every booking on the job but the one in play, newest first. */
   earlierBookings: EarlierBooking[];
   /** Feature 4006: which of Reschedule, Reassign and Cancel job the page offers. */

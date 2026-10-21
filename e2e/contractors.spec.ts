@@ -25,6 +25,8 @@
 // nothing writes to the seeded cast.
 import { test, expect } from "@playwright/test";
 import { login } from "./helpers/login";
+import { acceptedJobForBob, completeJobAsBob } from "./helpers/accepted-job";
+import { rateByLink, reviewLinkFor } from "./helpers/reviews";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 import { MOCKS_GOOGLE_PLACES, installMockGooglePlaces } from "./helpers/mock-google-places";
 
@@ -213,4 +215,35 @@ test.describe(() => {
     await expect(page.getByRole("button", { name: "Deactivate" })).toBeVisible();
     await page.getByRole("button", { name: "Keep active" }).click();
   });
+});
+
+test("6009 AC8: Bob's Reviews tab shows his average and count, the newest review with its date, job link, stars and comment, and no Would recommend; Dave's says No reviews yet", async ({
+  page,
+  browser,
+  request,
+}) => {
+  test.setTimeout(240_000);
+  const job = await acceptedJobForBob(browser, request, "reviews-tab");
+  await completeJobAsBob(browser, job);
+  await rateByLink(request, await reviewLinkFor(request, job.reference), { rating: 5, reviewText: "Tidy and on time.", recommendScore: 10 });
+
+  await page.goto("/ops/contractors/CON-014");
+  await login(page, "mike@idelta.com.au");
+  // The third Record tab, after Details and Service area.
+  await expect(page.getByRole("tab")).toHaveText(["Details", "Service area", "Reviews"]);
+  await page.getByRole("tab", { name: "Reviews" }).click();
+  await expect(page).toHaveURL(/\/ops\/contractors\/CON-014\/reviews$/, { timeout: 30_000 });
+  await expect(page.getByRole("tab", { name: "Reviews" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator('[data-container="medium"]')).toBeVisible();
+
+  await expect(page.getByTestId("reviews-summary")).toContainText(/^\d(\.\d)? from \d+ reviews?$/);
+  const row = page.getByTestId("review-row").filter({ hasText: job.reference });
+  await expect(row.getByRole("link", { name: job.reference })).toHaveAttribute("href", `/ops/jobs/${job.reference}`);
+  await expect(row.getByTestId("stars-shown")).toHaveAttribute("data-value", "5");
+  await expect(row).toContainText("Tidy and on time.");
+  await expect(row).toContainText(/\d{1,2} [A-Z][a-z]{2} \d{4}/);
+  await expect(page.getByText("Would recommend")).toHaveCount(0);
+
+  await page.goto("/ops/contractors/CON-021/reviews");
+  await expect(page.getByTestId("reviews-empty")).toHaveText("No reviews yet.");
 });
