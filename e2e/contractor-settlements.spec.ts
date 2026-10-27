@@ -59,7 +59,7 @@ test.describe(() => {
       await expect(card).toBeVisible();
       await expect(card.getByTestId("settlement-tag")).toHaveText("Awaiting your approval");
       await expect(card.getByTestId("settlement-tag")).toHaveCSS("text-transform", "uppercase");
-      await expect(card).toContainText(/\d{1,2} [A-Z][a-z]{2} - \d{1,2} [A-Z][a-z]{2} \d{4}/);
+      await expect(card).toContainText(/\d{1,2} [A-Z][a-z]{2}( \d{4})? - \d{1,2} [A-Z][a-z]{2} \d{4}/);
       await expect(card).toContainText(/To be paid on [A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}/);
       await expectNoSidewaysScroll(page);
 
