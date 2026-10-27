@@ -25,6 +25,7 @@ import { ReadOnlyPhotoGallery } from "@/components/ui/photo-gallery";
 import { Toast, useToast } from "@/components/ui/toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TimeEntryRows, isBlankRow, rowsFromEntries, type TimeEntryRow } from "@/components/ui/time-entry-rows";
+import { StarsShown } from "@/components/ui/star-rating";
 import { formatHours } from "@/lib/billed-hours";
 import { formatDollars } from "@/components/request-a-job/money";
 import { REFUND_TAGS, centsToField, refundMoney, typedDollarsToCents } from "@/components/refunds/money";
@@ -810,7 +811,45 @@ function CustomerRatingCard({ job }: { job: JobDetail }) {
         <RatingFact label="Disputes" value={String(rating.disputes)} attention={rating.disputes > 0} />
         <RatingFact label="Overdue invoices" value={String(rating.overdueInvoices)} attention={rating.overdueInvoices > 0} />
         <RatingFact label="Total due" value={formatDollars(rating.totalDue)} attention={rating.totalDue > 0} />
+        {rating.reviewsGiven ? (
+          <RatingFact
+            label="Reviews given"
+            value={`${String(rating.reviewsGiven.average)} from ${String(rating.reviewsGiven.count)}`}
+            attention={false}
+          />
+        ) : null}
+        {rating.wouldRecommend !== null ? (
+          <RatingFact label="Would recommend" value={`${String(rating.wouldRecommend)} / 10`} attention={false} />
+        ) : null}
       </div>
+    </Card>
+  );
+}
+
+/** Feature 6009: the customer's review, under the Invoice card of a completed job. */
+function ReviewCard({ job }: { job: JobDetail }) {
+  const review = job.review;
+  return (
+    <Card title="Review">
+      {review === null ? (
+        <p data-testid="review-empty" className="text-small text-muted-text">
+          No review yet.
+        </p>
+      ) : (
+        <div data-testid="review-card" className="grid gap-2">
+          <div className="flex items-center gap-2">
+            <StarsShown value={review.rating} />
+            <span className="font-bold text-ink tabular-nums">{review.rating} / 5</span>
+          </div>
+          {review.reviewText ? <p className="text-body text-ink">&ldquo;{review.reviewText}&rdquo;</p> : null}
+          {review.recommendScore !== null ? (
+            <p className="text-body text-ink">Would recommend: {review.recommendScore} / 10</p>
+          ) : null}
+          <p className="text-small text-muted-text">
+            {review.customerName} - {review.createdLabel}
+          </p>
+        </div>
+      )}
     </Card>
   );
 }
@@ -2129,19 +2168,22 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
             />
           </div>
         ) : null}
-        {job.invoice ? (
-          <div className="order-6 min-w-0 xl:order-none xl:col-start-1 xl:row-start-4">
-            <InvoiceCard
-              job={job}
-              invoice={job.invoice}
-              onToast={showToast}
-              onSent={(next, message) => {
-                setJob(next);
-                showToast(message);
-              }}
-              onPaid={setJob}
-              onRefreshed={setJob}
-            />
+        {job.invoice || job.status === "completed" ? (
+          <div className="order-6 grid min-w-0 gap-4 xl:order-none xl:col-start-1 xl:row-start-4">
+            {job.invoice ? (
+              <InvoiceCard
+                job={job}
+                invoice={job.invoice}
+                onToast={showToast}
+                onSent={(next, message) => {
+                  setJob(next);
+                  showToast(message);
+                }}
+                onPaid={setJob}
+                onRefreshed={setJob}
+              />
+            ) : null}
+            {job.status === "completed" ? <ReviewCard job={job} /> : null}
           </div>
         ) : null}
         <div className="order-7 min-w-0 xl:order-none xl:col-start-1 xl:row-start-5">

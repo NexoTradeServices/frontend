@@ -3,7 +3,7 @@
 // SAME header so the tab strip stays one component, never duplicated per
 // tab (Record tabs, frontend-conventions.md): a tab whose surface cannot
 // exist yet does not show -- so this carries only Details on /new (no
-// contractor yet), and both tabs once the record exists.
+// contractor yet), and all three tabs (Details, Service area, Reviews -- Feature 6009) once the record exists.
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { fmtDate, recordTagClasses, type ContractorDto } from "./types";
@@ -13,7 +13,7 @@ export function ContractorRecordHeader({
   activeTab,
 }: {
   contractor: ContractorDto | null;
-  activeTab: "details" | "service-area";
+  activeTab: "details" | "service-area" | "reviews";
 }) {
   const headTags: { kind: "active" | "suspended"; label: string }[] = contractor
     ? [{ kind: contractor.status === "active" ? "active" : "suspended", label: contractor.status === "active" ? "Active" : "Deactivated" }]
@@ -69,6 +69,16 @@ export function ContractorRecordHeader({
             }`}
           >
             Service area
+          </Link>
+          <Link
+            href={`/ops/contractors/${contractor.code}/reviews`}
+            role="tab"
+            aria-selected={activeTab === "reviews"}
+            className={`pb-2 text-sm font-bold ${
+              activeTab === "reviews" ? "border-b-2 border-brand-accent text-ink" : "text-muted-text"
+            }`}
+          >
+            Reviews
           </Link>
         </div>
       ) : null}
