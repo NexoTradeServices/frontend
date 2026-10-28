@@ -2,10 +2,12 @@
 // Architecture & Routing / Page inventory: `/review/<token>`, no login -- the token in the path is the
 // permission (Passwordless capability links, ADR 0004). Read server-side, like `/approve/<token>`, so a
 // dead link renders its reason on first paint. `?rating=1` to `?rating=5` (the stars in the email)
-// opens it with that star already chosen.
+// opens it with that star already chosen. Feature 3004 adds the Caption line under the card, by who
+// is looking (guest / has a login / logged in), on open and dead states alike.
 import { Container } from "@/components/frame/container";
 import { ReviewUnavailableCard } from "@/components/reviews/review-cards";
 import { DeadReviewCard, ReviewView } from "@/components/reviews/review-view";
+import { ReviewAccountOffer } from "@/components/reviews/review-account-offer";
 import type { ReviewRead } from "@/components/reviews/types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -44,6 +46,7 @@ export default async function ReviewPage({
       ) : (
         <DeadReviewCard dead={read} />
       )}
+      {read !== null ? <ReviewAccountOffer account={read.account} /> : null}
     </Container>
   );
 }

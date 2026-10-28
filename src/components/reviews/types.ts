@@ -12,12 +12,17 @@ export interface ReviewOpen {
   /** "14 Oct 2026" */
   finishedOn: string;
   officePhone: string;
+  /** Feature 3004: has the customer chosen a password -- the footer offer reads it. */
+  account: ReviewAccount;
 }
 
+/** Feature 3004. */
+export type ReviewAccount = "guest" | "has_login";
+
 export type ReviewDead =
-  | { state: "used"; jobReference: string; officePhone: string }
-  | { state: "expired"; jobReference: string; officePhone: string }
-  | { state: "unknown"; officePhone: string };
+  | { state: "used"; jobReference: string; officePhone: string; account: ReviewAccount }
+  | { state: "expired"; jobReference: string; officePhone: string; account: ReviewAccount }
+  | { state: "unknown"; officePhone: string; account: ReviewAccount };
 
 export type ReviewRead = ReviewOpen | ReviewDead;
 

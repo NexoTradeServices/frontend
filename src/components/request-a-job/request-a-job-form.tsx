@@ -226,6 +226,13 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
       });
       const body = (await res.json().catch(() => ({}))) as { reference?: string; error?: string; operatorPhone?: string };
       if (res.status === 201 && body.reference) {
+        // Feature 3004: the Set a password page arrives with this email filled -- kept in the
+        // browser for the confirmation page's offer, never in the address bar.
+        try {
+          window.sessionStorage.setItem("enquiryEmail", email.trim());
+        } catch {
+          // storage blocked: the page just opens empty
+        }
         router.push(`/request-a-job/confirmed?ref=${encodeURIComponent(body.reference)}`);
         return;
       }

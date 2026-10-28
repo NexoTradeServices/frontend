@@ -9,6 +9,10 @@
 //      its 30 days reads "This link has expired" with the office phone; a link that never existed
 //      says it does not work
 //
+// 3004 AC10 the Caption under the card by who is looking: a guest sees "Want to track all your jobs? Set a
+//      password" (open and dead links alike); once she has a password, "Log in to see all your jobs" logged
+//      out and "Go to your jobs" logged in
+//
 // The saving, the single use, the 30 days and the averages are proven in the backend
 // (tests/reviews.test.ts). The browser proves the flow at 390px, where a customer opens it from her
 // email. The review link is minted by the backend's test hook - the real one only exists inside a
@@ -17,6 +21,9 @@ import { test, expect } from "@playwright/test";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 import { acceptedJobForBob, completeJobAsBob } from "./helpers/accepted-job";
 import { reviewLinkFor } from "./helpers/reviews";
+import { askForSetPasswordLink } from "./helpers/set-password";
+import { waitForHydration } from "./helpers/login";
+import { BASE_URL, testRunStorageState } from "./helpers/test-run";
 import { expectNoSidewaysScroll } from "./helpers/settlements";
 
 test.describe(() => {
@@ -110,5 +117,48 @@ test.describe(() => {
     await page.goto("/review/not-a-real-link");
     await expect(page.getByRole("heading", { name: "This link doesn't work", level: 1 })).toBeVisible();
     await expect(page.getByRole("link", { name: /^Ring the office - / })).toBeVisible();
+  });
+});
+
+test.describe(() => {
+  test.use(MOBILE_VIEWPORT);
+
+  test("3004 AC10: guest, has a login but logged out, and logged in", async ({ page, browser, request }) => {
+    test.setTimeout(240_000);
+    const job = await acceptedJobForBob(browser, request, "rev-offer");
+    await completeJobAsBob(browser, job);
+    const path = await reviewLinkFor(request, job.reference);
+    const customerEmail = job.customerEmail ?? "";
+
+    // A guest: the offer on the open page and on a dead one.
+    await page.goto(path);
+    const offer = page.getByTestId("review-account-offer");
+    await expect(offer).toHaveText("Want to track all your jobs? Set a password");
+    await expect(offer.getByRole("link", { name: "Set a password" })).toHaveAttribute("href", "/set-password");
+    await page.goto("/review/not-a-real-token");
+    await expect(page.getByTestId("review-account-offer")).toHaveText("Want to track all your jobs? Set a password");
+
+    // She sets a password in a browser of her own - logged in there.
+    const hers = await browser.newContext({ baseURL: BASE_URL, storageState: testRunStorageState(), ...MOBILE_VIEWPORT });
+    try {
+      const herPage = await hers.newPage();
+      await herPage.goto(await askForSetPasswordLink(request, customerEmail));
+      await waitForHydration(herPage, "new-password");
+      await herPage.getByLabel("New password", { exact: true }).fill("a-new-customer-password-1");
+      await herPage.getByRole("button", { name: "Set password", exact: true }).click();
+      await expect(herPage).toHaveURL(/\/account/, { timeout: 20_000 });
+
+      // Logged in as her: "Go to your jobs".
+      await herPage.goto(path);
+      await expect(herPage.getByTestId("review-account-offer")).toHaveText("Go to your jobs");
+      await expect(herPage.getByTestId("review-account-offer").getByRole("link")).toHaveAttribute("href", "/account");
+    } finally {
+      await hers.close();
+    }
+
+    // Has a login, logged out (this page has no session): "Log in to see all your jobs".
+    await page.goto(path);
+    await expect(page.getByTestId("review-account-offer")).toHaveText("Log in to see all your jobs");
+    await expect(page.getByTestId("review-account-offer").getByRole("link")).toHaveAttribute("href", "/account");
   });
 });

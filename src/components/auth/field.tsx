@@ -9,7 +9,7 @@
 // `prefix`/`suffix` decorate the control itself -- "$" before a money
 // amount, a unit ("days", "km", "%", "min") after a number (Components /
 // Money input).
-import type { InputHTMLAttributes } from "react";
+import { useState, type InputHTMLAttributes } from "react";
 
 interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
@@ -33,8 +33,13 @@ export function Field({
   suffix,
   id,
   className,
+  type,
   ...inputProps
 }: FieldProps) {
+  // Feature 3004: every password box carries the show/hide eye at its right edge (Pages / Login and
+  // password pages), built once here for type="password".
+  const isPassword = type === "password";
+  const [shown, setShown] = useState(false);
   return (
     <div className="mb-3.5">
       <label
@@ -62,11 +67,28 @@ export function Field({
           id={id}
           className={`min-h-[44px] w-full rounded-button border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
             error ? "border-brand-destructive" : "border-hairline"
-          } ${prefix ? "pl-5" : ""} ${suffix ? "pr-9" : ""} ${className ?? ""}`}
+          } ${prefix ? "pl-5" : ""} ${suffix ? "pr-9" : ""} ${isPassword ? "pr-11" : ""} ${className ?? ""}`}
+          type={isPassword && shown ? "text" : type}
           aria-invalid={error ? true : undefined}
           aria-required={required ? true : undefined}
           {...inputProps}
         />
+        {isPassword ? (
+          <button
+            type="button"
+            onClick={() => setShown((value) => !value)}
+            aria-pressed={shown}
+            className="absolute top-0 right-0 flex size-11 items-center justify-center text-muted-text"
+          >
+            {/* Named by hidden text, not aria-label: a label lookup for "Password" must find the box only. */}
+            <span className="sr-only">{shown ? "Hide password" : "Show password"}</span>
+            <svg aria-hidden viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+              <circle cx="12" cy="12" r="3" />
+              {shown ? <path d="M4 4l16 16" /> : null}
+            </svg>
+          </button>
+        ) : null}
         {suffix ? (
           <span className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-sm text-muted-text">
             {suffix}

@@ -8,8 +8,8 @@
 // (AC3, a repeat enquiry from a known email, is proven at the backend --
 //      tests/enquiries.test.ts AC3 -- and no longer here, where it wrote a job
 //      onto the cast's Sarah.)
-// AC4  the confirmation page reads "we'll call you shortly" and carries no
-//      "Set a password" offer
+// AC4  the confirmation page reads "we'll call you shortly"; 3004 AC1 adds the offer line under
+//      the reference, opening Set a password with her email filled
 // AC8  every required field carries a star (change.md V3 -- this form
 //      moved off the "every field required, no stars" case once real
 //      optional fields existed); the word "(optional)" is never used
@@ -203,8 +203,12 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     await expect(page.getByTestId("message-card").locator("span.bg-success-bg svg")).toBeVisible();
     await expect(page.getByText("We'll call you shortly to confirm a time.")).toBeVisible();
     await expect(page.getByText(/^JOB-\d+$/)).toBeVisible();
-    // AC4: no "Set a password" offer -- that ships with 3004.
-    await expect(page.getByText(/password/i)).toHaveCount(0);
+    // 3004 AC1: the one Caption line under the reference offers a login, and the link opens
+    // Set a password with the email she just typed already in the box.
+    await expect(page.getByTestId("set-password-offer")).toHaveText("Want to track this online? Set a password");
+    await page.getByRole("link", { name: "Set a password" }).click();
+    await expect(page).toHaveURL(/\/set-password$/);
+    await expect(page.getByLabel("Email")).toHaveValue(/^e2e-3001-.*@idelta\.com\.au$/);
   });
 
   test("AC2: a Saturday date shows the weekend rate, a weekday shows normal", async ({ page }) => {
