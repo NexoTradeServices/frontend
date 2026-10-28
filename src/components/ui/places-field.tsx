@@ -113,7 +113,7 @@ type LoadState = "checking" | "unavailable" | "ready";
 // React Strict Mode double-invoke, waits behind too.
 const CALLBACK_NAME = "__tradeserviceGooglePlacesReady";
 
-function loadPlacesScript(apiKey: string): Promise<void> {
+export function loadPlacesScript(apiKey: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (window.google?.maps?.places) {
       resolve();
@@ -135,7 +135,11 @@ function loadPlacesScript(apiKey: string): Promise<void> {
     script.id = SCRIPT_ID;
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async&callback=${CALLBACK_NAME}`;
     script.async = true;
-    script.addEventListener("error", () => reject(new Error("google places script failed to load")));
+    script.addEventListener("error", () => {
+      // Feature 6012: a failed tag must not stay in the page, or a later try (Check again) would wait on it forever.
+      script.remove();
+      reject(new Error("google places script failed to load"));
+    });
     document.head.appendChild(script);
   });
 }
