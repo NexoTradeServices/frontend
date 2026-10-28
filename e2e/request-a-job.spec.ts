@@ -598,7 +598,7 @@ test.describe("Feature 3006 -- the enquiry form with Google Places down", () => 
 
 test.describe("Feature 3002 -- coverage at the pick", () => {
   const WARNING =
-    "We don't service this area right now. You can still leave your details and our operators will try to find someone - no guarantee.";
+    "We don't currently service your area, but you can still submit your details. We'll do our best to find a local service provider, subject to availability.";
 
   async function pickFremantle(page: Page) {
     const field = page.getByLabel("Suburb");

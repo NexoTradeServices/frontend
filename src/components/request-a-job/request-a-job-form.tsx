@@ -285,8 +285,8 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
             <>
               {outOfReach ? (
                 <Banner kind="warning">
-                  We don&apos;t service this area right now. You can still leave your details and our operators will try
-                  to find someone - no guarantee.
+                  We don&apos;t currently service your area, but you can still submit your details. We&apos;ll do our
+                  best to find a local service provider, subject to availability.
                 </Banner>
               ) : null}
               <PlacesField
