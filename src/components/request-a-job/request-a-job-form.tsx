@@ -63,6 +63,8 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
   /** Feature 3006: the suburb picked from the platform's own list while Google is down. */
   const [platformSuburb, setPlatformSuburb] = useState<PlatformSuburb | null>(null);
   const [locationError, setLocationError] = useState<string>();
+  /** Feature 3002: what the coverage check said about one pick. Never blocks Continue. */
+  const [coverageAnswer, setCoverageAnswer] = useState<{ query: string; outOfReach: boolean } | null>(null);
   const [trade, setTrade] = useState<string | null>(null);
   const [tradeError, setTradeError] = useState<string>();
   /** One typed answer per trade question, keyed by the question's own label. Optional -- left blank is fine. */
@@ -90,6 +92,30 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
   );
 
   const step = STEPS[Math.min(stepIndex, STEPS.length - 1)] ?? "suburb";
+
+  // Feature 3002: the coverage check on every suburb pick. A failed or slow check shows nothing and
+  // never blocks Continue (Foundations / Ground rules: outside services degrade, never block). The
+  // answer is kept with the pick it belongs to, so a stale one never shows for a newer pick.
+  const coverageQuery =
+    location !== null
+      ? new URLSearchParams({ postcode: location.postcode, lat: String(location.lat), lng: String(location.lng) }).toString()
+      : platformSuburb !== null
+        ? new URLSearchParams({ suburbId: platformSuburb.suburbId }).toString()
+        : null;
+  useEffect(() => {
+    if (coverageQuery === null) return;
+    const controller = new AbortController();
+    fetch(`${apiUrl}/api/enquiries/coverage?${coverageQuery}`, { signal: controller.signal })
+      .then((res) => (res.ok ? (res.json() as Promise<{ tier?: string }>) : null))
+      .then((body) => {
+        if (!controller.signal.aborted) setCoverageAnswer({ query: coverageQuery, outOfReach: body?.tier === "out_of_reach" });
+      })
+      .catch(() => undefined);
+    return () => {
+      controller.abort();
+    };
+  }, [coverageQuery]);
+  const outOfReach = coverageQuery !== null && coverageAnswer?.query === coverageQuery && coverageAnswer.outOfReach;
 
   // Feature 3003: learn whether photo upload is switched on the first time the
   // notes step shows.
@@ -248,6 +274,12 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
 
           {step === "suburb" ? (
             <>
+              {outOfReach ? (
+                <Banner kind="warning">
+                  We don&apos;t service this area right now. You can still leave your details and our operators will try
+                  to find someone - no guarantee.
+                </Banner>
+              ) : null}
               <PlacesField
                 id="suburb"
                 label="Suburb"

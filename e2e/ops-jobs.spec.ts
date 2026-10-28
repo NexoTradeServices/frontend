@@ -15,6 +15,8 @@
 //      save and come back on reload; clearing the business name hides and clears them
 // 6015 AC13 the Invoice card names the business, Attn and ABN when the invoice froze one, and
 //      reads Total / Amount due (the GST rows are proven at the backend and in refunds.spec.ts)
+// 3002 AC9 the queue tags a near-miss job "No direct coverage - n km" and an out-of-reach one "Out of reach -
+//      n km" under the suburb, none on a covered job; table at desktop width, cards on a phone
 // AC24 the email's job link opened logged out: the ops login, then that job
 //      (the link itself is proven at the backend, ops-jobs.test.ts AC24)
 // AC25 (BKLG-022) Assigned renders #6b4fa3 on #efeafa through the one
@@ -63,20 +65,25 @@ import { MOBILE_VIEWPORT } from "../playwright.config";
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
 
 /** A fresh web enquiry, posted the way the public form posts it (no reCAPTCHA token reads as unreachable, never a block). */
-async function postEnquiry(request: APIRequestContext, tag: string, name: string): Promise<string> {
+async function postEnquiry(
+  request: APIRequestContext,
+  tag: string,
+  name: string,
+  place: { suburb: string; postcode: string; lat: number; lng: number } = { suburb: "Fremantle", postcode: "6160", lat: -32.0569, lng: 115.7439 },
+): Promise<string> {
   const res = await request.post(`${apiUrl}/api/enquiries`, {
     data: {
       name,
       email: `e2e-4001-${tag}-${String(Date.now())}@idelta.com.au`,
       phone: "0400 000 401",
       location: {
-        suburb: "Fremantle",
+        suburb: place.suburb,
         state: "WA",
         country: "AU",
-        postcode: "6160",
-        lat: -32.0569,
-        lng: 115.7439,
-        placeId: "e2e-place-fremantle",
+        postcode: place.postcode,
+        lat: place.lat,
+        lng: place.lng,
+        placeId: `e2e-place-${place.suburb.toLowerCase().replace(/\s+/g, "-")}`,
       },
       trade: "Plumbing",
       selectedOptions: [],
@@ -841,4 +848,46 @@ test("6009 AC7: a job that is not completed has no Review card", async ({ page, 
   await login(page, "mike@idelta.com.au");
   await expect(page.getByRole("heading", { name: reference, exact: true }).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Review", exact: true })).toHaveCount(0);
+});
+
+test("3002 AC9: the queue tags a near-miss and an out-of-reach job, and a covered one carries nothing - table and phone cards", async ({
+  page,
+  request,
+}) => {
+  const stamp = String(Date.now());
+  const greg = `E2E Cover Greg ${stamp}`;
+  const karl = `E2E Cover Karl ${stamp}`;
+  const sarah = `E2E Cover Sarah ${stamp}`;
+  const gregRef = await postEnquiry(request, "cov-greg", greg, { suburb: "Rottnest Island", postcode: "6161", lat: -32.0072, lng: 115.5413 });
+  const karlRef = await postEnquiry(request, "cov-karl", karl, { suburb: "Joondalup", postcode: "6027", lat: -31.7448, lng: 115.7661 });
+  const sarahRef = await postEnquiry(request, "cov-sarah", sarah, { suburb: "Hilton", postcode: "6163", lat: -32.0731, lng: 115.7797 });
+
+  await page.goto("/ops/jobs");
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible();
+
+  for (const [name, ref, tag] of [
+    [greg, gregRef, /^No direct coverage - \d+\.\d km$/],
+    [karl, karlRef, /^Out of reach - \d+\.\d km$/],
+    [sarah, sarahRef, null],
+  ] as const) {
+    await page.getByLabel("Search jobs").fill(name);
+    const row = page.getByRole("row").filter({ hasText: ref });
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    if (tag === null) await expect(row.getByTestId("coverage-tag")).toHaveCount(0);
+    else await expect(row.getByTestId("coverage-tag")).toHaveText(tag);
+  }
+
+  await page.setViewportSize(MOBILE_VIEWPORT.viewport);
+  for (const [name, ref, tag] of [
+    [greg, gregRef, /^No direct coverage - \d+\.\d km$/],
+    [karl, karlRef, /^Out of reach - \d+\.\d km$/],
+    [sarah, sarahRef, null],
+  ] as const) {
+    await page.getByLabel("Search jobs").fill(name);
+    const card = page.locator(`a[data-ref="${ref}"]`);
+    await expect(card).toBeVisible({ timeout: 15_000 });
+    if (tag === null) await expect(card.getByTestId("coverage-tag")).toHaveCount(0);
+    else await expect(card.getByTestId("coverage-tag")).toHaveText(tag);
+  }
 });

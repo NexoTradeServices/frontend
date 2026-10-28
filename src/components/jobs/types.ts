@@ -31,6 +31,8 @@ export interface QueueRow {
   contractor: ContractorView | null;
   /** Feature 4003: waiting at new behind a decline -- who declined, and his note. */
   declined: { by: string; note: string | null } | null;
+  /** Feature 3002: the tier of the job's current suburb; open jobs only. */
+  coverage: { tier: "covered" | "near_miss" | "out_of_reach"; nearestKm: number | null } | null;
 }
 
 export type QueueCounts = Record<StatusFilter, number>;

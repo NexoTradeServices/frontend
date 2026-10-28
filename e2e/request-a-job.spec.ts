@@ -25,6 +25,9 @@
 // 1017 AC5  the evening window's note reads 17:00 - 19:00
 //      (the business name reaching the customer record is proven at the
 //      backend, tests/enquiries.test.ts 1017 AC2)
+// 3002 AC1, AC3, AC4, AC6, AC7 (coverage at the pick) lives in its own describe at the foot of this
+//      file: Joondalup shows the warning Banner and Continue still works, a Fremantle re-pick clears
+//      it, Hilton shows nothing, the platform list gets the same check, a failed check shows nothing
 // AC11 a trade's own questions render as labelled text answers under
 //      "Additional questions" on the Notes step ("Tell us what's wrong"),
 //      optional, never their own step; a trade with none shows that same
@@ -586,5 +589,71 @@ test.describe("Feature 3006 -- the enquiry form with Google Places down", () => 
       page.getByText("We can't take job requests online right now -- please call us on 0400 111 222."),
     ).toBeVisible();
     await expect(page).toHaveURL(/\/request-a-job$/);
+  });
+});
+
+test.describe("Feature 3002 -- coverage at the pick", () => {
+  const WARNING =
+    "We don't service this area right now. You can still leave your details and our operators will try to find someone - no guarantee.";
+
+  async function pickFremantle(page: Page) {
+    const field = page.getByLabel("Suburb");
+    await expect(field).toBeEnabled({ timeout: 10_000 });
+    await field.fill("Fremantle");
+    await expect(page.getByText("Google suggestions")).toBeVisible({ timeout: 20_000 });
+    await page.getByRole("button", { name: /Fremantle/ }).first().click();
+    await expect(field).toHaveValue(/Fremantle WA/, { timeout: 20_000 });
+  }
+
+  test.beforeEach(async ({ page }) => {
+    if (MOCKS_GOOGLE_PLACES) await installMockGooglePlaces(page);
+  });
+
+  test("AC3, AC4: Joondalup shows the warning and Continue still works; a Fremantle re-pick clears it", async ({ page }) => {
+    await page.goto("/request-a-job");
+    await pickJoondalup(page);
+    await expect(page.getByText(WARNING)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
+
+    await pickFremantle(page);
+    await expect(page.getByText(WARNING)).toHaveCount(0, { timeout: 10_000 });
+
+    await pickJoondalup(page);
+    await expect(page.getByText(WARNING)).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByRole("heading", { name: "What's the job?" })).toBeVisible();
+    // The warning belongs to the suburb step only.
+    await expect(page.getByText(WARNING)).toHaveCount(0);
+  });
+
+  test("AC7: a coverage check that fails shows nothing and Continue still works", async ({ page }) => {
+    await page.route(/\/api\/enquiries\/coverage/, (route) => route.abort());
+    await page.goto("/request-a-job");
+    await pickJoondalup(page);
+    await expect(page.getByText(WARNING)).toHaveCount(0);
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByRole("heading", { name: "What's the job?" })).toBeVisible();
+  });
+
+  test.describe("with Google Places down", () => {
+    test.beforeEach(async ({ page }) => {
+      await blockGooglePlaces(page);
+    });
+
+    test("AC1, AC6: Hilton from the platform list shows nothing; Joondalup from it shows the warning", async ({ page }) => {
+      await page.goto("/request-a-job");
+      const field = page.getByLabel("Suburb");
+      await expect(field).toBeEnabled({ timeout: 10_000 });
+      await field.fill("Hilt");
+      await page.getByRole("button", { name: "Hilton WA 6163" }).click();
+      await expect(field).toHaveValue("Hilton WA 6163");
+      await page.waitForTimeout(500);
+      await expect(page.getByText(WARNING)).toHaveCount(0);
+
+      await field.fill("Joondalup");
+      await page.getByRole("button", { name: "Joondalup WA 6027" }).click();
+      await expect(field).toHaveValue("Joondalup WA 6027");
+      await expect(page.getByText(WARNING)).toBeVisible({ timeout: 10_000 });
+    });
   });
 });
