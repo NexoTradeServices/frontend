@@ -27,8 +27,10 @@ import { AlertPhone, AlertStrip } from "@/components/ui/alert-strip";
 import { PhotoGallery } from "@/components/ui/photo-gallery";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { TradeIcon } from "./trade-icon";
+import { PriceBox } from "./price-box";
+import { AdditionalQuestions } from "./additional-questions";
 import { MAX_PHOTOS, PHOTO_UNAVAILABLE, useEnquiryPhotos } from "./use-enquiry-photos";
-import { formatDayName, formatDollars, formatFriendlyDate, isWeekendDate, todayYmd } from "./money";
+import { formatDayName, formatFriendlyDate, isWeekendDate, todayYmd } from "./money";
 import type { FormDataDto, PreferredWindow } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -46,7 +48,7 @@ const STEP_LABELS: Record<StepKey, string> = {
   price: "Pricing",
 };
 
-const WINDOWS: { value: PreferredWindow; label: string; note: string }[] = [
+export const WINDOWS: { value: PreferredWindow; label: string; note: string }[] = [
   { value: "morning", label: "Morning", note: "7:00 - 12:00" },
   { value: "afternoon", label: "Afternoon", note: "12:00 - 17:00" },
   { value: "evening", label: "Evening", note: "17:00 - 19:00" },
@@ -406,21 +408,11 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
                 {descriptionError ? <p className="mt-[5px] text-xs text-brand-destructive">{descriptionError}</p> : null}
               </div>
 
-              {selectedType && selectedType.prefilledFields.length > 0 ? (
-                <div className="mt-6 border-t border-hairline pt-5">
-                  <h2 className="font-heading text-sm font-extrabold text-ink">Additional questions</h2>
-                  <p className="mb-4 text-xs text-muted-text">Help us to attend the job better prepared.</p>
-                  {selectedType.prefilledFields.map((question, index) => (
-                    <Field
-                      key={question}
-                      id={`prefilled-${String(index)}`}
-                      label={question}
-                      value={questionAnswers[question] ?? ""}
-                      onChange={(e) => setQuestionAnswers((prev) => ({ ...prev, [question]: e.target.value }))}
-                    />
-                  ))}
-                </div>
-              ) : null}
+              <AdditionalQuestions
+                questions={selectedType?.prefilledFields ?? []}
+                answers={questionAnswers}
+                onChange={(question, answer) => setQuestionAnswers((prev) => ({ ...prev, [question]: answer }))}
+              />
 
               <div className="mt-6 border-t border-hairline pt-5">
                 <h2 className="mb-3 font-heading text-sm font-extrabold text-ink">Photos</h2>
@@ -526,13 +518,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
                 This price includes the call-out and up to one hour of service. Any additional time is charged at the
                 hourly rate shown below.
               </p>
-              <div data-testid="price-box" className="rounded-small-box bg-ground p-3.5">
-                <span className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase">
-                  {weekend ? "Weekend rate" : "Standard Rate"}
-                </span>
-                <div className="font-heading text-page-title font-extrabold text-ink">{formatDollars(calloutRate)}</div>
-                <p className="text-caption text-muted-text">then {formatDollars(standardRate)} per additional hour</p>
-              </div>
+              <PriceBox weekend={weekend} calloutRate={calloutRate} standardRate={standardRate} />
             </>
           ) : null}
 

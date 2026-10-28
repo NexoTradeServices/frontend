@@ -7,6 +7,7 @@ import type { QueueResult } from "@/components/jobs/types";
 import { Container } from "@/components/frame/container";
 import { PageHeader } from "@/components/ui/page-header";
 import { LoadFailed } from "@/components/ui/load-failed";
+import { PrimaryLink } from "@/components/auth/buttons";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -24,6 +25,11 @@ export default async function JobsPage() {
       <PageHeader
         title="Jobs"
         subtitle="Open work - new enquiries first, oldest waiting at the top."
+        action={
+          <PrimaryLink href="/ops/jobs/new" size="compact">
+            New phone job
+          </PrimaryLink>
+        }
       />
       <JobQueue initial={initial} />
     </Container>
