@@ -21,6 +21,7 @@ import { LockedField } from "@/components/ui/locked-field";
 import { SelectField } from "@/components/ui/select-field";
 import { PrimaryButton, PrimaryLink } from "@/components/auth/buttons";
 import { Field } from "@/components/auth/field";
+import { Banner } from "@/components/auth/banner";
 import { ReadOnlyPhotoGallery } from "@/components/ui/photo-gallery";
 import { Toast, useToast } from "@/components/ui/toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -86,7 +87,226 @@ function ReferenceLink({ reference }: { reference: string }) {
   );
 }
 
-function RequestCard({ job }: { job: JobDetail }) {
+const REQUEST_WINDOWS: { value: JobDetail["preferredWindow"]; label: string }[] = [
+  { value: "morning", label: "Morning" },
+  { value: "afternoon", label: "Afternoon" },
+  { value: "evening", label: "Evening" },
+];
+
+type RequestField = "trade" | "location" | "preferredDate" | "preferredWindow" | "description";
+
+/**
+ * Feature 4004, pre-dispatch edit: the request card's form while the job is `new`. Trade, Suburb (locked
+ * with a site address), Date, Time of day, Issue Description. A changed trade warns that the price changes.
+ * Save -> Toast and the card back to its Facts; a 409 -> the server's words as a Banner and the card
+ * reloads read-only (the job was dispatched while the edit was open).
+ */
+function RequestEditCard({
+  job,
+  onCancel,
+  onSaved,
+}: {
+  job: JobDetail;
+  onCancel: () => void;
+  onSaved: (next: JobDetail, message: string) => void;
+}) {
+  const [trades, setTrades] = useState<string[]>([job.trade]);
+  const [trade, setTrade] = useState(job.trade);
+  const [location, setLocation] = useState<PickedAddress | null>(null);
+  const [platformSuburb, setPlatformSuburb] = useState<{ suburbId: string; label: string } | null>(null);
+  const [preferredDate, setPreferredDate] = useState(job.preferredDate);
+  const [preferredWindow, setPreferredWindow] = useState(job.preferredWindow);
+  const [description, setDescription] = useState(job.description ?? "");
+  const [errors, setErrors] = useState<Partial<Record<RequestField, string>>>({});
+  const [banner, setBanner] = useState<string>();
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    fetch(`${apiUrl}/api/enquiries/form-data`, { cache: "no-store" })
+      .then((res) => (res.ok ? (res.json() as Promise<{ serviceTypes: { trade: string }[] }>) : null))
+      .then((body) => {
+        if (live && body) setTrades(body.serviceTypes.map((type) => type.trade));
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const siteLocked = job.siteAddress !== null;
+
+  function clear(key: RequestField) {
+    setErrors((prev) => ({ ...prev, [key]: undefined }));
+  }
+
+  async function save() {
+    const found: Partial<Record<RequestField, string>> = {};
+    if (description.trim() === "") found.description = "Tell us what's happening.";
+    if (preferredDate === "") found.preferredDate = "Pick a date.";
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
+
+    const body: Record<string, unknown> = {};
+    if (trade !== job.trade) body["trade"] = trade;
+    if (description.trim() !== (job.description ?? "").trim()) body["description"] = description.trim();
+    if (preferredDate !== job.preferredDate) body["preferredDate"] = preferredDate;
+    if (preferredWindow !== job.preferredWindow) body["preferredWindow"] = preferredWindow;
+    if (!siteLocked && location !== null) {
+      body["location"] = {
+        suburb: location.suburb,
+        state: location.state,
+        country: location.country,
+        postcode: location.postcode,
+        lat: location.lat,
+        lng: location.lng,
+        placeId: location.placeId,
+      };
+    } else if (!siteLocked && platformSuburb !== null) {
+      body["location"] = { suburbId: platformSuburb.suburbId };
+    }
+    if (Object.keys(body).length === 0) {
+      onCancel();
+      return;
+    }
+
+    setSaving(true);
+    setBanner(undefined);
+    try {
+      const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(job.reference)}/request`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { error?: string; field?: RequestField };
+      if (res.status === 200) {
+        onSaved(payload as unknown as JobDetail, "Request updated");
+      } else if (res.status === 409) {
+        // Dispatched while the edit was open: say so, then reload the card read-only.
+        setBanner(payload.error ?? "This job has been dispatched - its details are locked.");
+        const fresh = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(job.reference)}`, { credentials: "include", cache: "no-store" });
+        if (fresh.status === 200) onSaved((await fresh.json()) as JobDetail, payload.error ?? "This job has been dispatched - its details are locked.");
+      } else if (res.status === 400 && payload.field && payload.error) {
+        setErrors({ [payload.field]: payload.error });
+      } else {
+        setBanner("The request was not updated. Please try again.");
+      }
+    } catch {
+      setBanner("The request was not updated. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card title="The request">
+      {banner ? <Banner kind="error">{banner}</Banner> : null}
+      <SelectField
+        id="request-trade"
+        label="Trade"
+        value={trade}
+        onChange={(event) => {
+          setTrade(event.target.value);
+          clear("trade");
+        }}
+        error={errors.trade}
+        options={trades.map((name) => ({ value: name, label: name }))}
+      />
+      {trade !== job.trade ? (
+        <p className="-mt-2 mb-3.5 text-xs text-brand-warning" data-testid="trade-price-warning">
+          The price changes to this trade&apos;s rates - tell the customer.
+        </p>
+      ) : null}
+      {siteLocked ? (
+        <LockedField label="Suburb" value={`${job.suburb} ${job.postcode}`} helper="Follows the job site address" />
+      ) : (
+        <PlacesField
+          id="request-suburb"
+          label="Suburb"
+          variant="suburb"
+          helper={`Now ${job.suburb} ${job.postcode} - pick another to move it.`}
+          value={location}
+          onChange={(value) => {
+            setLocation(value);
+            if (value) clear("location");
+          }}
+          error={errors.location}
+          onErrorChange={(message) => setErrors((prev) => ({ ...prev, location: message }))}
+          platformFallback={{
+            onChange: (value) => {
+              setPlatformSuburb(value);
+              if (value) clear("location");
+            },
+          }}
+        />
+      )}
+      <Field
+        id="request-date"
+        label="Date"
+        type="date"
+        value={preferredDate}
+        onChange={(event) => {
+          setPreferredDate(event.target.value);
+          clear("preferredDate");
+        }}
+        error={errors.preferredDate}
+      />
+      <SelectField
+        id="request-window"
+        label="Time of day"
+        value={preferredWindow}
+        onChange={(event) => setPreferredWindow(event.target.value as JobDetail["preferredWindow"])}
+        error={errors.preferredWindow}
+        options={REQUEST_WINDOWS}
+      />
+      <div className="mb-3.5">
+        <label htmlFor="request-description" className={labelClass + " mb-[5px]"}>
+          Issue Description
+        </label>
+        <textarea
+          id="request-description"
+          className={`min-h-[110px] w-full rounded-button border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
+            errors.description ? "border-brand-destructive" : "border-hairline"
+          }`}
+          value={description}
+          onChange={(event) => {
+            setDescription(event.target.value);
+            if (event.target.value.trim() !== "") clear("description");
+          }}
+        />
+        {errors.description ? <p className="mt-[5px] text-xs text-brand-destructive">{errors.description}</p> : null}
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-2.5">
+        <PrimaryButton type="button" size="compact" loading={saving} loadingLabel="Saving..." onClick={() => void save()}>
+          Save
+        </PrimaryButton>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={onCancel}
+          className="min-h-11 rounded-button border border-hairline bg-surface px-4 text-sm font-bold text-ink disabled:opacity-60"
+        >
+          Cancel
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+function RequestCard({
+  job,
+  editing,
+  onCancel,
+  onSaved,
+}: {
+  job: JobDetail;
+  editing: boolean;
+  onCancel: () => void;
+  onSaved: (next: JobDetail, message: string) => void;
+}) {
+  // Feature 4004: Edit turns this card into its form in place, like the Addresses card.
+  if (editing && job.status === "new") return <RequestEditCard job={job} onCancel={onCancel} onSaved={onSaved} />;
   return (
     <Card title="The request">
       <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-x-4.5 gap-y-3">
@@ -169,15 +389,26 @@ const LEVEL_LABELS: Record<"normal" | "weekend" | "emergency", string> = {
  * and Raise callback. Feature 6007 did the same for Correct & reissue: a real link in the Invoice card.
  */
 const ACTION_PLACEHOLDERS: { label: string; feature: string; statuses: JobDetail["status"][] }[] = [
-  { label: "Edit", feature: "4004", statuses: ["new"] },
   { label: "On hold", feature: "5002", statuses: ["scheduled", "in_progress"] },
 ];
 
-function ActionPlaceholders({ job }: { job: JobDetail }) {
+function ActionPlaceholders({ job, onEdit, editing }: { job: JobDetail; onEdit: () => void; editing: boolean }) {
   const shown = ACTION_PLACEHOLDERS.filter((action) => action.statuses.includes(job.status));
-  if (shown.length === 0) return null;
+  // Feature 4004: Edit is a real Outlined button for `new` jobs only.
+  const canEdit = job.status === "new";
+  if (shown.length === 0 && !canEdit) return null;
   return (
     <div className="mt-3.5 flex flex-wrap gap-2 border-t border-hairline pt-3" data-testid="action-placeholders">
+      {canEdit ? (
+        <button
+          type="button"
+          disabled={editing}
+          onClick={onEdit}
+          className="min-h-11 rounded-button border border-hairline bg-surface px-3.5 text-small font-bold text-ink disabled:opacity-60"
+        >
+          Edit
+        </button>
+      ) : null}
       {shown.map((action) => (
         <button
           key={action.label}
@@ -568,7 +799,17 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
   );
 }
 
-function ContractorCard({ job, onChanged }: { job: JobDetail; onChanged: (next: JobDetail, message: string) => void }) {
+function ContractorCard({
+  job,
+  onChanged,
+  onEdit,
+  editing,
+}: {
+  job: JobDetail;
+  onChanged: (next: JobDetail, message: string) => void;
+  onEdit: () => void;
+  editing: boolean;
+}) {
   return (
     <Card title="Contractor">
       {job.contractor ? (
@@ -612,7 +853,7 @@ function ContractorCard({ job, onChanged }: { job: JobDetail; onChanged: (next: 
       )}
       <EarlierBookings bookings={job.earlierBookings} />
       <JobActions job={job} onChanged={onChanged} />
-      <ActionPlaceholders job={job} />
+      <ActionPlaceholders job={job} onEdit={onEdit} editing={editing} />
     </Card>
   );
 }
@@ -2172,6 +2413,8 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
   const [notesVersion, setNotesVersion] = useState(0);
   const [visitVersion, setVisitVersion] = useState(0);
   const [toastMessage, showToast] = useToast();
+  // Feature 4004: the request card as its form.
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     // Feature 4002, plan decision 15: after Dispatch the page returns here
@@ -2194,7 +2437,17 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
             arrangement (Request+Contractor+Messages+Notes left, Rating+Customer+Addresses
             right) rides the explicit xl: column/row placement. */}
         <div className="order-1 min-w-0 xl:order-none xl:col-start-1 xl:row-start-1">
-          <RequestCard job={job} />
+          <RequestCard
+            job={job}
+            editing={editing}
+            onCancel={() => setEditing(false)}
+            onSaved={(next, message) => {
+              setJob(next);
+              setEditing(false);
+              showToast(message);
+              router.refresh();
+            }}
+          />
         </div>
         {/* Feature 4010: the rating stands right above Customer -- one cell, so Addresses and the
             rows below keep their places on desktop and the single column keeps them together. */}
@@ -2224,6 +2477,8 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
         <div className="order-4 min-w-0 xl:order-none xl:col-start-1 xl:row-start-2">
           <ContractorCard
             job={job}
+            editing={editing}
+            onEdit={() => setEditing(true)}
             onChanged={(next, message) => {
               setJob(next);
               showToast(message);

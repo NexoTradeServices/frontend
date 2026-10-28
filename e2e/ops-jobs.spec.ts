@@ -19,6 +19,8 @@
 //      n km" under the suburb, none on a covered job; table at desktop width, cards on a phone
 // 3010 AC2, AC4, AC6 the Customer card on a returning customer's job: the tag, the phone and business
 //      name changes, Update customer -> Toast and the tag gone; a different name alone reads "Given as"
+// 4004 AC1, AC2, AC4, AC5 Edit on a new job: the trade warning, Save -> Toast and the new Facts; the suburb
+//      locked once a site address is set; no Edit on a dispatched job
 // AC24 the email's job link opened logged out: the ops login, then that job
 //      (the link itself is proven at the backend, ops-jobs.test.ts AC24)
 // AC25 (BKLG-022) Assigned renders #6b4fa3 on #efeafa through the one
@@ -947,4 +949,55 @@ test("3010 AC2, AC4, AC6: a returning customer's new phone and business name are
   await expect(card3.getByTestId("given-name")).toHaveText("Given as E2E Sara", { timeout: 15_000 });
   await expect(card3.getByText("Attention: Existing customer, with new details")).toHaveCount(0);
   await expect(card3.getByRole("button", { name: "Update customer" })).toHaveCount(0);
+});
+
+test("4004 AC1, AC2: Edit turns the request into its form, a new trade warns about the price, Save shows the new Facts", async ({ page, request }) => {
+  const reference = await postEnquiry(request, "ed1", "E2E Edit One");
+  await page.goto(`/ops/jobs/${reference}`);
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: reference, exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+
+  await expect(page.getByTestId("trade-price-warning")).toHaveCount(0);
+  await page.getByLabel("Trade", { exact: true }).selectOption("Electrical");
+  await expect(page.getByTestId("trade-price-warning")).toHaveText("The price changes to this trade's rates - tell the customer.");
+  await page.getByLabel("Time of day").selectOption("afternoon");
+  await page.getByLabel("Issue Description").fill("The garage lights keep tripping the switch.");
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: "The request" }) });
+  await card.getByRole("button", { name: "Save", exact: true }).click();
+
+  await expect(page.getByText("Request updated")).toBeVisible({ timeout: 15_000 });
+  await expect(card.getByText("Electrical", { exact: true })).toBeVisible();
+  await expect(card.getByText("afternoon 12:00-17:00")).toBeVisible();
+  await expect(card.getByText("The garage lights keep tripping the switch.")).toBeVisible();
+  await expect(card.getByRole("button", { name: "Save", exact: true })).toHaveCount(0);
+});
+
+test("4004 AC4: with a site address the suburb is locked and says it follows the address", async ({ page, request }) => {
+  const reference = await postEnquiry(request, "ed2", "E2E Edit Two");
+  await page.goto(`/ops/jobs/${reference}`);
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: reference, exact: true })).toBeVisible();
+  const saved = await page.request.put(`${apiUrl}/api/jobs/${reference}/addresses`, {
+    data: {
+      billingAddress: { street: "14 Marine Terrace", suburb: "Fremantle", state: "WA", country: "AU", postcode: "6160", lat: -32.0569, lng: 115.7439, placeId: "e2e-4004-billing" },
+      site: { sameAsBilling: true },
+    },
+  });
+  expect(saved.status()).toBe(200);
+  await page.reload();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(page.getByText("Follows the job site address")).toBeVisible();
+  await expect(page.locator("#request-suburb")).toHaveCount(0);
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: "The request" }) });
+  await card.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(card.getByRole("button", { name: "Save", exact: true })).toHaveCount(0);
+});
+
+test("4004 AC5: a dispatched job shows no Edit", async ({ page, request }) => {
+  test.setTimeout(120_000);
+  const job = await dispatchThrowawayJob(page, request, "ed3");
+  await page.goto(`/ops/jobs/${job.reference}`);
+  await expect(page.getByRole("heading", { name: job.reference, exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
 });

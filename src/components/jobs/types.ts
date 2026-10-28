@@ -166,6 +166,9 @@ export interface JobDetail {
   postcode: string;
   wantedDate: string;
   windowLabel: string;
+  /** Feature 4004: the plain date (YYYY-MM-DD) and the window the edit form starts from. */
+  preferredDate: string;
+  preferredWindow: "morning" | "afternoon" | "evening";
   receivedLabel: string;
   description: string | null;
   answers: string[];
