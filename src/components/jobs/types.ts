@@ -182,6 +182,10 @@ export interface JobDetail {
     phone: string | null;
     email: string;
     billingAddress: PickedAddress | null;
+    /** Feature 3010: what she typed on this request where it differs from her record; null = same or empty. */
+    given: { name: string | null; phone: string | null; businessName: string | null };
+    /** Feature 3010: the phone or the business name differs (the name never counts). */
+    newDetails: boolean;
   };
   /** Feature 4010: worked out from her history on every read. */
   customerRating: CustomerRating;

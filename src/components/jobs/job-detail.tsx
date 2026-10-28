@@ -26,6 +26,8 @@ import { Toast, useToast } from "@/components/ui/toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TimeEntryRows, isBlankRow, rowsFromEntries, type TimeEntryRow } from "@/components/ui/time-entry-rows";
 import { StarsShown } from "@/components/ui/star-rating";
+import { Tag } from "@/components/ui/tag";
+import { ValueChange } from "@/components/ui/value-change";
 import { formatHours } from "@/lib/billed-hours";
 import { formatDollars } from "@/components/request-a-job/money";
 import { REFUND_TAGS, centsToField, refundMoney, typedDollarsToCents } from "@/components/refunds/money";
@@ -38,11 +40,14 @@ const labelClass = "block text-field-label font-bold tracking-[0.08em] text-mute
 function Card({
   title,
   aside,
+  tag,
   subtitle,
   children,
 }: {
   title: string;
   aside?: string;
+  /** Feature 3010: a Tag beside the title. */
+  tag?: ReactNode;
   /** Shown on its own line under the title, instead of inline beside it. */
   subtitle?: string;
   children: ReactNode;
@@ -52,6 +57,7 @@ function Card({
       <h2 className="font-heading text-base font-extrabold text-ink">
         {title}
         {aside ? <small className="ml-1.5 font-body text-xs font-normal text-muted-text">{aside}</small> : null}
+        {tag ? <span className="ml-2 align-middle">{tag}</span> : null}
       </h2>
       {subtitle ? <p className="mt-0.5 text-xs text-muted-text">{subtitle}</p> : null}
       <div className="mt-3">{children}</div>
@@ -854,28 +860,93 @@ function ReviewCard({ job }: { job: JobDetail }) {
   );
 }
 
-function CustomerCard({ job }: { job: JobDetail }) {
+function CustomerCard({ job, onUpdated }: { job: JobDetail; onUpdated: (next: JobDetail, message: string) => void }) {
   const { customer } = job;
+  const { given } = customer;
+  const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState<string>();
+
+  // Feature 3010: copy what she gave onto her record for every later job (after confirming on the call).
+  async function updateCustomer() {
+    setUpdating(true);
+    setUpdateError(undefined);
+    try {
+      const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(job.reference)}/customer/update-from-request`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.status === 200) {
+        onUpdated((await res.json()) as JobDetail, "Customer updated");
+      } else {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setUpdateError(body.error ?? "The customer was not updated. Please try again.");
+      }
+    } catch {
+      setUpdateError("The customer was not updated. Please try again.");
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  const callLink = (phone: string) => (
+    <a
+      href={`tel:${phone.replace(/[^\d+]/g, "")}`}
+      className="inline-flex min-h-11 items-center font-heading text-lg font-extrabold text-ink tabular-nums"
+    >
+      {phone}
+    </a>
+  );
+
   return (
-    <Card title="Customer" aside={customer.code}>
+    <Card
+      title="Customer"
+      aside={customer.code}
+      tag={customer.newDetails ? <Tag tone="warning">Attention: Existing customer, with new details</Tag> : undefined}
+    >
       <div className="grid gap-3">
-        <Fact label="Name">{customer.name}</Fact>
+        <Fact label="Name">
+          {customer.name}
+          {given.name !== null ? (
+            <span className="block text-caption font-normal text-muted-text" data-testid="given-name">
+              Given as {given.name}
+            </span>
+          ) : null}
+        </Fact>
         <Fact label="Phone">
-          {customer.phone ? (
-            <a
-              href={`tel:${customer.phone.replace(/[^\d+]/g, "")}`}
-              className="inline-flex min-h-11 items-center font-heading text-lg font-extrabold text-ink tabular-nums"
-            >
-              {customer.phone}
-            </a>
+          {given.phone !== null ? (
+            <ValueChange from={customer.phone ?? "None"} to={callLink(given.phone)} />
+          ) : customer.phone ? (
+            callLink(customer.phone)
           ) : (
             <span className="font-normal text-muted-text">None given</span>
           )}
         </Fact>
+        {given.businessName !== null ? (
+          <Fact label="Business name">
+            <ValueChange from={customer.businessName ?? "None"} to={given.businessName} />
+          </Fact>
+        ) : null}
         <Fact label="Email">
           <span className="break-all">{customer.email}</span>
         </Fact>
       </div>
+      {customer.newDetails ? (
+        <div className="mt-4">
+          <button
+            type="button"
+            disabled={updating}
+            onClick={() => void updateCustomer()}
+            className="min-h-11 rounded-button border border-hairline bg-surface px-4 text-sm font-bold text-ink disabled:opacity-60"
+          >
+            {updating ? "Updating..." : "Update customer"}
+          </button>
+          {updateError ? (
+            <p className="mt-[5px] text-xs text-brand-destructive">{updateError}</p>
+          ) : (
+            <p className="mt-[5px] text-xs text-muted-text">Confirm with the customer first</p>
+          )}
+        </div>
+      ) : null}
     </Card>
   );
 }
@@ -2129,7 +2200,13 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
             rows below keep their places on desktop and the single column keeps them together. */}
         <div className="order-2 grid min-w-0 gap-4 xl:order-none xl:col-start-2 xl:row-start-1">
           <CustomerRatingCard job={job} />
-          <CustomerCard job={job} />
+          <CustomerCard
+            job={job}
+            onUpdated={(next, message) => {
+              setJob(next);
+              showToast(message);
+            }}
+          />
         </div>
         <div className="order-3 min-w-0 xl:order-none xl:col-start-2 xl:row-span-5 xl:row-start-2">
           <AddressesCard

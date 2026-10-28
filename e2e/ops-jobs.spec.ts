@@ -17,6 +17,8 @@
 //      reads Total / Amount due (the GST rows are proven at the backend and in refunds.spec.ts)
 // 3002 AC9 the queue tags a near-miss job "No direct coverage - n km" and an out-of-reach one "Out of reach -
 //      n km" under the suburb, none on a covered job; table at desktop width, cards on a phone
+// 3010 AC2, AC4, AC6 the Customer card on a returning customer's job: the tag, the phone and business
+//      name changes, Update customer -> Toast and the tag gone; a different name alone reads "Given as"
 // AC24 the email's job link opened logged out: the ops login, then that job
 //      (the link itself is proven at the backend, ops-jobs.test.ts AC24)
 // AC25 (BKLG-022) Assigned renders #6b4fa3 on #efeafa through the one
@@ -890,4 +892,59 @@ test("3002 AC9: the queue tags a near-miss and an out-of-reach job, and a covere
     if (tag === null) await expect(card.getByTestId("coverage-tag")).toHaveCount(0);
     else await expect(card.getByTestId("coverage-tag")).toHaveText(tag);
   }
+});
+
+test("3010 AC2, AC4, AC6: a returning customer's new phone and business name are flagged, Update customer clears them, a name alone is only shown", async ({
+  page,
+  request,
+}) => {
+  const email = `e2e-3010-${String(Date.now())}@idelta.com.au`;
+  const post = async (data: { name: string; phone: string; businessName?: string }): Promise<string> => {
+    const res = await request.post(`${apiUrl}/api/enquiries`, {
+      data: {
+        ...data,
+        email,
+        location: { suburb: "Fremantle", state: "WA", country: "AU", postcode: "6160", lat: -32.0569, lng: 115.7439, placeId: "e2e-place-3010" },
+        trade: "Plumbing",
+        selectedOptions: [],
+        preferredDate: "2026-12-01",
+        preferredWindow: "morning",
+        description: "An e2e throwaway job for feature 3010.",
+        marketingEmail: false,
+        marketingSms: false,
+      },
+    });
+    expect(res.status()).toBe(201);
+    return ((await res.json()) as { reference: string }).reference;
+  };
+  // Her first request makes her record; the second brings a new phone and a business name.
+  await post({ name: "E2E Chen", phone: "0400 000 311" });
+  const second = await post({ name: "E2E Chen", phone: "0412 555 019", businessName: "Chen Consulting" });
+
+  await page.goto(`/ops/jobs/${second}`);
+  await login(page, "mike@idelta.com.au");
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: "Customer", exact: false }) }).filter({ hasText: "Email" }).first();
+  await expect(card.getByText("Attention: Existing customer, with new details")).toBeVisible({ timeout: 15_000 });
+  const changes = card.getByTestId("value-change");
+  await expect(changes).toHaveCount(2);
+  await expect(changes.first()).toContainText("0400 000 311");
+  await expect(changes.first()).toContainText("0412 555 019");
+  await expect(changes.nth(1)).toContainText("None");
+  await expect(changes.nth(1)).toContainText("Chen Consulting");
+  await expect(card.getByText("Confirm with the customer first")).toBeVisible();
+  await expect(card.getByRole("link", { name: "0412 555 019" })).toHaveAttribute("href", "tel:0412555019");
+
+  await card.getByRole("button", { name: "Update customer" }).click();
+  await expect(page.getByText("Customer updated")).toBeVisible({ timeout: 15_000 });
+  await expect(card.getByText("Attention: Existing customer, with new details")).toHaveCount(0);
+  await expect(card.getByTestId("value-change")).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "Update customer" })).toHaveCount(0);
+
+  // A different name alone: shown under the Name, never flagged, nothing to copy.
+  const third = await post({ name: "E2E Sara", phone: "0412 555 019", businessName: "Chen Consulting" });
+  await page.goto(`/ops/jobs/${third}`);
+  const card3 = page.locator("section").filter({ has: page.getByRole("heading", { name: "Customer", exact: false }) }).filter({ hasText: "Email" }).first();
+  await expect(card3.getByTestId("given-name")).toHaveText("Given as E2E Sara", { timeout: 15_000 });
+  await expect(card3.getByText("Attention: Existing customer, with new details")).toHaveCount(0);
+  await expect(card3.getByRole("button", { name: "Update customer" })).toHaveCount(0);
 });
