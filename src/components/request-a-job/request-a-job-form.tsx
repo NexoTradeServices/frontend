@@ -22,7 +22,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Field } from "@/components/auth/field";
 import { Banner } from "@/components/auth/banner";
-import { PlacesField, type PickedAddress } from "@/components/ui/places-field";
+import { PlacesField, type PickedAddress, type PlatformSuburb } from "@/components/ui/places-field";
+import { AlertPhone, AlertStrip } from "@/components/ui/alert-strip";
 import { PhotoGallery } from "@/components/ui/photo-gallery";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { TradeIcon } from "./trade-icon";
@@ -59,6 +60,8 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
 
   const [stepIndex, setStepIndex] = useState(0);
   const [location, setLocation] = useState<PickedAddress | null>(null);
+  /** Feature 3006: the suburb picked from the platform's own list while Google is down. */
+  const [platformSuburb, setPlatformSuburb] = useState<PlatformSuburb | null>(null);
   const [locationError, setLocationError] = useState<string>();
   const [trade, setTrade] = useState<string | null>(null);
   const [tradeError, setTradeError] = useState<string>();
@@ -106,7 +109,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
 
   function validateStep(): boolean {
     if (step === "suburb") {
-      if (location === null) {
+      if (location === null && platformSuburb === null) {
         setLocationError("Pick a suburb from the list before continuing.");
         return false;
       }
@@ -143,7 +146,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
   }
 
   async function handleSubmit() {
-    if (location === null || trade === null) return;
+    if ((location === null && platformSuburb === null) || trade === null) return;
     setSubmitting(true);
     setSubmitError(undefined);
     try {
@@ -171,15 +174,19 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
           phone: phone.trim(),
           // Feature 1017: only when filled; a returning customer's is never changed from here.
           ...(businessName.trim() !== "" ? { businessName: businessName.trim() } : {}),
-          location: {
-            suburb: location.suburb,
-            state: location.state,
-            country: location.country,
-            postcode: location.postcode,
-            lat: location.lat,
-            lng: location.lng,
-            placeId: location.placeId,
-          },
+          // Feature 3006: the Places pick, or just the id of the suburb picked from our own list.
+          location:
+            location !== null
+              ? {
+                  suburb: location.suburb,
+                  state: location.state,
+                  country: location.country,
+                  postcode: location.postcode,
+                  lat: location.lat,
+                  lng: location.lng,
+                  placeId: location.placeId,
+                }
+              : { suburbId: platformSuburb?.suburbId },
           trade,
           selectedOptions,
           preferredDate,
@@ -194,6 +201,11 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
       const body = (await res.json().catch(() => ({}))) as { reference?: string; error?: string; operatorPhone?: string };
       if (res.status === 201 && body.reference) {
         router.push(`/request-a-job/confirmed?ref=${encodeURIComponent(body.reference)}`);
+        return;
+      }
+      // Feature 3006: a page opened before the live site's reCAPTCHA key went missing.
+      if (res.status === 503 && body.operatorPhone) {
+        setSubmitError(`We can't take job requests online right now -- please call us on ${body.operatorPhone}.`);
         return;
       }
       if (res.status === 403) {
@@ -212,14 +224,9 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
 
   return (
     <div>
-      <div className="bg-warning-bg px-5 py-3 text-center">
-        <p className="text-small font-semibold text-brand-warning">
-          Job urgent? Don&apos;t fill the form -- call us now:{" "}
-          <a href={`tel:${operatorPhone}`} className="text-ink underline">
-            {operatorPhone}
-          </a>
-        </p>
-      </div>
+      <AlertStrip>
+        Job urgent? Don&apos;t fill the form -- call us now: <AlertPhone phone={operatorPhone} />
+      </AlertStrip>
 
       <div>
         <div className="pb-1">
@@ -253,6 +260,12 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
                 }}
                 error={locationError}
                 onErrorChange={setLocationError}
+                platformFallback={{
+                  onChange: (value) => {
+                    setPlatformSuburb(value);
+                    if (value) setLocationError(undefined);
+                  },
+                }}
               />
             </>
           ) : null}

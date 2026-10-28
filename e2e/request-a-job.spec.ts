@@ -14,6 +14,10 @@
 //      moved off the "every field required, no stars" case once real
 //      optional fields existed); the word "(optional)" is never used
 // AC10 no picker, no "emergency" option, anywhere on the form
+// 3006 (Places down, the platform's own suburb list; the 503 Banner) lives in its own
+//      describe at the foot of this file: AC4 AC5 AC6 AC7. AC8 (every other Places field
+//      stays disabled with its warning) is proven where those fields are -- service-area.spec.ts
+//      and contractors.spec.ts. AC1, AC2, AC3 and AC9 are backend and unit tests.
 // 3003 (enquiry photos) lives in its own describe at the foot of this file:
 //      AC5 AC5b AC6 AC7 AC8 AC9 AC10, at phone width, Cloudinary faked
 // 1017 AC1  the details step shows Business name under Phone, no star, the hint
@@ -40,7 +44,7 @@
 // runs in parallel can observe a transient prefilledFields state that never
 // matches the `formData` snapshot this file read moments earlier.
 import { test, expect, type Page } from "@playwright/test";
-import { MOCKS_GOOGLE_PLACES, installMockGooglePlaces } from "./helpers/mock-google-places";
+import { MOCKS_GOOGLE_PLACES, blockGooglePlaces, installMockGooglePlaces } from "./helpers/mock-google-places";
 import { installMockCloudinary } from "./helpers/mock-cloudinary";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 
@@ -468,5 +472,119 @@ test.describe("Feature 3003 -- enquiry photos", () => {
     await page.getByRole("button", { name: "Request a job" }).click();
     await expect(page).toHaveURL(/\/request-a-job\/confirmed\?ref=JOB-/, { timeout: 20_000 });
     expect(cloudinary.uploads).toEqual([]);
+  });
+});
+
+test.describe("Feature 3006 -- the enquiry form with Google Places down", () => {
+  let formData: FormDataDto;
+
+  test.beforeAll(async ({ request }) => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
+    const res = await request.get(`${apiUrl}/api/enquiries/form-data`);
+    formData = (await res.json()) as FormDataDto;
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await blockGooglePlaces(page);
+  });
+
+  async function typeSuburb(page: Page, text: string) {
+    const field = page.getByLabel("Suburb");
+    await expect(field).toBeEnabled({ timeout: 10_000 });
+    await field.fill(text);
+    return field;
+  }
+
+  async function pickHilton(page: Page) {
+    const field = await typeSuburb(page, "Hilt");
+    await expect(page.getByText("Platform suggestions")).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "Hilton WA 6163" }).click();
+    await expect(field).toHaveValue("Hilton WA 6163");
+  }
+
+  /** Suburb to the Pricing step with Hilton picked, ready to press "Request a job". */
+  async function reachPricingStep(page: Page, tag: string) {
+    await page.goto("/request-a-job");
+    await pickHilton(page);
+    await page.getByRole("button", { name: "Continue" }).click();
+    await pickTrade(page, nonPlumbing(formData.serviceTypes).trade);
+    await page.getByLabel("Date").fill("2026-09-09");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByLabel("What's happening").fill("Mixer tap leaking from the base.");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByLabel("Your name").fill("Sarah Chen");
+    await page.getByLabel("Email", { exact: true }).fill(uniqueEmail(`3006-${tag}`));
+    await page.getByLabel("Phone").fill("0400 001 050");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByRole("heading", { name: "Pricing" })).toBeVisible();
+  }
+
+  /** The enquiry the form posts, with the reCAPTCHA token dropped (see the photos describe). */
+  async function captureEnquiries(page: Page): Promise<Record<string, unknown>[]> {
+    const posted: Record<string, unknown>[] = [];
+    await page.route(/\/api\/enquiries$/, async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      const body = JSON.parse(route.request().postData() ?? "{}") as Record<string, unknown>;
+      delete body.recaptchaToken;
+      posted.push(body);
+      return route.continue({ postData: JSON.stringify(body) });
+    });
+    return posted;
+  }
+
+  test("AC5: Places down -- the box stays usable, Sarah picks Hilton from 'Platform suggestions' and the enquiry sends with a suburb id", async ({
+    page,
+  }) => {
+    await page.goto("/request-a-job");
+    await expect(page.getByLabel("Suburb")).toBeEnabled({ timeout: 10_000 });
+    await expect(page.getByText("Suburb lookup is unavailable right now")).toHaveCount(0);
+    await expect(page.getByText("Google suggestions")).toHaveCount(0);
+
+    const posted = await captureEnquiries(page);
+    await reachPricingStep(page, "ac5");
+    await page.getByRole("button", { name: "Request a job" }).click();
+    await expect(page).toHaveURL(/\/request-a-job\/confirmed\?ref=JOB-/, { timeout: 30_000 });
+
+    expect(posted).toHaveLength(1);
+    const location = posted[0]?.location as Record<string, unknown>;
+    expect(Object.keys(location)).toEqual(["suburbId"]);
+    expect(typeof location.suburbId).toBe("string");
+  });
+
+  test("AC6: 'Ardross' is offered as its own row, with its postcode", async ({ page }) => {
+    await page.goto("/request-a-job");
+    await typeSuburb(page, "Ardross");
+    await expect(page.getByText("Platform suggestions")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("button", { name: "Ardross WA 6153" })).toBeVisible();
+  });
+
+  test("AC7: typed text left unpicked shows the field error and the step does not move on", async ({ page }) => {
+    await page.goto("/request-a-job");
+    await typeSuburb(page, "Hilton");
+    await expect(page.getByText("Platform suggestions")).toBeVisible({ timeout: 10_000 });
+    // Walk off the box without picking.
+    await page.getByRole("heading", { level: 1 }).click();
+    await expect(page.getByText("Pick the address from the list, or clear the field.")).toBeVisible();
+
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByText("Pick a suburb from the list before continuing.")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Where's the job?");
+  });
+
+  test("AC4: a 503 with the operator phone on submit shows the closed-for-now words in the Banner", async ({ page }) => {
+    await page.route(/\/api\/enquiries$/, (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      return route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "enquiries are not taken online right now", operatorPhone: "0400 111 222" }),
+      });
+    });
+    await reachPricingStep(page, "ac4");
+    await page.getByRole("button", { name: "Request a job" }).click();
+    await expect(
+      page.getByText("We can't take job requests online right now -- please call us on 0400 111 222."),
+    ).toBeVisible();
+    await expect(page).toHaveURL(/\/request-a-job$/);
   });
 });

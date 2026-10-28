@@ -17,6 +17,8 @@ export interface ServiceTypeDto {
 
 export interface FormDataDto {
   operatorPhone: string;
+  /** Feature 3006: false on the live site when the backend has no reCAPTCHA secret. */
+  takingEnquiries: boolean;
   serviceTypes: ServiceTypeDto[];
 }
 
