@@ -164,19 +164,19 @@ test.describe("AC8 + AC9 -- the Portal shell, contractor and customer", () => {
     expect((await containerFit(page)).kind).toBe("medium");
   });
 
-  test("a customer's placeholder is in the Medium container, with its Page header", async ({ page }) => {
+  test("a customer's Jobs page is in the Wide container, with its Page header", async ({ page }) => {
     const customer = await makeCustomerLogin();
     await page.setViewportSize({ width: 1536, height: 900 });
     await page.goto("/account");
     await login(page, customer.email, customer.password);
-    // The login card is titled the same; wait for the Portal frame, then read the page's title.
+    // 6010: the account opens on Jobs. Wait for the Portal frame, then read the page's title.
     await expect(page.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
-    const title = page.getByRole("heading", { name: "Customer account", exact: true });
+    const title = page.getByRole("heading", { name: "Jobs", exact: true });
     await expect(title).toBeVisible();
     expect(await title.evaluate((el) => getComputedStyle(el).fontSize)).toBe("22px");
     const fit = await containerFit(page);
-    expect(fit.kind).toBe("medium");
-    expect(fit.width).toBeLessThanOrEqual(MAX.medium);
+    expect(fit.kind).toBe("wide");
+    expect(fit.width).toBeLessThanOrEqual(MAX.wide);
   });
 
   test("a logged-out portal URL's login card is in the Narrow container, centred at 1536px", async ({ page }) => {

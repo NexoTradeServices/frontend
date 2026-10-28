@@ -115,7 +115,7 @@ for (const gate of GATES) {
   });
 }
 
-test("1018 AC4: logged out, /account shows the Customer account login card at that same URL; a customer lands on the same URL in the Portal frame", async ({
+test("1018 AC4: logged out, /account shows the Customer account login card at that same URL; a customer lands on Jobs in the Portal frame", async ({
   page,
 }) => {
   const customer = await makeCustomerLogin();
@@ -126,7 +126,8 @@ test("1018 AC4: logged out, /account shows the Customer account login card at th
   await expect(page.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
 
   await login(page, customer.email, customer.password);
-  await expect(page).toHaveURL(/\/account$/);
+  // 6010: the account opens on Jobs.
+  await expect(page).toHaveURL(/\/account\/jobs$/);
   await expect(page.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
   await page.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: "Log out" }).click();
   await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
