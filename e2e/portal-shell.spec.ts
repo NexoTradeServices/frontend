@@ -107,7 +107,7 @@ test("AC28 (BKLG-024): the contractor menu is the same drawer", async ({ page })
   await expectDrawer(page, 1023);
 });
 
-test("1018 AC1: Mike's Sidebar at 1280px - Wordmark, Jobs, Contractors, Receivables, Refunds, Payouts in order, Jobs current, no OWNER group, his name and Log out", async ({
+test("1018 AC1: Mike's Sidebar at 1280px - Wordmark, Jobs, Contractors, Receivables, Refunds, Payouts, Service status in order, Jobs current, no OWNER group, his name and Log out", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -123,7 +123,7 @@ test("1018 AC1: Mike's Sidebar at 1280px - Wordmark, Jobs, Contractors, Receivab
   const background = await bar.evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(background).toBe("rgb(28, 43, 58)");
 
-  await expect(bar.getByRole("link")).toHaveText(["Jobs", "Contractors", "Receivables", "Refunds", "Payouts"]);
+  await expect(bar.getByRole("link")).toHaveText(["Jobs", "Contractors", "Receivables", "Refunds", "Payouts", "Service status"]);
   await expect(bar.getByRole("link", { name: "Jobs", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(bar.getByText("Owner", { exact: true })).toHaveCount(0);
 
@@ -151,7 +151,7 @@ test("1018 AC1: the owner sees the same entries plus the OWNER group - Settings 
   await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible();
 
   const bar = sidebar(page);
-  await expect(bar.getByRole("link")).toHaveText(["Jobs", "Contractors", "Receivables", "Refunds", "Payouts", "Settings", "Pricing"]);
+  await expect(bar.getByRole("link")).toHaveText(["Jobs", "Contractors", "Receivables", "Refunds", "Payouts", "Service status", "Settings", "Pricing"]);
   await expect(bar.getByText("Owner", { exact: true })).toBeVisible();
   await expect(bar.getByTestId("menu-person")).toHaveText("The owner");
 

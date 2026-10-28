@@ -30,6 +30,24 @@
 
 import { useEffect, useRef, useState } from "react";
 
+/** Feature 3006: a suburb picked from the platform's own list (the Suburb table) while Google is down. */
+export interface PlatformSuburb {
+  suburbId: string;
+  /** What the box shows once picked, e.g. "Hilton WA 6163". */
+  label: string;
+}
+
+interface PlatformSuburbHit {
+  id: string;
+  name: string;
+  postcode: string;
+  state: string;
+}
+
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+/** Feature 3006: how long after the last keystroke the platform list is searched. */
+const PLATFORM_SEARCH_DELAY_MS = 300;
+
 export interface PickedAddress {
   street: string;
   suburb: string;
@@ -95,7 +113,7 @@ type LoadState = "checking" | "unavailable" | "ready";
 // React Strict Mode double-invoke, waits behind too.
 const CALLBACK_NAME = "__tradeserviceGooglePlacesReady";
 
-function loadPlacesScript(apiKey: string): Promise<void> {
+export function loadPlacesScript(apiKey: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (window.google?.maps?.places) {
       resolve();
@@ -117,7 +135,11 @@ function loadPlacesScript(apiKey: string): Promise<void> {
     script.id = SCRIPT_ID;
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async&callback=${CALLBACK_NAME}`;
     script.async = true;
-    script.addEventListener("error", () => reject(new Error("google places script failed to load")));
+    script.addEventListener("error", () => {
+      // Feature 6012: a failed tag must not stay in the page, or a later try (Check again) would wait on it forever.
+      script.remove();
+      reject(new Error("google places script failed to load"));
+    });
     document.head.appendChild(script);
   });
 }
@@ -167,6 +189,7 @@ export function PlacesField({
   error,
   onErrorChange,
   onPickingChange,
+  platformFallback,
 }: {
   id: string;
   label: string;
@@ -188,6 +211,15 @@ export function PlacesField({
    * form uses this to hold Save off until the pick actually lands.
    */
   onPickingChange?: (picking: boolean) => void;
+  /**
+   * Feature 3006, opt-in, used only by the customer enquiry form's suburb step
+   * (Molecules - Address search behaviour: "Google down, on the customer enquiry
+   * form"). When Google is unavailable the box stays enabled and searches the
+   * platform's own suburb list under "Platform suggestions"; a pick is handed to
+   * `onChange` as a suburb id. Every other screen leaves this off and keeps its
+   * disabled box with the warning line.
+   */
+  platformFallback?: { onChange: (value: PlatformSuburb | null) => void };
 }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_PLACES_KEY;
   const [state, setState] = useState<LoadState>(apiKey ? "checking" : "unavailable");
@@ -206,6 +238,9 @@ export function PlacesField({
   // does, so the blur handler defers to the pick in flight instead of
   // guessing wrong under real network latency.
   const pickingRef = useRef(false);
+  const [platformHits, setPlatformHits] = useState<PlatformSuburbHit[]>([]);
+  const platformTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const platformRequestRef = useRef(0);
 
   // Re-sync the displayed text when `value` changes for a reason OTHER than
   // this field's own typing/picking (a different contractor loaded) --
@@ -243,11 +278,53 @@ export function PlacesField({
     };
   }, [apiKey]);
 
+  useEffect(
+    () => () => {
+      if (platformTimerRef.current) clearTimeout(platformTimerRef.current);
+    },
+    [],
+  );
+
+  /** Feature 3006: search the platform's own suburb list, about 300ms after the last keystroke. */
+  function searchPlatform(text: string) {
+    if (platformTimerRef.current) clearTimeout(platformTimerRef.current);
+    if (text.trim().length < 2) {
+      setPlatformHits([]);
+      setSuggOpen(false);
+      return;
+    }
+    const requestId = ++platformRequestRef.current;
+    platformTimerRef.current = setTimeout(() => {
+      fetch(`${apiUrl}/api/suburbs/search?q=${encodeURIComponent(text.trim())}`)
+        .then((res) => (res.ok ? (res.json() as Promise<PlatformSuburbHit[]>) : []))
+        .catch(() => [] as PlatformSuburbHit[])
+        .then((hits) => {
+          if (requestId !== platformRequestRef.current) return; // superseded by a later keystroke
+          setPlatformHits(hits);
+          setSuggOpen(true);
+        });
+    }, PLATFORM_SEARCH_DELAY_MS);
+  }
+
+  function pickPlatform(hit: PlatformSuburbHit) {
+    const label = `${hit.name} ${hit.state} ${hit.postcode}`;
+    pickedRef.current = true;
+    setInputValue(label);
+    setSuggOpen(false);
+    platformFallback?.onChange({ suburbId: hit.id, label });
+    onErrorChange(undefined);
+  }
+
   function handleInput(next: string) {
     setInputValue(next);
     pickedRef.current = false;
     onChange(null);
+    platformFallback?.onChange(null);
     onErrorChange(undefined);
+    if (platformFallback && state === "unavailable") {
+      searchPlatform(next);
+      return;
+    }
     if (state !== "ready" || next.trim().length < 3 || !namespaceRef.current) {
       setPredictions([]);
       setSuggOpen(false);
@@ -270,6 +347,12 @@ export function PlacesField({
       })
       .catch(() => {
         if (requestId !== requestIdRef.current) return;
+        // Feature 3006: a failed lookup counts as Google being down, where the platform list is on.
+        if (platformFallback) {
+          setState("unavailable");
+          searchPlatform(next);
+          return;
+        }
         setPredictions([]);
         setSuggOpen(true);
       });
@@ -317,6 +400,8 @@ export function PlacesField({
   }
 
   const unavailable = state === "unavailable";
+  // Feature 3006: Google is down and the platform list stands in -- the box is usable, with no warning line.
+  const usingPlatform = unavailable && platformFallback !== undefined;
   // Disabled for BOTH "checking" and "unavailable" -- only "ready" means
   // namespaceRef.current actually holds the library. A field that reads as
   // enabled the instant it mounts (the old bound: only `unavailable`
@@ -324,7 +409,7 @@ export function PlacesField({
   // loading; handleInput's own `state !== "ready"` guard would then just
   // silently drop that keystroke's lookup -- found by the e2e suite typing
   // immediately after `toBeEnabled()`, which was true from first paint.
-  const notReady = state !== "ready";
+  const notReady = state !== "ready" && !usingPlatform;
 
   return (
     <div className="relative mb-3.5">
@@ -349,6 +434,27 @@ export function PlacesField({
         onBlur={handleBlur}
         aria-invalid={error ? true : undefined}
       />
+      {suggOpen && usingPlatform ? (
+        <div className="absolute inset-x-0 top-full z-10 overflow-hidden rounded-b-md border border-t-0 border-hairline bg-surface shadow-lg">
+          <div className="px-3 pt-1.5 pb-0.5 text-field-label tracking-[0.08em] text-muted-text uppercase">
+            Platform suggestions
+          </div>
+          {platformHits.length === 0 ? (
+            <div className="px-3 py-2.5 text-small text-muted-text">No match. Keep typing, or check the spelling.</div>
+          ) : (
+            platformHits.map((hit) => (
+              <button
+                key={hit.id}
+                type="button"
+                onClick={() => pickPlatform(hit)}
+                className="block w-full border-0 bg-none px-3 py-2.5 text-left text-sm text-ink hover:bg-ground"
+              >
+                {hit.name} {hit.state} {hit.postcode}
+              </button>
+            ))
+          )}
+        </div>
+      ) : null}
       {suggOpen && !unavailable ? (
         <div className="absolute inset-x-0 top-full z-10 overflow-hidden rounded-b-md border border-t-0 border-hairline bg-surface shadow-lg">
           <div className="px-3 pt-1.5 pb-0.5 text-field-label tracking-[0.08em] text-muted-text uppercase">
@@ -372,7 +478,7 @@ export function PlacesField({
       ) : null}
       {error ? (
         <p className="mt-[5px] text-xs text-brand-destructive">{error}</p>
-      ) : unavailable ? (
+      ) : unavailable && !usingPlatform ? (
         <p className="mt-[5px] text-xs text-brand-warning">
           {variant === "suburb"
             ? "Suburb lookup is unavailable right now -- try again shortly."

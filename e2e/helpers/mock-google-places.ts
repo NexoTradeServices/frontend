@@ -121,3 +121,10 @@ export async function installMockGooglePlaces(page: Page): Promise<void> {
     };
   }, MOCK_PLACES);
 }
+
+/** Google Places made unreachable, for the "Places is down" cases (feature 3006): the script request
+ * fails, so PlacesField reads `unavailable` -- in CI and locally alike. Never combine with
+ * `installMockGooglePlaces`, which pre-seeds the library so no script is requested at all. */
+export async function blockGooglePlaces(page: Page): Promise<void> {
+  await page.route(/maps\.googleapis\.com/, (route) => route.abort());
+}

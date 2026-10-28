@@ -1,12 +1,14 @@
 // The Tag -- frontend-conventions.md, Atoms / Tags and chips. Feature 6007.
 //
 // A small uppercase label in a colour pair: success (Paid), warning (Completed - awaiting payment).
-// The job status tags keep their own palette in status-tag.tsx; this is the plain pair for a fact.
+// Feature 6012 adds the neutral pair. The job status tags keep their own palette in status-tag.tsx; this is the plain pair for a fact.
 import type { ReactNode } from "react";
 
 const PAIRS = {
   success: "bg-success-bg text-brand-success",
   warning: "bg-warning-bg text-brand-warning",
+  /** The cancelled (neutral) pair: a fact that is neither good nor bad, e.g. "Not set up" (Feature 6012). */
+  neutral: "bg-status-cancelled-bg text-status-cancelled",
 } as const;
 
 export function Tag({ tone, children, testId }: { tone: keyof typeof PAIRS; children: ReactNode; testId?: string }) {
