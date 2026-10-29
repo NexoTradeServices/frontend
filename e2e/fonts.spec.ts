@@ -46,6 +46,9 @@ function expectOwnDomainOnly(urls: string[], page: Page) {
 
 async function checkPage(page: Page, fontUrls: string[]) {
   await page.evaluate(() => document.fonts.ready);
+  // Let the page finish its data loads and redraws first: a list that redraws between finding the
+  // heading and reading its weight left the weight empty on a loaded machine.
+  await page.waitForLoadState("networkidle");
 
   // Headings at 800 (the shared heading class) and the wordmark at 900 are
   // both Archivo; body text is Public Sans.
