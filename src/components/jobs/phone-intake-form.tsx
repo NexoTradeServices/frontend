@@ -5,6 +5,8 @@
 // page takes: a record edited as a form), without photos, marketing ticks or reCAPTCHA. Saving makes
 // a normal `new` job (source phone) and opens its page, where Mike carries on with the confirming
 // call. The suburb field, the trade's questions and the price block are the enquiry form's own pieces.
+// Owner's call at UAT: the street address of the job and whoever lets us in are taken on the call too
+// (both optional), so Mike does not have to ring back for them.
 "use client";
 
 import { useMemo, useState } from "react";
@@ -23,7 +25,20 @@ import type { FormDataDto, PreferredWindow } from "@/components/request-a-job/ty
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-type FieldKey = "location" | "trade" | "description" | "preferredDate" | "preferredWindow" | "name" | "email" | "phone" | "businessName";
+type FieldKey =
+  | "location"
+  | "trade"
+  | "description"
+  | "preferredDate"
+  | "preferredWindow"
+  | "name"
+  | "email"
+  | "phone"
+  | "businessName"
+  | "siteAddress"
+  | "siteContactName"
+  | "siteContactPhone"
+  | "siteContactEmail";
 type Errors = Partial<Record<FieldKey, string>>;
 
 export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
@@ -41,6 +56,10 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [businessName, setBusinessName] = useState("");
+  const [siteAddress, setSiteAddress] = useState<PickedAddress | null>(null);
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
@@ -67,6 +86,13 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
     if (name.trim() === "") next.name = "Enter the customer's name.";
     if (!EMAIL_PATTERN.test(email.trim())) next.email = "Enter the customer's email address.";
     if (phone.trim() === "") next.phone = "Enter the customer's phone number.";
+    // The site contact is all-or-nothing: name and phone together, the email checked when given.
+    const anyContact = contactName.trim() !== "" || contactPhone.trim() !== "" || contactEmail.trim() !== "";
+    if (anyContact && contactName.trim() === "") next.siteContactName = "Required.";
+    if (anyContact && contactPhone.trim() === "") next.siteContactPhone = "Required.";
+    if (contactEmail.trim() !== "" && !EMAIL_PATTERN.test(contactEmail.trim())) {
+      next.siteContactEmail = "That does not look like an email address.";
+    }
     return next;
   }
 
@@ -110,6 +136,16 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
           preferredDate,
           preferredWindow,
           description: description.trim(),
+          ...(siteAddress !== null ? { siteAddress } : {}),
+          ...(contactName.trim() !== "" || contactPhone.trim() !== "" || contactEmail.trim() !== ""
+            ? {
+                siteContact: {
+                  name: contactName.trim(),
+                  phone: contactPhone.trim(),
+                  ...(contactEmail.trim() !== "" ? { email: contactEmail.trim() } : {}),
+                },
+              }
+            : {}),
         }),
       });
       const body = (await res.json().catch(() => ({}))) as { reference?: string; error?: string; field?: FieldKey };
@@ -289,6 +325,62 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
           value={businessName}
           onChange={(event) => setBusinessName(event.target.value)}
           autoComplete="organization"
+        />
+      </div>
+
+      <div className="mt-6 border-t border-hairline pt-5">
+        <PlacesField
+          id="site-address"
+          label="Street address of the job"
+          helper="Ask while they are on the line. Leave blank if they do not know yet."
+          value={siteAddress}
+          onChange={(value) => {
+            setSiteAddress(value);
+            clearError("siteAddress");
+          }}
+          error={errors.siteAddress}
+          onErrorChange={(message) => setErrors((prev) => ({ ...prev, siteAddress: message }))}
+        />
+        {siteAddress !== null && location !== null && (siteAddress.suburb !== location.suburb || siteAddress.postcode !== location.postcode) ? (
+          <p className="mb-3.5 text-small text-secondary-text">
+            This address is in {siteAddress.suburb} {siteAddress.postcode}, so the job will be saved there.
+          </p>
+        ) : null}
+        <p className="mb-2 text-small text-secondary-text">Who lets us in, if it is not the customer:</p>
+        <Field
+          id="site-contact-name"
+          label="Site contact name"
+          value={contactName}
+          onChange={(event) => {
+            setContactName(event.target.value);
+            clearError("siteContactName");
+          }}
+          error={errors.siteContactName}
+          autoComplete="off"
+        />
+        <Field
+          id="site-contact-phone"
+          label="Site contact phone"
+          value={contactPhone}
+          onChange={(event) => {
+            setContactPhone(event.target.value);
+            clearError("siteContactPhone");
+          }}
+          error={errors.siteContactPhone}
+          autoComplete="off"
+        />
+        <Field
+          id="site-contact-email"
+          label="Site contact email"
+          type="email"
+          helper="Optional"
+          value={contactEmail}
+          onChange={(event) => {
+            setContactEmail(event.target.value);
+            clearError("siteContactEmail");
+          }}
+          error={errors.siteContactEmail}
+          autoComplete="off"
         />
       </div>
 

@@ -5,6 +5,7 @@
 //      the backend, tests/phone-intake.test.ts)
 // AC2  Mike keys a job, Create job opens the new job's page, and the queue row says Phone
 // AC6  pressing Create job on an empty page shows each required field's own error and creates nothing
+// UAT  the street address and site contact boxes are there and optional; a half-filled contact is refused on its own box
 // AC7  with Google Places down the suburb box offers "Platform suggestions" and the job saves
 // AC8  the page shows no photos, marketing ticks or reCAPTCHA
 //
@@ -87,6 +88,22 @@ test("AC6: an empty page shows each required field's own error and creates nothi
   ]) {
     await expect(page.getByText(message)).toBeVisible();
   }
+  expect(posted).toBe(0);
+});
+
+test("UAT: the street address and site contact are optional boxes; a contact with a name and no phone is refused on its own box", async ({ page }) => {
+  if (MOCKS_GOOGLE_PLACES) await installMockGooglePlaces(page);
+  let posted = 0;
+  await page.route(/\/api\/jobs\/phone/, (route) => {
+    posted += 1;
+    return route.continue();
+  });
+  await page.goto("/ops/jobs/new");
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByLabel("Street address of the job")).toBeVisible();
+  await page.getByLabel("Site contact name").fill("Lena Park");
+  await page.getByRole("button", { name: "Create job" }).click();
+  await expect(page.getByText("Required.")).toBeVisible();
   expect(posted).toBe(0);
 });
 
