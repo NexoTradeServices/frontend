@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { StatusTag } from "@/components/ui/status-tag";
 import { FilterRow } from "@/components/ui/filter-row";
+import { Tag } from "@/components/ui/tag";
 import { SOURCE_LABELS, type QueueResult, type QueueRow, type StatusFilter } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -45,6 +46,19 @@ async function fetchQueue(status: StatusFilter, q: string, offset: number, limit
 
 function jobHref(row: QueueRow): string {
   return `/ops/jobs/${encodeURIComponent(row.reference)}`;
+}
+
+/** Feature 3002: a near-miss or out-of-reach open job says so, with the nearest contractor's distance. */
+function CoverageTag({ row }: { row: QueueRow }) {
+  const coverage = row.coverage;
+  if (coverage === null || coverage.tier === "covered") return null;
+  const km = coverage.nearestKm === null ? "" : ` - ${coverage.nearestKm.toFixed(1)} km`;
+  const label = coverage.tier === "near_miss" ? "No direct coverage" : "Out of reach";
+  return (
+    <span className="mt-1 block" data-testid="coverage-tag">
+      <Tag tone="warning">{`${label}${km}`}</Tag>
+    </span>
+  );
 }
 
 function ContractorLine({ row }: { row: QueueRow }) {
@@ -129,6 +143,7 @@ function QueueTable({ rows }: { rows: QueueRow[] }) {
                 <span className="block text-xs text-muted-text">
                   {row.suburb} {row.postcode}
                 </span>
+                <CoverageTag row={row} />
               </td>
               <td className={`${td} tabular-nums`}>
                 {row.wantedDate}
@@ -172,6 +187,7 @@ function QueueCards({ rows }: { rows: QueueRow[] }) {
             <span className="block">
               {row.trade} - {row.suburb} {row.postcode}
             </span>
+            <CoverageTag row={row} />
             <span className="block tabular-nums">
               Wanted {row.wantedDate}, {row.windowLabel}
             </span>

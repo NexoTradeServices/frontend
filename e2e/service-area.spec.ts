@@ -287,10 +287,12 @@ test.describe(() => {
   test("AC10: at 390px Bob's page holds the floor -- pin, slider, chips, both text actions, Save and Cancel reachable, no horizontal scroll", async ({
     page,
   }) => {
+    // Listen before the page loads: the in-range lookup (3002's index) can answer before a later listener starts.
+    const inRange = waitForInRange(page);
     await page.goto("/contractor/service-area");
     await login(page, "bob@idelta.com.au");
     await expect(page.getByRole("heading", { name: "Your service area" })).toBeVisible({ timeout: 10_000 });
-    await waitForInRange(page);
+    await inRange;
 
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);

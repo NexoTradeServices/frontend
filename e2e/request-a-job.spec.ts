@@ -8,8 +8,8 @@
 // (AC3, a repeat enquiry from a known email, is proven at the backend --
 //      tests/enquiries.test.ts AC3 -- and no longer here, where it wrote a job
 //      onto the cast's Sarah.)
-// AC4  the confirmation page reads "we'll call you shortly" and carries no
-//      "Set a password" offer
+// AC4  the confirmation page reads "we'll call you shortly"; 3004 AC1 adds the offer line under
+//      the reference, opening Set a password with her email filled
 // AC8  every required field carries a star (change.md V3 -- this form
 //      moved off the "every field required, no stars" case once real
 //      optional fields existed); the word "(optional)" is never used
@@ -25,6 +25,9 @@
 // 1017 AC5  the evening window's note reads 17:00 - 19:00
 //      (the business name reaching the customer record is proven at the
 //      backend, tests/enquiries.test.ts 1017 AC2)
+// 3002 AC1, AC3, AC4, AC6, AC7 (coverage at the pick) lives in its own describe at the foot of this
+//      file: Joondalup shows the warning Banner and Continue still works, a Fremantle re-pick clears
+//      it, Hilton shows nothing, the platform list gets the same check, a failed check shows nothing
 // AC11 a trade's own questions render as labelled text answers under
 //      "Additional questions" on the Notes step ("Tell us what's wrong"),
 //      optional, never their own step; a trade with none shows that same
@@ -86,12 +89,25 @@ async function hasRequiredStar(page: Page, text: string): Promise<boolean> {
   }, text);
 }
 
-async function pickJoondalup(page: Page) {
+/**
+ * Type into the Suburb box and click a suggestion, trying again until it takes. On a loaded machine the
+ * box is enabled before the Places field has settled and the first keystrokes are dropped, or the list
+ * redraws under the click; a person would just keep typing, so the test does too.
+ */
+async function typeAndPick(page: Page, typed: string, suggestion: RegExp, heading: string) {
   const field = page.getByLabel("Suburb");
   await expect(field).toBeEnabled({ timeout: 10_000 });
-  await field.fill("Joondalup");
-  await expect(page.getByText("Google suggestions")).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: /Joondalup/ }).first().click();
+  await expect(async () => {
+    await field.fill("");
+    await field.fill(typed);
+    await expect(page.getByText(heading)).toBeVisible({ timeout: 4_000 });
+    await page.getByRole("button", { name: suggestion }).first().click({ timeout: 4_000 });
+  }).toPass({ timeout: 40_000 });
+}
+
+async function pickJoondalup(page: Page) {
+  const field = page.getByLabel("Suburb");
+  await typeAndPick(page, "Joondalup", /Joondalup/, "Google suggestions");
   // The plain typed text "Joondalup" also matches a loose /Joondalup/
   // check, so a real pick (the suggestion's own async fetchFields()
   // round-trip) can still be in flight when that passes -- wait for the
@@ -200,8 +216,12 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     await expect(page.getByTestId("message-card").locator("span.bg-success-bg svg")).toBeVisible();
     await expect(page.getByText("We'll call you shortly to confirm a time.")).toBeVisible();
     await expect(page.getByText(/^JOB-\d+$/)).toBeVisible();
-    // AC4: no "Set a password" offer -- that ships with 3004.
-    await expect(page.getByText(/password/i)).toHaveCount(0);
+    // 3004 AC1: the one Caption line under the reference offers a login, and the link opens
+    // Set a password with the email she just typed already in the box.
+    await expect(page.getByTestId("set-password-offer")).toHaveText("Set up your account to manage jobs and access your service history.");
+    await page.getByRole("link", { name: "Set up your account" }).click();
+    await expect(page).toHaveURL(/\/set-password$/);
+    await expect(page.getByLabel("Email")).toHaveValue(/^e2e-3001-.*@idelta\.com\.au$/);
   });
 
   test("AC2: a Saturday date shows the weekend rate, a weekday shows normal", async ({ page }) => {
@@ -586,5 +606,70 @@ test.describe("Feature 3006 -- the enquiry form with Google Places down", () => 
       page.getByText("We can't take job requests online right now -- please call us on 0400 111 222."),
     ).toBeVisible();
     await expect(page).toHaveURL(/\/request-a-job$/);
+  });
+});
+
+test.describe("Feature 3002 -- coverage at the pick", () => {
+  const WARNING =
+    "We don't currently service your area, but you can still submit your details. We'll do our best to find a local service provider, subject to availability.";
+
+  async function pickFremantle(page: Page) {
+      const field = page.getByLabel("Suburb");
+    await typeAndPick(page, "Fremantle", /Fremantle/, "Google suggestions");
+    await expect(field).toHaveValue(/Fremantle WA/, { timeout: 20_000 });
+  }
+
+  test.beforeEach(async ({ page }) => {
+    if (MOCKS_GOOGLE_PLACES) await installMockGooglePlaces(page);
+  });
+
+  test("AC3, AC4: Joondalup shows the warning and Continue still works; a Fremantle re-pick clears it", async ({ page }) => {
+    await page.goto("/request-a-job");
+    await pickJoondalup(page);
+    await expect(page.getByText(WARNING)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
+
+    await pickFremantle(page);
+    await expect(page.getByText(WARNING)).toHaveCount(0, { timeout: 10_000 });
+
+    await pickJoondalup(page);
+    await expect(page.getByText(WARNING)).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByRole("heading", { name: "What's the job?" })).toBeVisible();
+    // The warning belongs to the suburb step only.
+    await expect(page.getByText(WARNING)).toHaveCount(0);
+  });
+
+  test("AC7: a coverage check that fails shows nothing and Continue still works", async ({ page }) => {
+    await page.route(/\/api\/enquiries\/coverage/, (route) => route.abort());
+    await page.goto("/request-a-job");
+    await pickJoondalup(page);
+    await expect(page.getByText(WARNING)).toHaveCount(0);
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByRole("heading", { name: "What's the job?" })).toBeVisible();
+  });
+});
+
+test.describe("Feature 3002 -- coverage at the pick, with Google Places down", () => {
+  // Its own describe: the other 3002 tests install the fake Google Places in CI, and the fake must never be
+  // combined with blockGooglePlaces (mock-google-places.ts).
+  const WARNING =
+    "We don't currently service your area, but you can still submit your details. We'll do our best to find a local service provider, subject to availability.";
+
+  test.beforeEach(async ({ page }) => {
+    await blockGooglePlaces(page);
+  });
+
+  test("AC1, AC6: Hilton from the platform list shows nothing; Joondalup from it shows the warning", async ({ page }) => {
+    await page.goto("/request-a-job");
+    const field = page.getByLabel("Suburb");
+    await typeAndPick(page, "Hilt", /^Hilton WA 6163$/, "Platform suggestions");
+    await expect(field).toHaveValue("Hilton WA 6163");
+    await page.waitForTimeout(500);
+    await expect(page.getByText(WARNING)).toHaveCount(0);
+
+    await typeAndPick(page, "Joondalup", /^Joondalup WA 6027$/, "Platform suggestions");
+    await expect(field).toHaveValue("Joondalup WA 6027");
+    await expect(page.getByText(WARNING)).toBeVisible({ timeout: 10_000 });
   });
 });

@@ -22,6 +22,7 @@ const devOrigins = (process.env.DEV_ORIGINS ?? "")
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: devOrigins,
+  devIndicators: false,
   // The pages were called Settlements before the owner chose Payouts (Feature 6003): old
   // addresses, in bookmarks and earlier emails, still arrive.
   async redirects() {

@@ -31,6 +31,8 @@ export interface QueueRow {
   contractor: ContractorView | null;
   /** Feature 4003: waiting at new behind a decline -- who declined, and his note. */
   declined: { by: string; note: string | null } | null;
+  /** Feature 3002: the tier of the job's current suburb; open jobs only. */
+  coverage: { tier: "covered" | "near_miss" | "out_of_reach"; nearestKm: number | null } | null;
 }
 
 export type QueueCounts = Record<StatusFilter, number>;
@@ -164,6 +166,9 @@ export interface JobDetail {
   postcode: string;
   wantedDate: string;
   windowLabel: string;
+  /** Feature 4004: the plain date (YYYY-MM-DD) and the window the edit form starts from. */
+  preferredDate: string;
+  preferredWindow: "morning" | "afternoon" | "evening";
   receivedLabel: string;
   description: string | null;
   answers: string[];
@@ -180,6 +185,10 @@ export interface JobDetail {
     phone: string | null;
     email: string;
     billingAddress: PickedAddress | null;
+    /** Feature 3010: what she typed on this request where it differs from her record; null = same or empty. */
+    given: { name: string | null; phone: string | null; businessName: string | null };
+    /** Feature 3010: the phone or the business name differs (the name never counts). */
+    newDetails: boolean;
   };
   /** Feature 4010: worked out from her history on every read. */
   customerRating: CustomerRating;

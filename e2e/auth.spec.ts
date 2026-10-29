@@ -20,7 +20,7 @@
 // throwaway one -- so this file never completes a password reset (that would
 // permanently change Bob's dev password) and never asserts on state a
 // parallel test run could have changed; it only exercises login, wrong-door,
-// and log out, all reversible.
+// and log out, all reversible. 3004 AC11 adds the show/hide eye on the login boxes.
 import { test, expect } from "@playwright/test";
 import { login, waitForHydration } from "./helpers/login";
 import { makeCustomerLogin } from "./helpers/test-run";
@@ -115,7 +115,7 @@ for (const gate of GATES) {
   });
 }
 
-test("1018 AC4: logged out, /account shows the Customer account login card at that same URL; a customer lands on the same URL in the Portal frame", async ({
+test("1018 AC4: logged out, /account shows the Customer account login card at that same URL; a customer lands on Jobs in the Portal frame", async ({
   page,
 }) => {
   const customer = await makeCustomerLogin();
@@ -126,7 +126,8 @@ test("1018 AC4: logged out, /account shows the Customer account login card at th
   await expect(page.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
 
   await login(page, customer.email, customer.password);
-  await expect(page).toHaveURL(/\/account$/);
+  // 6010: the account opens on Jobs.
+  await expect(page).toHaveURL(/\/account\/jobs$/);
   await expect(page.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
   await page.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: "Log out" }).click();
   await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
@@ -193,6 +194,25 @@ test("a dead reset link shows the dead-link page with its fix as the primary act
   await expect(page.locator('[data-container="narrow"]').getByTestId("message-card")).toBeVisible();
   await expect(page.getByRole("heading", { name: "This link has expired" })).toHaveCSS("font-size", "22px");
   await expect(page.getByRole("heading", { name: "This link has expired" })).toHaveCSS("font-weight", "800");
+});
+
+test("3004 AC11: the eye on the login box shows the typed password, and tapping again hides it - at each portal", async ({ page }) => {
+  for (const door of ["/ops", "/contractor", "/account"]) {
+    await page.goto(door);
+    await waitForHydration(page, "email");
+    const box = page.getByLabel("Password", { exact: true });
+    await box.fill("not-a-real-password");
+    await expect(box).toHaveAttribute("type", "password");
+    const eye = page.getByRole("button", { name: "Show password" });
+    const area = await eye.boundingBox();
+    expect(area?.width).toBeGreaterThanOrEqual(44);
+    expect(area?.height).toBeGreaterThanOrEqual(44);
+    await eye.click();
+    await expect(box).toHaveAttribute("type", "text");
+    await expect(box).toHaveValue("not-a-real-password");
+    await page.getByRole("button", { name: "Hide password" }).click();
+    await expect(box).toHaveAttribute("type", "password");
+  }
 });
 
 test.describe(() => {

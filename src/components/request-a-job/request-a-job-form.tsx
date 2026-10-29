@@ -27,8 +27,10 @@ import { AlertPhone, AlertStrip } from "@/components/ui/alert-strip";
 import { PhotoGallery } from "@/components/ui/photo-gallery";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { TradeIcon } from "./trade-icon";
+import { PriceBox } from "./price-box";
+import { AdditionalQuestions } from "./additional-questions";
 import { MAX_PHOTOS, PHOTO_UNAVAILABLE, useEnquiryPhotos } from "./use-enquiry-photos";
-import { formatDayName, formatDollars, formatFriendlyDate, isWeekendDate, todayYmd } from "./money";
+import { formatDayName, formatFriendlyDate, isWeekendDate, todayYmd } from "./money";
 import type { FormDataDto, PreferredWindow } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -46,7 +48,7 @@ const STEP_LABELS: Record<StepKey, string> = {
   price: "Pricing",
 };
 
-const WINDOWS: { value: PreferredWindow; label: string; note: string }[] = [
+export const WINDOWS: { value: PreferredWindow; label: string; note: string }[] = [
   { value: "morning", label: "Morning", note: "7:00 - 12:00" },
   { value: "afternoon", label: "Afternoon", note: "12:00 - 17:00" },
   { value: "evening", label: "Evening", note: "17:00 - 19:00" },
@@ -63,6 +65,8 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
   /** Feature 3006: the suburb picked from the platform's own list while Google is down. */
   const [platformSuburb, setPlatformSuburb] = useState<PlatformSuburb | null>(null);
   const [locationError, setLocationError] = useState<string>();
+  /** Feature 3002: what the coverage check said about one pick. Never blocks Continue. */
+  const [coverageAnswer, setCoverageAnswer] = useState<{ query: string; outOfReach: boolean } | null>(null);
   const [trade, setTrade] = useState<string | null>(null);
   const [tradeError, setTradeError] = useState<string>();
   /** One typed answer per trade question, keyed by the question's own label. Optional -- left blank is fine. */
@@ -90,6 +94,30 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
   );
 
   const step = STEPS[Math.min(stepIndex, STEPS.length - 1)] ?? "suburb";
+
+  // Feature 3002: the coverage check on every suburb pick. A failed or slow check shows nothing and
+  // never blocks Continue (Foundations / Ground rules: outside services degrade, never block). The
+  // answer is kept with the pick it belongs to, so a stale one never shows for a newer pick.
+  const coverageQuery =
+    location !== null
+      ? new URLSearchParams({ postcode: location.postcode, lat: String(location.lat), lng: String(location.lng) }).toString()
+      : platformSuburb !== null
+        ? new URLSearchParams({ suburbId: platformSuburb.suburbId }).toString()
+        : null;
+  useEffect(() => {
+    if (coverageQuery === null) return;
+    const controller = new AbortController();
+    fetch(`${apiUrl}/api/enquiries/coverage?${coverageQuery}`, { signal: controller.signal })
+      .then((res) => (res.ok ? (res.json() as Promise<{ tier?: string }>) : null))
+      .then((body) => {
+        if (!controller.signal.aborted) setCoverageAnswer({ query: coverageQuery, outOfReach: body?.tier === "out_of_reach" });
+      })
+      .catch(() => undefined);
+    return () => {
+      controller.abort();
+    };
+  }, [coverageQuery]);
+  const outOfReach = coverageQuery !== null && coverageAnswer?.query === coverageQuery && coverageAnswer.outOfReach;
 
   // Feature 3003: learn whether photo upload is switched on the first time the
   // notes step shows.
@@ -200,6 +228,13 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
       });
       const body = (await res.json().catch(() => ({}))) as { reference?: string; error?: string; operatorPhone?: string };
       if (res.status === 201 && body.reference) {
+        // Feature 3004: the Set a password page arrives with this email filled -- kept in the
+        // browser for the confirmation page's offer, never in the address bar.
+        try {
+          window.sessionStorage.setItem("enquiryEmail", email.trim());
+        } catch {
+          // storage blocked: the page just opens empty
+        }
         router.push(`/request-a-job/confirmed?ref=${encodeURIComponent(body.reference)}`);
         return;
       }
@@ -248,6 +283,12 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
 
           {step === "suburb" ? (
             <>
+              {outOfReach ? (
+                <Banner kind="warning">
+                  We don&apos;t currently service your area, but you can still submit your details. We&apos;ll do our
+                  best to find a local service provider, subject to availability.
+                </Banner>
+              ) : null}
               <PlacesField
                 id="suburb"
                 label="Suburb"
@@ -367,21 +408,11 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
                 {descriptionError ? <p className="mt-[5px] text-xs text-brand-destructive">{descriptionError}</p> : null}
               </div>
 
-              {selectedType && selectedType.prefilledFields.length > 0 ? (
-                <div className="mt-6 border-t border-hairline pt-5">
-                  <h2 className="font-heading text-sm font-extrabold text-ink">Additional questions</h2>
-                  <p className="mb-4 text-xs text-muted-text">Help us to attend the job better prepared.</p>
-                  {selectedType.prefilledFields.map((question, index) => (
-                    <Field
-                      key={question}
-                      id={`prefilled-${String(index)}`}
-                      label={question}
-                      value={questionAnswers[question] ?? ""}
-                      onChange={(e) => setQuestionAnswers((prev) => ({ ...prev, [question]: e.target.value }))}
-                    />
-                  ))}
-                </div>
-              ) : null}
+              <AdditionalQuestions
+                questions={selectedType?.prefilledFields ?? []}
+                answers={questionAnswers}
+                onChange={(question, answer) => setQuestionAnswers((prev) => ({ ...prev, [question]: answer }))}
+              />
 
               <div className="mt-6 border-t border-hairline pt-5">
                 <h2 className="mb-3 font-heading text-sm font-extrabold text-ink">Photos</h2>
@@ -487,13 +518,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
                 This price includes the call-out and up to one hour of service. Any additional time is charged at the
                 hourly rate shown below.
               </p>
-              <div data-testid="price-box" className="rounded-small-box bg-ground p-3.5">
-                <span className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase">
-                  {weekend ? "Weekend rate" : "Standard Rate"}
-                </span>
-                <div className="font-heading text-page-title font-extrabold text-ink">{formatDollars(calloutRate)}</div>
-                <p className="text-caption text-muted-text">then {formatDollars(standardRate)} per additional hour</p>
-              </div>
+              <PriceBox weekend={weekend} calloutRate={calloutRate} standardRate={standardRate} />
             </>
           ) : null}
 

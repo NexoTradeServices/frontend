@@ -1,8 +1,10 @@
 // /request-a-job/confirmed -- Feature 3001, enquiry form to job created.
-// AC4: the JOB reference and "we'll call you shortly" -- no "Set a
-// password" offer, that ships with 3004. The reference travels in the
+// AC4: the JOB reference and "we'll call you shortly". Feature 3004 adds the one Caption
+// line under the reference: "Set up your account to manage jobs and access your service history." -> /set-password.
+// The reference travels in the
 // query string from the form's own POST response; nothing here is fetched
 // by job reference, so there is no way to enumerate someone else's job.
+import Link from "next/link";
 import { Container } from "@/components/frame/container";
 import { MessageCard } from "@/components/ui/message-card";
 
@@ -26,6 +28,12 @@ export default async function RequestAJobConfirmedPage({
             {ref}
           </p>
         ) : null}
+        <p className="mt-3 text-caption text-muted-text" data-testid="set-password-offer">
+          <Link href="/set-password" className="underline underline-offset-2">
+            Set up your account
+          </Link>{" "}
+          to manage jobs and access your service history.
+        </p>
       </MessageCard>
     </Container>
   );

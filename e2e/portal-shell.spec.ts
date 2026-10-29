@@ -212,22 +212,24 @@ test("1018 AC3: Bob gets the same shell with Dashboard, Payouts, Rates and Servi
   await expect(bar.getByRole("button", { name: "Log out" })).toBeVisible();
 });
 
-test("1018 AC3: a customer login gets the same shell with no menu entries, its name and Log out, and the placeholder", async ({
+test("1018 AC3 (6010): a customer login gets the same shell with its four menu entries, its name and Log out, and lands on Jobs", async ({
   page,
 }) => {
   const customer = await makeCustomerLogin();
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/account");
   await login(page, customer.email, customer.password);
-  await expect(page.getByRole("heading", { name: "Customer account" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible();
 
   const bar = sidebar(page);
   await expect(bar).toBeVisible();
-  await expect(bar.getByRole("link")).toHaveCount(0);
+  // 6010: Jobs, Invoices, Profile (refunds sit under Invoices), Jobs current.
+  await expect(bar.getByRole("link")).toHaveText(["Jobs", "Invoices", "Profile"]);
+  await expect(bar.getByRole("link", { name: "Jobs", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(bar.getByTestId("menu-person")).toHaveText(customer.name);
   await expect(bar.getByRole("button", { name: "Log out" })).toBeVisible();
-  // The placeholder content: who is logged in, and their role.
-  await expect(page.getByText(`Logged in as ${customer.name}`)).toBeVisible();
+  // A login with no jobs yet: the empty state.
+  await expect(page.getByText("No jobs yet.")).toBeVisible();
 
   await bar.getByRole("button", { name: "Log out" }).click();
   await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();

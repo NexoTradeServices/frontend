@@ -15,6 +15,12 @@
 //      save and come back on reload; clearing the business name hides and clears them
 // 6015 AC13 the Invoice card names the business, Attn and ABN when the invoice froze one, and
 //      reads Total / Amount due (the GST rows are proven at the backend and in refunds.spec.ts)
+// 3002 AC9 the queue tags a near-miss job "No direct coverage - n km" and an out-of-reach one "Out of reach -
+//      n km" under the suburb, none on a covered job; table at desktop width, cards on a phone
+// 3010 AC2, AC4, AC6 the Customer card on a returning customer's job: the tag, the phone and business
+//      name changes, Update customer -> Toast and the tag gone; a different name alone reads "Given as"
+// 4004 AC1, AC2, AC4, AC5 Edit on a new job: the trade warning, Save -> Toast and the new Facts; the suburb
+//      locked once a site address is set; no Edit on a dispatched job
 // AC24 the email's job link opened logged out: the ops login, then that job
 //      (the link itself is proven at the backend, ops-jobs.test.ts AC24)
 // AC25 (BKLG-022) Assigned renders #6b4fa3 on #efeafa through the one
@@ -63,20 +69,25 @@ import { MOBILE_VIEWPORT } from "../playwright.config";
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
 
 /** A fresh web enquiry, posted the way the public form posts it (no reCAPTCHA token reads as unreachable, never a block). */
-async function postEnquiry(request: APIRequestContext, tag: string, name: string): Promise<string> {
+async function postEnquiry(
+  request: APIRequestContext,
+  tag: string,
+  name: string,
+  place: { suburb: string; postcode: string; lat: number; lng: number } = { suburb: "Fremantle", postcode: "6160", lat: -32.0569, lng: 115.7439 },
+): Promise<string> {
   const res = await request.post(`${apiUrl}/api/enquiries`, {
     data: {
       name,
       email: `e2e-4001-${tag}-${String(Date.now())}@idelta.com.au`,
       phone: "0400 000 401",
       location: {
-        suburb: "Fremantle",
+        suburb: place.suburb,
         state: "WA",
         country: "AU",
-        postcode: "6160",
-        lat: -32.0569,
-        lng: 115.7439,
-        placeId: "e2e-place-fremantle",
+        postcode: place.postcode,
+        lat: place.lat,
+        lng: place.lng,
+        placeId: `e2e-place-${place.suburb.toLowerCase().replace(/\s+/g, "-")}`,
       },
       trade: "Plumbing",
       selectedOptions: [],
@@ -841,4 +852,152 @@ test("6009 AC7: a job that is not completed has no Review card", async ({ page, 
   await login(page, "mike@idelta.com.au");
   await expect(page.getByRole("heading", { name: reference, exact: true }).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Review", exact: true })).toHaveCount(0);
+});
+
+test("3002 AC9: the queue tags a near-miss and an out-of-reach job, and a covered one carries nothing - table and phone cards", async ({
+  page,
+  request,
+}) => {
+  const stamp = String(Date.now());
+  const greg = `E2E Cover Greg ${stamp}`;
+  const karl = `E2E Cover Karl ${stamp}`;
+  const sarah = `E2E Cover Sarah ${stamp}`;
+  const gregRef = await postEnquiry(request, "cov-greg", greg, { suburb: "Rottnest Island", postcode: "6161", lat: -32.0072, lng: 115.5413 });
+  const karlRef = await postEnquiry(request, "cov-karl", karl, { suburb: "Joondalup", postcode: "6027", lat: -31.7448, lng: 115.7661 });
+  const sarahRef = await postEnquiry(request, "cov-sarah", sarah, { suburb: "Hilton", postcode: "6163", lat: -32.0731, lng: 115.7797 });
+
+  await page.goto("/ops/jobs");
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible();
+
+  for (const [name, ref, tag] of [
+    [greg, gregRef, /^No direct coverage - \d+\.\d km$/],
+    [karl, karlRef, /^Out of reach - \d+\.\d km$/],
+    [sarah, sarahRef, null],
+  ] as const) {
+    await page.getByLabel("Search jobs").fill(name);
+    const row = page.getByRole("row").filter({ hasText: ref });
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    if (tag === null) await expect(row.getByTestId("coverage-tag")).toHaveCount(0);
+    else await expect(row.getByTestId("coverage-tag")).toHaveText(tag);
+  }
+
+  await page.setViewportSize(MOBILE_VIEWPORT.viewport);
+  for (const [name, ref, tag] of [
+    [greg, gregRef, /^No direct coverage - \d+\.\d km$/],
+    [karl, karlRef, /^Out of reach - \d+\.\d km$/],
+    [sarah, sarahRef, null],
+  ] as const) {
+    await page.getByLabel("Search jobs").fill(name);
+    const card = page.locator(`a[data-ref="${ref}"]`);
+    await expect(card).toBeVisible({ timeout: 15_000 });
+    if (tag === null) await expect(card.getByTestId("coverage-tag")).toHaveCount(0);
+    else await expect(card.getByTestId("coverage-tag")).toHaveText(tag);
+  }
+});
+
+test("3010 AC2, AC4, AC6: a returning customer's new phone and business name are flagged, Update customer clears them, a name alone is only shown", async ({
+  page,
+  request,
+}) => {
+  const email = `e2e-3010-${String(Date.now())}@idelta.com.au`;
+  const post = async (data: { name: string; phone: string; businessName?: string }): Promise<string> => {
+    const res = await request.post(`${apiUrl}/api/enquiries`, {
+      data: {
+        ...data,
+        email,
+        location: { suburb: "Fremantle", state: "WA", country: "AU", postcode: "6160", lat: -32.0569, lng: 115.7439, placeId: "e2e-place-3010" },
+        trade: "Plumbing",
+        selectedOptions: [],
+        preferredDate: "2026-12-01",
+        preferredWindow: "morning",
+        description: "An e2e throwaway job for feature 3010.",
+        marketingEmail: false,
+        marketingSms: false,
+      },
+    });
+    expect(res.status()).toBe(201);
+    return ((await res.json()) as { reference: string }).reference;
+  };
+  // Her first request makes her record; the second brings a new phone and a business name.
+  await post({ name: "E2E Chen", phone: "0400 000 311" });
+  const second = await post({ name: "E2E Chen", phone: "0412 555 019", businessName: "Chen Consulting" });
+
+  await page.goto(`/ops/jobs/${second}`);
+  await login(page, "mike@idelta.com.au");
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: "Customer", exact: false }) }).filter({ hasText: "Email" }).first();
+  await expect(card.getByText("Attention: Existing customer, with new details")).toBeVisible({ timeout: 15_000 });
+  const changes = card.getByTestId("value-change");
+  await expect(changes).toHaveCount(2);
+  await expect(changes.first()).toContainText("0400 000 311");
+  await expect(changes.first()).toContainText("0412 555 019");
+  await expect(changes.nth(1)).toContainText("None");
+  await expect(changes.nth(1)).toContainText("Chen Consulting");
+  await expect(card.getByText("Confirm with the customer first")).toBeVisible();
+  await expect(card.getByRole("link", { name: "0412 555 019" })).toHaveAttribute("href", "tel:0412555019");
+
+  await card.getByRole("button", { name: "Update customer" }).click();
+  await expect(page.getByText("Customer updated")).toBeVisible({ timeout: 15_000 });
+  await expect(card.getByText("Attention: Existing customer, with new details")).toHaveCount(0);
+  await expect(card.getByTestId("value-change")).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "Update customer" })).toHaveCount(0);
+
+  // A different name alone: shown under the Name, never flagged, nothing to copy.
+  const third = await post({ name: "E2E Sara", phone: "0412 555 019", businessName: "Chen Consulting" });
+  await page.goto(`/ops/jobs/${third}`);
+  const card3 = page.locator("section").filter({ has: page.getByRole("heading", { name: "Customer", exact: false }) }).filter({ hasText: "Email" }).first();
+  await expect(card3.getByTestId("given-name")).toHaveText("Given as E2E Sara", { timeout: 15_000 });
+  await expect(card3.getByText("Attention: Existing customer, with new details")).toHaveCount(0);
+  await expect(card3.getByRole("button", { name: "Update customer" })).toHaveCount(0);
+});
+
+test("4004 AC1, AC2: Edit turns the request into its form, a new trade warns about the price, Save shows the new Facts", async ({ page, request }) => {
+  const reference = await postEnquiry(request, "ed1", "E2E Edit One");
+  await page.goto(`/ops/jobs/${reference}`);
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: reference, exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+
+  await expect(page.getByTestId("trade-price-warning")).toHaveCount(0);
+  await page.getByLabel("Trade", { exact: true }).selectOption("Electrical");
+  await expect(page.getByTestId("trade-price-warning")).toHaveText("The price changes to this trade's rates - tell the customer.");
+  await page.getByLabel("Time of day").selectOption("afternoon");
+  await page.getByLabel("Issue Description").fill("The garage lights keep tripping the switch.");
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: "The request" }) });
+  await card.getByRole("button", { name: "Save", exact: true }).click();
+
+  await expect(page.getByText("Request updated")).toBeVisible({ timeout: 15_000 });
+  await expect(card.getByText("Electrical", { exact: true })).toBeVisible();
+  await expect(card.getByText("afternoon 12:00-17:00")).toBeVisible();
+  await expect(card.getByText("The garage lights keep tripping the switch.")).toBeVisible();
+  await expect(card.getByRole("button", { name: "Save", exact: true })).toHaveCount(0);
+});
+
+test("4004 AC4: with a site address the suburb is locked and says it follows the address", async ({ page, request }) => {
+  const reference = await postEnquiry(request, "ed2", "E2E Edit Two");
+  await page.goto(`/ops/jobs/${reference}`);
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: reference, exact: true })).toBeVisible();
+  const saved = await page.request.put(`${apiUrl}/api/jobs/${reference}/addresses`, {
+    data: {
+      billingAddress: { street: "14 Marine Terrace", suburb: "Fremantle", state: "WA", country: "AU", postcode: "6160", lat: -32.0569, lng: 115.7439, placeId: "e2e-4004-billing" },
+      site: { sameAsBilling: true },
+    },
+  });
+  expect(saved.status()).toBe(200);
+  await page.reload();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(page.getByText("Comes from the job site address. To change it, change the address.")).toBeVisible();
+  await expect(page.locator("#request-suburb")).toHaveCount(0);
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: "The request" }) });
+  await card.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(card.getByRole("button", { name: "Save", exact: true })).toHaveCount(0);
+});
+
+test("4004 AC5: a dispatched job shows no Edit", async ({ page, request }) => {
+  test.setTimeout(120_000);
+  const job = await dispatchThrowawayJob(page, request, "ed3");
+  await page.goto(`/ops/jobs/${job.reference}`);
+  await expect(page.getByRole("heading", { name: job.reference, exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
 });

@@ -80,6 +80,8 @@ export interface DispatchedJob {
   respondPath: string;
   /** The raw token, for a direct call to the respond API. */
   token: string;
+  /** Feature 3004: the throwaway customer's email, for the Set a password flow (dispatchThrowawayJob only). */
+  customerEmail?: string;
 }
 
 export async function dispatchThrowawayJob(
@@ -124,7 +126,7 @@ export async function dispatchThrowawayJob(
   });
   expect(saved.status()).toBe(200);
 
-  return dispatchExistingJob(page, request, reference);
+  return { ...(await dispatchExistingJob(page, request, reference)), customerEmail: `e2e-4003-${tag}-${stamp}@idelta.com.au` };
 }
 
 /**
