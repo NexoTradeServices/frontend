@@ -202,6 +202,7 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
       {formError ? <Banner kind="error">{formError}</Banner> : null}
 
       <div>
+        <h2 className="mb-3 font-heading text-base font-extrabold text-ink">Customer</h2>
         <Field
           id="name"
           label="Name"
@@ -367,6 +368,7 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
       </div>
 
       <div className="mt-6 border-t border-hairline pt-5">
+        <h2 className="mb-3 font-heading text-base font-extrabold text-ink">The job</h2>
         {effectiveSite !== null ? (
           <LockedField
             label="Suburb"
