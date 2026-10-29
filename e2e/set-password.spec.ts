@@ -41,7 +41,7 @@ async function makeGuest(request: APIRequestContext, tag: string): Promise<strin
 test("AC2: a guest asks for a link and the card reads Check your inbox", async ({ page, request }) => {
   const email = await makeGuest(request, "ask");
   await page.goto("/set-password");
-  await expect(page.getByRole("heading", { name: "Track your jobs online" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Set up your account" })).toBeVisible();
   await expect(page.locator('[data-container="narrow"]')).toBeVisible();
   await waitForHydration(page, "email");
   await page.getByLabel("Email").fill(email);
