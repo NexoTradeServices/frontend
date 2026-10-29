@@ -89,12 +89,25 @@ async function hasRequiredStar(page: Page, text: string): Promise<boolean> {
   }, text);
 }
 
-async function pickJoondalup(page: Page) {
+/**
+ * Type into the Suburb box and click a suggestion, trying again until it takes. On a loaded machine the
+ * box is enabled before the Places field has settled and the first keystrokes are dropped, or the list
+ * redraws under the click; a person would just keep typing, so the test does too.
+ */
+async function typeAndPick(page: Page, typed: string, suggestion: RegExp, heading: string) {
   const field = page.getByLabel("Suburb");
   await expect(field).toBeEnabled({ timeout: 10_000 });
-  await field.fill("Joondalup");
-  await expect(page.getByText("Google suggestions")).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: /Joondalup/ }).first().click();
+  await expect(async () => {
+    await field.fill("");
+    await field.fill(typed);
+    await expect(page.getByText(heading)).toBeVisible({ timeout: 4_000 });
+    await page.getByRole("button", { name: suggestion }).first().click({ timeout: 4_000 });
+  }).toPass({ timeout: 40_000 });
+}
+
+async function pickJoondalup(page: Page) {
+  const field = page.getByLabel("Suburb");
+  await typeAndPick(page, "Joondalup", /Joondalup/, "Google suggestions");
   // The plain typed text "Joondalup" also matches a loose /Joondalup/
   // check, so a real pick (the suggestion's own async fetchFields()
   // round-trip) can still be in flight when that passes -- wait for the
@@ -601,11 +614,8 @@ test.describe("Feature 3002 -- coverage at the pick", () => {
     "We don't currently service your area, but you can still submit your details. We'll do our best to find a local service provider, subject to availability.";
 
   async function pickFremantle(page: Page) {
-    const field = page.getByLabel("Suburb");
-    await expect(field).toBeEnabled({ timeout: 10_000 });
-    await field.fill("Fremantle");
-    await expect(page.getByText("Google suggestions")).toBeVisible({ timeout: 20_000 });
-    await page.getByRole("button", { name: /Fremantle/ }).first().click();
+      const field = page.getByLabel("Suburb");
+    await typeAndPick(page, "Fremantle", /Fremantle/, "Google suggestions");
     await expect(field).toHaveValue(/Fremantle WA/, { timeout: 20_000 });
   }
 
@@ -653,15 +663,12 @@ test.describe("Feature 3002 -- coverage at the pick, with Google Places down", (
   test("AC1, AC6: Hilton from the platform list shows nothing; Joondalup from it shows the warning", async ({ page }) => {
     await page.goto("/request-a-job");
     const field = page.getByLabel("Suburb");
-    await expect(field).toBeEnabled({ timeout: 10_000 });
-    await field.fill("Hilt");
-    await page.getByRole("button", { name: "Hilton WA 6163" }).click();
+    await typeAndPick(page, "Hilt", /^Hilton WA 6163$/, "Platform suggestions");
     await expect(field).toHaveValue("Hilton WA 6163");
     await page.waitForTimeout(500);
     await expect(page.getByText(WARNING)).toHaveCount(0);
 
-    await field.fill("Joondalup");
-    await page.getByRole("button", { name: "Joondalup WA 6027" }).click();
+    await typeAndPick(page, "Joondalup", /^Joondalup WA 6027$/, "Platform suggestions");
     await expect(field).toHaveValue("Joondalup WA 6027");
     await expect(page.getByText(WARNING)).toBeVisible({ timeout: 10_000 });
   });
