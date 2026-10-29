@@ -7,9 +7,12 @@
 // reads in its own violet pair here exactly as on the ops queue.
 // Feature 6007: a completed job stays as a card with the warning Tag "Completed - awaiting payment"
 // until its invoice is paid, and opens his job screen at its Payment card.
+// Feature 5004: a card for a visit booked today also carries "On my way" under a Divider, its own tap
+// target outside the Link; a card with no visit today is drawn exactly as before.
 import Link from "next/link";
 import { StatusTag } from "@/components/ui/status-tag";
 import { Tag } from "@/components/ui/tag";
+import { CardOnMyWay } from "./on-my-way";
 import { jobStatusTagLabel, type JobCardDto } from "./types";
 
 export function JobCard({ job }: { job: JobCardDto }) {
@@ -35,12 +38,23 @@ export function JobCard({ job }: { job: JobCardDto }) {
   );
   const cardClass = "block rounded-card border border-hairline bg-surface p-3.5";
   if (!job.opens) return <div className={cardClass}>{body}</div>;
+  const href = `/contractor/jobs/${encodeURIComponent(job.reference)}${job.awaitingPayment ? "#payment" : ""}`;
+  const linkClass = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
+  if (job.onMyWay === null) {
+    return (
+      <Link href={href} className={`${cardClass} ${linkClass}`}>
+        {body}
+      </Link>
+    );
+  }
   return (
-    <Link
-      href={`/contractor/jobs/${encodeURIComponent(job.reference)}${job.awaitingPayment ? "#payment" : ""}`}
-      className={`${cardClass} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink`}
-    >
-      {body}
-    </Link>
+    <div className="rounded-card border border-hairline bg-surface" data-testid="job-card-with-on-my-way">
+      <Link href={href} className={`block rounded-t-card p-3.5 ${linkClass}`}>
+        {body}
+      </Link>
+      <div className="border-t border-hairline p-3.5">
+        <CardOnMyWay reference={job.reference} initial={job.onMyWay} />
+      </div>
+    </div>
   );
 }

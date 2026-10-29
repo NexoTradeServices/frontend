@@ -2,6 +2,7 @@
 // Mirrors the backend's DTOs (backend/src/contractors/job-routes.ts, jobs/visit.ts).
 import type { JobStatus } from "@/components/ui/status-tag";
 import type { ReadOnlyPhoto } from "@/components/ui/photo-gallery";
+import type { OnMyWayDto } from "@/components/contractor-dashboard/types";
 
 export interface EntryDto {
   date: string;
@@ -69,6 +70,8 @@ export interface ContractorJobDto {
   maxContractorPartAmount: number;
   frozen: boolean;
   canOnSite: boolean;
+  /** Feature 5004: null (no visit booked today), or whether On my way has gone for today's visit. */
+  onMyWay: OnMyWayDto;
   timezone: string;
   /** Feature 6004: the original's reference when this job is a callback, else null. */
   callbackOn: string | null;

@@ -6,6 +6,8 @@
 //      receipt is refused on its Receipt photo
 // AC7  Complete with nothing entered is refused on those fields; otherwise the dialog asks
 //      once, then the screen is locked and the job has left his dashboard
+// 5004 AC4, AC6 the Arrival card shows On my way above I've arrived for a visit today; the tap turns it
+//      into the sent line and I've arrived is still there
 // AC1  (UI) the dashboard card opens the job screen -- every test here gets in that way
 // 6001 AC12 the Payment card after Complete: scrolled into view, the customer's total, the
 //      "invoice sent" confirmation, a QR code that decodes to the pay link, never Bob's own
@@ -279,6 +281,32 @@ test.describe("Bob's job screen, on a phone", () => {
     await expect(payment.getByTestId("payment-sending")).toHaveText("Sending the invoice to E2E by email and text...");
     await expect(payment.getByText("The pay link is on its way - you can collect payment with a QR code here in a moment.")).toBeVisible();
     await expect(payment.getByTestId("qr-code")).toHaveCount(0);
+  });
+
+  test("5004 AC4, AC6: On my way sits above I've arrived; the tap turns it into the sent line and I've arrived stays", async ({ page, browser, request }) => {
+    const job = await acceptedJobForBob(browser, request, "omw-job");
+    const moved = await request.post(`${process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au"}/api/test-data/jobs/${job.reference}/visit-today`);
+    expect(moved.status()).toBe(200);
+    await openJobScreen(page, job);
+
+    const arrival = page.locator("section, div").filter({ has: page.getByRole("heading", { name: "Arrival" }) }).last();
+    await expect(arrival.getByText(/Tap On my way when you leave - .+ gets a message\. Tap I've arrived when you get there/)).toBeVisible();
+    const onMyWay = page.getByRole("button", { name: "On my way" });
+    const arrived = page.getByRole("button", { name: "I've arrived" });
+    const above = await onMyWay.boundingBox();
+    const below = await arrived.boundingBox();
+    expect((above?.y ?? 0) < (below?.y ?? 0)).toBe(true);
+
+    await page.route("**/api/contractor/jobs/*/on-my-way", (route) => route.fulfill({ status: 500, json: { error: "internal error" } }));
+    await onMyWay.click();
+    await expect(page.getByText("Couldn't send On my way - try again.")).toBeVisible();
+    await page.unroute("**/api/contractor/jobs/*/on-my-way");
+
+    await onMyWay.click();
+    await expect(page.getByTestId("on-my-way-sent")).toHaveText(/^On my way sent at \d{1,2}:\d{2}(am|pm)$/);
+    await expect(onMyWay).toHaveCount(0);
+    await expect(arrived).toBeVisible();
+    await expect(page.getByText("Scheduled", { exact: true })).toBeVisible(); // no status moved
   });
 
   test("AC4: I've arrived shows him in progress, and the job's receipt upload not being set up leaves the rest of the screen saving", async ({
