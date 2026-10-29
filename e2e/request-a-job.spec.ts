@@ -638,26 +638,31 @@ test.describe("Feature 3002 -- coverage at the pick", () => {
     await page.getByRole("button", { name: "Continue" }).click();
     await expect(page.getByRole("heading", { name: "What's the job?" })).toBeVisible();
   });
+});
 
-  test.describe("with Google Places down", () => {
-    test.beforeEach(async ({ page }) => {
-      await blockGooglePlaces(page);
-    });
+test.describe("Feature 3002 -- coverage at the pick, with Google Places down", () => {
+  // Its own describe: the other 3002 tests install the fake Google Places in CI, and the fake must never be
+  // combined with blockGooglePlaces (mock-google-places.ts).
+  const WARNING =
+    "We don't currently service your area, but you can still submit your details. We'll do our best to find a local service provider, subject to availability.";
 
-    test("AC1, AC6: Hilton from the platform list shows nothing; Joondalup from it shows the warning", async ({ page }) => {
-      await page.goto("/request-a-job");
-      const field = page.getByLabel("Suburb");
-      await expect(field).toBeEnabled({ timeout: 10_000 });
-      await field.fill("Hilt");
-      await page.getByRole("button", { name: "Hilton WA 6163" }).click();
-      await expect(field).toHaveValue("Hilton WA 6163");
-      await page.waitForTimeout(500);
-      await expect(page.getByText(WARNING)).toHaveCount(0);
+  test.beforeEach(async ({ page }) => {
+    await blockGooglePlaces(page);
+  });
 
-      await field.fill("Joondalup");
-      await page.getByRole("button", { name: "Joondalup WA 6027" }).click();
-      await expect(field).toHaveValue("Joondalup WA 6027");
-      await expect(page.getByText(WARNING)).toBeVisible({ timeout: 10_000 });
-    });
+  test("AC1, AC6: Hilton from the platform list shows nothing; Joondalup from it shows the warning", async ({ page }) => {
+    await page.goto("/request-a-job");
+    const field = page.getByLabel("Suburb");
+    await expect(field).toBeEnabled({ timeout: 10_000 });
+    await field.fill("Hilt");
+    await page.getByRole("button", { name: "Hilton WA 6163" }).click();
+    await expect(field).toHaveValue("Hilton WA 6163");
+    await page.waitForTimeout(500);
+    await expect(page.getByText(WARNING)).toHaveCount(0);
+
+    await field.fill("Joondalup");
+    await page.getByRole("button", { name: "Joondalup WA 6027" }).click();
+    await expect(field).toHaveValue("Joondalup WA 6027");
+    await expect(page.getByText(WARNING)).toBeVisible({ timeout: 10_000 });
   });
 });
