@@ -91,7 +91,7 @@ export function SetPasswordRequestForm() {
 
   return (
     <GateCard>
-      <GateCardTitle title="Set up your account" subtitle="Manage jobs and access your service history." next="We'll email you a link to set your password." />
+      <GateCardTitle title="Set up your account" subtitle="Manage jobs and access your service history." />
       {botPhone !== undefined ? (
         <Banner kind="error">
           We couldn&apos;t take that request automatically - please call us on{" "}
@@ -112,6 +112,7 @@ export function SetPasswordRequestForm() {
         <PrimaryButton loading={loading} loadingLabel="Sending...">
           Email me a link
         </PrimaryButton>
+        <p className="mt-3 text-center text-caption text-muted-text">We&apos;ll email you a link to set your password.</p>
       </form>
     </GateCard>
   );
