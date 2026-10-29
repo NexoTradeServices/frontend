@@ -205,8 +205,8 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     await expect(page.getByText(/^JOB-\d+$/)).toBeVisible();
     // 3004 AC1: the one Caption line under the reference offers a login, and the link opens
     // Set a password with the email she just typed already in the box.
-    await expect(page.getByTestId("set-password-offer")).toHaveText("Want to track this online? Set a password");
-    await page.getByRole("link", { name: "Set a password" }).click();
+    await expect(page.getByTestId("set-password-offer")).toHaveText("Set up your account to manage jobs and access your service history.");
+    await page.getByRole("link", { name: "Set up your account" }).click();
     await expect(page).toHaveURL(/\/set-password$/);
     await expect(page.getByLabel("Email")).toHaveValue(/^e2e-3001-.*@idelta\.com\.au$/);
   });

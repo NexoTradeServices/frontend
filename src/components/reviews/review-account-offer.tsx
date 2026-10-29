@@ -1,7 +1,7 @@
 // The account offer under the review card -- Feature 3004, guest to account.
 //
 // One Caption line with a Link, by who is looking (design, Guest by default):
-//   guest                          -> "Want to track all your jobs? Set a password"  -> /set-password
+//   guest                          -> "Set up your account to manage jobs and access your service history."  -> /set-password
 //   has a login, not logged in     -> "Log in to see all your jobs"                  -> /account
 //   logged in                      -> "Go to your jobs"                              -> /account
 // The first two come from the review read; "logged in" is the browser's own session.
@@ -38,10 +38,10 @@ export function ReviewAccountOffer({ account }: { account: ReviewAccount }) {
     <p className="mt-4 text-center text-caption text-muted-text" data-testid="review-account-offer">
       {account === "guest" ? (
         <>
-          Want to track all your jobs?{" "}
           <Link href="/set-password" className={linkClass}>
-            Set a password
-          </Link>
+            Set up your account
+          </Link>{" "}
+          to manage jobs and access your service history.
         </>
       ) : loggedIn === true ? (
         <Link href="/account" className={linkClass}>

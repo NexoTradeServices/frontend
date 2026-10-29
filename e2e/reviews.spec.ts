@@ -9,8 +9,8 @@
 //      its 30 days reads "This link has expired" with the office phone; a link that never existed
 //      says it does not work
 //
-// 3004 AC10 the Caption under the card by who is looking: a guest sees "Want to track all your jobs? Set a
-//      password" (open and dead links alike); once she has a password, "Log in to see all your jobs" logged
+// 3004 AC10 the Caption under the card by who is looking: a guest sees "Set up your account to manage jobs and
+//      access your service history." (open and dead links alike); once she has a password, "Log in to see all your jobs" logged
 //      out and "Go to your jobs" logged in
 //
 // The saving, the single use, the 30 days and the averages are proven in the backend
@@ -133,10 +133,10 @@ test.describe(() => {
     // A guest: the offer on the open page and on a dead one.
     await page.goto(path);
     const offer = page.getByTestId("review-account-offer");
-    await expect(offer).toHaveText("Want to track all your jobs? Set a password");
-    await expect(offer.getByRole("link", { name: "Set a password" })).toHaveAttribute("href", "/set-password");
+    await expect(offer).toHaveText("Set up your account to manage jobs and access your service history.");
+    await expect(offer.getByRole("link", { name: "Set up your account" })).toHaveAttribute("href", "/set-password");
     await page.goto("/review/not-a-real-token");
-    await expect(page.getByTestId("review-account-offer")).toHaveText("Want to track all your jobs? Set a password");
+    await expect(page.getByTestId("review-account-offer")).toHaveText("Set up your account to manage jobs and access your service history.");
 
     // She sets a password in a browser of her own - logged in there.
     const hers = await browser.newContext({ baseURL: BASE_URL, storageState: testRunStorageState(), ...MOBILE_VIEWPORT });

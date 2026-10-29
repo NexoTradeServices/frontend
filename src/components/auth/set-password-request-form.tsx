@@ -1,6 +1,6 @@
 // Set a password (the request) -- Feature 3004, guest to account.
 //
-// Every offer ("Want to track all your jobs? Set a password") opens this page. She types her email
+// Every offer ("Set up your account") opens this page. She types her email
 // and taps "Email me a link"; the page runs the enquiry form's reCAPTCHA check and then always says
 // the same thing, so it never reveals which emails we hold. The email arrives filled when she comes
 // from the confirmation page (kept in the browser, never in the address bar).

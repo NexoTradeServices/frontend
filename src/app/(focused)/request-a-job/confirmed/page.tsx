@@ -1,6 +1,6 @@
 // /request-a-job/confirmed -- Feature 3001, enquiry form to job created.
 // AC4: the JOB reference and "we'll call you shortly". Feature 3004 adds the one Caption
-// line under the reference: "Want to track this online? Set a password" -> /set-password.
+// line under the reference: "Set up your account to manage jobs and access your service history." -> /set-password.
 // The reference travels in the
 // query string from the form's own POST response; nothing here is fetched
 // by job reference, so there is no way to enumerate someone else's job.
@@ -29,10 +29,10 @@ export default async function RequestAJobConfirmedPage({
           </p>
         ) : null}
         <p className="mt-3 text-caption text-muted-text" data-testid="set-password-offer">
-          Want to track this online?{" "}
           <Link href="/set-password" className="underline underline-offset-2">
-            Set a password
-          </Link>
+            Set up your account
+          </Link>{" "}
+          to manage jobs and access your service history.
         </p>
       </MessageCard>
     </Container>
