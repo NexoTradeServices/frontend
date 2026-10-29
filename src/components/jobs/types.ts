@@ -189,6 +189,8 @@ export interface JobDetail {
     given: { name: string | null; phone: string | null; businessName: string | null };
     /** Feature 3010: the phone or the business name differs (the name never counts). */
     newDetails: boolean;
+    /** Feature 7001: a hard bounce has listed her current email; "Change email" fixes it. */
+    emailBouncing: boolean;
   };
   /** Feature 4010: worked out from her history on every read. */
   customerRating: CustomerRating;

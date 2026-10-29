@@ -15,6 +15,9 @@
 //      save and come back on reload; clearing the business name hides and clears them
 // 6015 AC13 the Invoice card names the business, Attn and ABN when the invoice froze one, and
 //      reads Total / Amount due (the GST rows are proven at the backend and in refunds.spec.ts)
+// 7001 AC7, AC8 the Customer card: a listed-bounced email shows the Bouncing tag; Change email refuses a
+//      non-email, her own email and another customer's (naming their code) under the field; a good one closes
+//      the dialog, shows the new address, drops the tag and shows the Toast
 // 3002 AC9 the queue tags a near-miss job "No direct coverage - n km" and an out-of-reach one "Out of reach -
 //      n km" under the suburb, none on a covered job; table at desktop width, cards on a phone
 // 3010 AC2, AC4, AC6 the Customer card on a returning customer's job: the tag, the phone and business
@@ -1000,4 +1003,53 @@ test("4004 AC5: a dispatched job shows no Edit", async ({ page, request }) => {
   await page.goto(`/ops/jobs/${job.reference}`);
   await expect(page.getByRole("heading", { name: job.reference, exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
+});
+
+test("7001 AC7, AC8: Bouncing tag on a listed email; Change email refuses under the field, then changes it", async ({ page, request }) => {
+  const reference = await postEnquiry(request, "bn1", "E2E Bounce");
+  const other = await postEnquiry(request, "bn2", "E2E Other");
+  // The other customer's email, read off the page as Mike (it is the one Change email must refuse).
+  await page.goto(`/ops/jobs/${other}`);
+  await login(page, "mike@idelta.com.au");
+  const otherCard = page.locator("section").filter({ has: page.getByRole("heading", { name: "Customer", exact: false }) }).filter({ hasText: "Email" }).first();
+  await expect(otherCard.getByText(/^e2e-4001-bn2-\d+@idelta\.com\.au$/)).toBeVisible({ timeout: 15_000 });
+  const heldEmail = (await otherCard.getByText(/^e2e-4001-bn2-\d+@idelta\.com\.au$/).textContent()) ?? "";
+
+  const hook = await page.request.post(`${apiUrl}/api/test-data/jobs/${reference}/email-bounce`);
+  expect(hook.status()).toBe(200);
+
+  await page.goto(`/ops/jobs/${reference}`);
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: "Customer", exact: false }) }).filter({ hasText: "Email" }).first();
+  await expect(card.getByTestId("email-bouncing-tag")).toHaveText("Bouncing", { timeout: 15_000 });
+
+  await card.getByRole("button", { name: "Change email" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog.getByRole("heading", { name: "Change E2E's email" })).toBeVisible();
+  await expect(dialog.getByText("Use the address E2E has just given you. E2E's emails go there from now on.")).toBeVisible();
+  await expect(dialog.getByLabel("Email")).toHaveValue("");
+
+  // A non-email: refused under the field.
+  await dialog.getByLabel("Email").fill("not-an-email");
+  await dialog.getByRole("button", { name: "Change email" }).click();
+  await expect(dialog.getByText("That does not look like an email address.")).toBeVisible();
+
+  // Her own email: refused by the server, under the field.
+  const ownEmail = (await card.getByText(/^e2e-4001-bn1-\d+@idelta\.com\.au$/).textContent()) ?? "";
+  await dialog.getByLabel("Email").fill(ownEmail);
+  await dialog.getByRole("button", { name: "Change email" }).click();
+  await expect(dialog.getByText("That is already E2E's email.")).toBeVisible();
+
+  // Another customer's email: refused naming their code.
+  await dialog.getByLabel("Email").fill(heldEmail);
+  await dialog.getByRole("button", { name: "Change email" }).click();
+  await expect(dialog.getByText(/^Another customer, CUS-\d+, already uses this email\.$/)).toBeVisible();
+
+  // A good one.
+  const fresh = `e2e-7001-new-${String(Date.now())}@idelta.com.au`;
+  await dialog.getByLabel("Email").fill(fresh);
+  await dialog.getByRole("button", { name: "Change email" }).click();
+  await expect(page.getByText("Email changed")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await expect(card.getByText(fresh)).toBeVisible();
+  await expect(card.getByTestId("email-bouncing-tag")).toHaveCount(0);
 });

@@ -1112,6 +1112,11 @@ function CustomerCard({ job, onUpdated }: { job: JobDetail; onUpdated: (next: Jo
   const { given } = customer;
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string>();
+  // Feature 7001: Change email -- a Dialog with one Field; its errors sit under the field.
+  const [changingEmail, setChangingEmail] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [newEmailError, setNewEmailError] = useState<string>();
+  const [savingEmail, setSavingEmail] = useState(false);
 
   // Feature 3010: copy what she gave onto her record for every later job (after confirming on the call).
   async function updateCustomer() {
@@ -1132,6 +1137,41 @@ function CustomerCard({ job, onUpdated }: { job: JobDetail; onUpdated: (next: Jo
       setUpdateError("The customer was not updated. Please try again.");
     } finally {
       setUpdating(false);
+    }
+  }
+
+  function closeEmailDialog() {
+    setChangingEmail(false);
+    setNewEmail("");
+    setNewEmailError(undefined);
+  }
+
+  async function changeEmail() {
+    if (!EMAIL_PATTERN.test(newEmail.trim())) {
+      setNewEmailError("That does not look like an email address.");
+      return;
+    }
+    setSavingEmail(true);
+    setNewEmailError(undefined);
+    try {
+      const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(job.reference)}/customer/email`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: newEmail }),
+      });
+      if (res.status === 200) {
+        const next = (await res.json()) as JobDetail;
+        closeEmailDialog();
+        onUpdated(next, "Email changed");
+      } else {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setNewEmailError(body.error ?? "The email was not changed. Please try again.");
+      }
+    } catch {
+      setNewEmailError("The email was not changed. Please try again.");
+    } finally {
+      setSavingEmail(false);
     }
   }
 
@@ -1175,8 +1215,46 @@ function CustomerCard({ job, onUpdated }: { job: JobDetail; onUpdated: (next: Jo
         ) : null}
         <Fact label="Email">
           <span className="break-all">{customer.email}</span>
+          {customer.emailBouncing ? (
+            <span className="ml-2 align-middle">
+              <Tag tone="warning" testId="email-bouncing-tag">
+                Bouncing
+              </Tag>
+            </span>
+          ) : null}
+          <span className="mt-1 block">
+            <button type="button" className={outlinedButton} onClick={() => setChangingEmail(true)}>
+              Change email
+            </button>
+          </span>
         </Fact>
       </div>
+      <ConfirmDialog
+        open={changingEmail}
+        title={`Change ${firstNameOf(customer.name)}'s email`}
+        confirmLabel="Change email"
+        loading={savingEmail}
+        loadingLabel="Changing..."
+        onConfirm={() => void changeEmail()}
+        onCancel={closeEmailDialog}
+        fields={
+          <Field
+            id="customer-new-email"
+            label="Email"
+            type="email"
+            inputMode="email"
+            autoComplete="off"
+            value={newEmail}
+            error={newEmailError}
+            onChange={(event) => {
+              setNewEmail(event.target.value);
+              setNewEmailError(undefined);
+            }}
+          />
+        }
+      >
+        Use the address {firstNameOf(customer.name)} has just given you. {firstNameOf(customer.name)}&apos;s emails go there from now on.
+      </ConfirmDialog>
       {customer.newDetails ? (
         <div className="mt-4">
           <button
