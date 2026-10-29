@@ -11,11 +11,12 @@ export function GateCard({ children }: { children: ReactNode }) {
   return <div className="w-full rounded-card border border-hairline bg-surface p-4 md:p-5">{children}</div>;
 }
 
-export function GateCardTitle({ title, subtitle }: { title: string; subtitle: string }) {
+export function GateCardTitle({ title, subtitle, next }: { title: string; subtitle: string; next?: string }) {
   return (
     <>
       <h1 className="mb-0.5 font-heading text-page-title font-extrabold text-ink">{title}</h1>
-      <p className="mb-[18px] text-caption text-muted-text">{subtitle}</p>
+      <p className={`${next === undefined ? "mb-[18px]" : "mb-0.5"} text-caption text-muted-text`}>{subtitle}</p>
+      {next === undefined ? null : <p className="mb-[18px] text-caption text-muted-text">{next}</p>}
     </>
   );
 }
