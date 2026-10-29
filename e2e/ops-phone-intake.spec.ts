@@ -100,8 +100,10 @@ test("UAT: the billing address, site tick and site contact are optional; a conta
   });
   await page.goto("/ops/jobs/new");
   await login(page, "mike@idelta.com.au");
-  await expect(page.getByLabel("Billing address")).toBeVisible();
-  await expect(page.getByLabel("Job site address")).toBeVisible();
+  await expect(page.getByLabel("Billing address", { exact: true })).toBeVisible();
+  // The site tick starts on (the site is the billing address); un-ticked, the site's own box shows.
+  await page.getByRole("checkbox", { name: /same as/ }).uncheck();
+  await expect(page.getByLabel("Job site address", { exact: true })).toBeVisible();
   await page.getByLabel("Contact name").fill("Lena Park");
   await page.getByRole("button", { name: "Create job" }).click();
   await expect(page.getByText("Required.")).toBeVisible();
@@ -129,7 +131,9 @@ test("AC8: no photos, marketing ticks or reCAPTCHA on the page", async ({ page }
   await expect(page.getByRole("heading", { name: "New phone job", level: 1 })).toBeVisible();
   await expect(page.getByText("Photos", { exact: true })).toHaveCount(0);
   await expect(page.getByText(/offers and updates/)).toHaveCount(0);
-  await expect(page.locator("input[type=checkbox]")).toHaveCount(0);
+  // The one tick is the job site "same as billing" -- no marketing or consent ticks.
+  await expect(page.locator("input[type=checkbox]")).toHaveCount(1);
+  await expect(page.getByRole("checkbox", { name: /same as/ })).toBeVisible();
   await expect(page.locator("script[src*='recaptcha']")).toHaveCount(0);
 });
 
