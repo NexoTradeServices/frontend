@@ -43,10 +43,13 @@ function Card({
   aside,
   tag,
   subtitle,
+  action,
   children,
 }: {
   title: string;
   aside?: string;
+  /** A control at the right end of the title row (Feature 4004: the request card's Edit). */
+  action?: ReactNode;
   /** Feature 3010: a Tag beside the title. */
   tag?: ReactNode;
   /** Shown on its own line under the title, instead of inline beside it. */
@@ -55,11 +58,14 @@ function Card({
 }) {
   return (
     <section className="rounded-card border border-hairline bg-surface p-5">
-      <h2 className="font-heading text-base font-extrabold text-ink">
-        {title}
-        {aside ? <small className="ml-1.5 font-body text-xs font-normal text-muted-text">{aside}</small> : null}
-        {tag ? <span className="ml-2 align-middle">{tag}</span> : null}
-      </h2>
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="font-heading text-base font-extrabold text-ink">
+          {title}
+          {aside ? <small className="ml-1.5 font-body text-xs font-normal text-muted-text">{aside}</small> : null}
+          {tag ? <span className="ml-2 align-middle">{tag}</span> : null}
+        </h2>
+        {action}
+      </div>
       {subtitle ? <p className="mt-0.5 text-xs text-muted-text">{subtitle}</p> : null}
       <div className="mt-3">{children}</div>
     </section>
@@ -297,18 +303,34 @@ function RequestEditCard({
 function RequestCard({
   job,
   editing,
+  onEdit,
   onCancel,
   onSaved,
 }: {
   job: JobDetail;
   editing: boolean;
+  onEdit: () => void;
   onCancel: () => void;
   onSaved: (next: JobDetail, message: string) => void;
 }) {
-  // Feature 4004: Edit turns this card into its form in place, like the Addresses card.
+  // Feature 4004: Edit turns this card into its form in place, like the Addresses card. The button sits
+  // on the card it edits (owner's call at UAT), for `new` jobs only.
   if (editing && job.status === "new") return <RequestEditCard job={job} onCancel={onCancel} onSaved={onSaved} />;
   return (
-    <Card title="The request">
+    <Card
+      title="The request"
+      action={
+        job.status === "new" ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="min-h-11 rounded-button border border-hairline bg-surface px-3.5 text-small font-bold text-ink"
+          >
+            Edit
+          </button>
+        ) : undefined
+      }
+    >
       <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-x-4.5 gap-y-3">
         <Fact label="Trade">{job.trade}</Fact>
         <Fact label="Suburb">
@@ -392,23 +414,11 @@ const ACTION_PLACEHOLDERS: { label: string; feature: string; statuses: JobDetail
   { label: "On hold", feature: "5002", statuses: ["scheduled", "in_progress"] },
 ];
 
-function ActionPlaceholders({ job, onEdit, editing }: { job: JobDetail; onEdit: () => void; editing: boolean }) {
+function ActionPlaceholders({ job }: { job: JobDetail }) {
   const shown = ACTION_PLACEHOLDERS.filter((action) => action.statuses.includes(job.status));
-  // Feature 4004: Edit is a real Outlined button for `new` jobs only.
-  const canEdit = job.status === "new";
-  if (shown.length === 0 && !canEdit) return null;
+  if (shown.length === 0) return null;
   return (
     <div className="mt-3.5 flex flex-wrap gap-2 border-t border-hairline pt-3" data-testid="action-placeholders">
-      {canEdit ? (
-        <button
-          type="button"
-          disabled={editing}
-          onClick={onEdit}
-          className="min-h-11 rounded-button border border-hairline bg-surface px-3.5 text-small font-bold text-ink disabled:opacity-60"
-        >
-          Edit
-        </button>
-      ) : null}
       {shown.map((action) => (
         <button
           key={action.label}
@@ -802,13 +812,9 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
 function ContractorCard({
   job,
   onChanged,
-  onEdit,
-  editing,
 }: {
   job: JobDetail;
   onChanged: (next: JobDetail, message: string) => void;
-  onEdit: () => void;
-  editing: boolean;
 }) {
   return (
     <Card title="Contractor">
@@ -853,7 +859,7 @@ function ContractorCard({
       )}
       <EarlierBookings bookings={job.earlierBookings} />
       <JobActions job={job} onChanged={onChanged} />
-      <ActionPlaceholders job={job} onEdit={onEdit} editing={editing} />
+      <ActionPlaceholders job={job} />
     </Card>
   );
 }
@@ -2440,6 +2446,7 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
           <RequestCard
             job={job}
             editing={editing}
+            onEdit={() => setEditing(true)}
             onCancel={() => setEditing(false)}
             onSaved={(next, message) => {
               setJob(next);
@@ -2477,8 +2484,6 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
         <div className="order-4 min-w-0 xl:order-none xl:col-start-1 xl:row-start-2">
           <ContractorCard
             job={job}
-            editing={editing}
-            onEdit={() => setEditing(true)}
             onChanged={(next, message) => {
               setJob(next);
               showToast(message);
