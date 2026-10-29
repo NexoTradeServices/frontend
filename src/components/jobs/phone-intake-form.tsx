@@ -373,7 +373,7 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
           <LockedField
             label="Suburb"
             value={`${effectiveSite.suburb} ${effectiveSite.postcode}`}
-            helper="Follows the job site address"
+            helper="Comes from the job site address. To change it, change the address."
           />
         ) : (
           <PlacesField

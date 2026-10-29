@@ -225,7 +225,7 @@ function RequestEditCard({
         </p>
       ) : null}
       {siteLocked ? (
-        <LockedField label="Suburb" value={`${job.suburb} ${job.postcode}`} helper="Follows the job site address" />
+        <LockedField label="Suburb" value={`${job.suburb} ${job.postcode}`} helper="Comes from the job site address. To change it, change the address." />
       ) : (
         <PlacesField
           id="request-suburb"

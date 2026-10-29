@@ -987,7 +987,7 @@ test("4004 AC4: with a site address the suburb is locked and says it follows the
   expect(saved.status()).toBe(200);
   await page.reload();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
-  await expect(page.getByText("Follows the job site address")).toBeVisible();
+  await expect(page.getByText("Comes from the job site address. To change it, change the address.")).toBeVisible();
   await expect(page.locator("#request-suburb")).toHaveCount(0);
   const card = page.locator("section").filter({ has: page.getByRole("heading", { name: "The request" }) });
   await card.getByRole("button", { name: "Cancel", exact: true }).click();
