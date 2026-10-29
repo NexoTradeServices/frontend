@@ -1,19 +1,7 @@
-// Payments -- Feature 6010, customer portal. Portal shell, Wide, List page: payments and refunds, newest first.
-import { Container } from "@/components/frame/container";
-import { PageHeader } from "@/components/ui/page-header";
-import { LoadFailed } from "@/components/ui/load-failed";
-import { PaymentsList, type PaymentRow } from "@/components/account/lists";
-import { accountGet } from "@/lib/account-api";
+// Payments -- Feature 6010. No longer a page of its own (6010 UAT): what she paid is the Paid tag on Invoices and
+// what was refunded is the Refunds section under the invoice list. An old link lands on Invoices.
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Your payments" };
-
-export default async function AccountPaymentsPage() {
-  const { data } = await accountGet<{ rows: PaymentRow[] }>("/payments");
-  if (data === null) return <LoadFailed />;
-  return (
-    <Container width="wide">
-      <PageHeader title="Payments" subtitle="What you have paid, and anything refunded." />
-      <PaymentsList rows={data.rows} />
-    </Container>
-  );
+export default function AccountPaymentsPage(): never {
+  redirect("/account/invoices");
 }

@@ -1,6 +1,6 @@
 // Job detail -- Feature 6010, customer portal. Portal shell, Wide, Record page.
-// Breadcrumb "< Jobs", the reference as title, the status tag; cards: The job, What you asked for,
-// Invoices, Your review (absent before the job is done; "No review yet." once done and unrated).
+// Breadcrumb "< Jobs", the reference as title, the status tag; cards: Job details (the facts, then the description and
+// Additional questions), Invoices, Your review (absent before the job is done; "No review yet." once done and unrated).
 import Link from "next/link";
 import { Container } from "@/components/frame/container";
 import { PageHeader } from "@/components/ui/page-header";
@@ -41,32 +41,40 @@ export default async function AccountJobPage({ params }: { params: Promise<{ ref
     <Container width="wide">
       <PageHeader breadcrumb={{ label: "Jobs", href: "/account/jobs" }} title={job.reference} tags={<JobStatusTag word={job.status} />} />
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        <Card title="The job">
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-x-4.5 gap-y-3">
-            <Fact label="Trade">{job.trade}</Fact>
-            <Fact label="Suburb">
-              {job.suburb} {job.postcode}
-            </Fact>
-            <Fact label="When">
-              <span className="tabular-nums">{job.when}</span>
-            </Fact>
-            {job.tradie !== null ? <Fact label="Tradie">{job.tradie}</Fact> : null}
-            {job.jobSite !== null ? <Fact label="Job site">{job.jobSite}</Fact> : null}
-          </div>
-        </Card>
-        <Card title="What you asked for">
-          <p className="max-w-[62ch] whitespace-pre-wrap text-secondary-text">{job.description ?? "-"}</p>
-          {job.answers.length > 0 ? (
-            <div className="mt-3">
-              <span className="block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase">Additional questions</span>
-              <ul className="list-disc pl-4.5 text-secondary-text">
-                {job.answers.map((answer) => (
-                  <li key={answer}>{answer}</li>
-                ))}
-              </ul>
+        <div>
+          <Card title="Job details">
+            <div className="grid grid-cols-1 gap-x-4.5 gap-y-3 sm:grid-cols-3">
+              <Fact label="Trade">{job.trade}</Fact>
+              <Fact label="Suburb">
+                {job.suburb} {job.postcode}
+              </Fact>
+              <Fact label="When">
+                <span className="tabular-nums">{job.when}</span>
+              </Fact>
+              {job.tradie !== null ? <Fact label="Tradie">{job.tradie}</Fact> : null}
+              {job.jobSite !== null ? (
+                <div className="sm:col-span-2">
+                  <Fact label="Job site">{job.jobSite}</Fact>
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </Card>
+            <div className="mt-4 border-t border-hairline pt-4">
+              <Fact label="Description" wide>
+                <p className="max-w-[62ch] whitespace-pre-wrap font-normal text-secondary-text">{job.description ?? "-"}</p>
+              </Fact>
+              {job.answers.length > 0 ? (
+                <div className="mt-3">
+                  <span className="block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase">Additional questions</span>
+                  <ul className="list-disc pl-4.5 text-secondary-text">
+                    {job.answers.map((answer) => (
+                      <li key={answer}>{answer}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          </Card>
+        </div>
         <Card title="Invoices">
           {job.invoices.length > 0 ? (
             <ul className="flex flex-col gap-2">

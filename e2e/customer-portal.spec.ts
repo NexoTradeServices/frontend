@@ -2,11 +2,11 @@
 //
 // One customer's whole visit, from a login made the 3004 way on a throwaway customer who has a completed job
 // of Bob's, its invoice (a fake pay link), and then its payment:
-//   AC1  she lands on Jobs and the menu has Jobs, Invoices, Payments, Profile
+//   AC1  she lands on Jobs and the menu has Jobs, Invoices, Profile (refunds sit under Invoices)
 //   AC2  the job is listed with her wording of status (Done)
 //   AC3  the job's detail: what she asked for, Bob, the invoice as a link, "No review yet."
 //   AC4  Invoices: the open invoice, its lines and total, Pay now to the pay link, Download PDF gives a PDF;
-//        once paid there is no Pay now and Payments lists the payment
+//        once paid there is no Pay now and Invoices shows it Paid; /account/payments leads to Invoices
 //   AC7  Profile: her details, the call-us line and the change-password link
 //   AC8  another customer's job (JOB-1042, Sarah's) reads "We can't find that"
 //   and at 390px the lists are Record cards
@@ -36,7 +36,7 @@ test("6010: a customer's portal -- Jobs, a job, Invoices and the PDF, Payments, 
   // AC1: she lands on Jobs; the four menu entries.
   await expect(page).toHaveURL(/\/account\/jobs$/, { timeout: 20_000 });
   const bar = page.getByRole("navigation", { name: "Sidebar" });
-  await expect(bar.getByRole("link")).toHaveText(["Jobs", "Invoices", "Payments", "Profile"]);
+  await expect(bar.getByRole("link")).toHaveText(["Jobs", "Invoices", "Profile"]);
 
   // AC2: the job is listed, Done.
   const row = page.getByRole("row").filter({ hasText: job.reference });
@@ -73,8 +73,11 @@ test("6010: a customer's portal -- Jobs, a job, Invoices and the PDF, Payments, 
   await page.goto(`/account/invoices/${invoiceRef}`);
   await expect(page.getByRole("link", { name: "Pay now" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Download PDF" })).toBeVisible();
+  await page.goto("/account/invoices");
+  await expect(page.getByRole("row").filter({ hasText: invoiceRef }).getByText("Paid", { exact: true })).toBeVisible();
+  // The old Payments address leads to Invoices (there is no Payments menu entry).
   await page.goto("/account/payments");
-  await expect(page.getByRole("row").filter({ hasText: `Payment for ${invoiceRef}` })).toBeVisible();
+  await expect(page).toHaveURL(/\/account\/invoices$/);
 
   // AC7: the profile.
   await page.goto("/account/profile");

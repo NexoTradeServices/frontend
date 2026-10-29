@@ -17,7 +17,7 @@ export const labelClass = "block text-field-label font-bold tracking-[0.08em] te
 
 export function Card({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-card border border-hairline bg-surface p-5">
+    <section className="relative rounded-card border border-hairline bg-surface p-5">
       <h2 className="font-heading text-base font-extrabold text-ink">
         {title}
         {aside ? <small className="ml-1.5 font-body text-xs font-normal text-muted-text">{aside}</small> : null}

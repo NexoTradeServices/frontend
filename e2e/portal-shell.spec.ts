@@ -223,8 +223,8 @@ test("1018 AC3 (6010): a customer login gets the same shell with its four menu e
 
   const bar = sidebar(page);
   await expect(bar).toBeVisible();
-  // 6010: Jobs, Invoices, Payments, Profile, Jobs current.
-  await expect(bar.getByRole("link")).toHaveText(["Jobs", "Invoices", "Payments", "Profile"]);
+  // 6010: Jobs, Invoices, Profile (refunds sit under Invoices), Jobs current.
+  await expect(bar.getByRole("link")).toHaveText(["Jobs", "Invoices", "Profile"]);
   await expect(bar.getByRole("link", { name: "Jobs", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(bar.getByTestId("menu-person")).toHaveText(customer.name);
   await expect(bar.getByRole("button", { name: "Log out" })).toBeVisible();

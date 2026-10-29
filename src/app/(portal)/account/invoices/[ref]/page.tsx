@@ -1,6 +1,6 @@
 // Invoice detail -- Feature 6010, customer portal. Portal shell, Wide, Record page.
-// Breadcrumb "< Invoices", Facts (To, Date, Due), the Line items table with its GST rule, Primary "Pay now"
-// while Open, Outlined "Download PDF"; a void invoice that was replaced carries a note with the link.
+// Breadcrumb "< Invoices", then the invoice as the PDF reads it (who issued it, Bill to and the facts, the lines,
+// the totals with Amount due, the GST rule, the questions line), Primary "Pay now" while Open, Outlined "Download PDF"; a void invoice that was replaced carries a note with the link.
 import Link from "next/link";
 import { Container } from "@/components/frame/container";
 import { PageHeader } from "@/components/ui/page-header";
@@ -15,7 +15,12 @@ interface InvoiceDto {
   reference: string;
   jobReference: string;
   status: string;
-  billedTo: { name: string; businessName: string | null; abn: string | null; address: string | null };
+  title: string;
+  seller: { name: string; abn: string | null; address: string | null };
+  accountsPhone: string;
+  callbackOn: string | null;
+  amountDue: number;
+  billedTo: { name: string; isBusiness: boolean; businessName: string | null; abn: string | null; address: string | null };
   issued: string;
   due: string;
   lines: { kind: string; description: string; qty: number; unitPrice: number; lineTotal: number }[];
@@ -42,7 +47,8 @@ export default async function AccountInvoicePage({ params }: { params: Promise<{
     );
   }
   if (invoice === null) return <LoadFailed />;
-  const billedTo = invoice.billedTo.businessName ?? invoice.billedTo.name;
+  const billed = invoice.billedTo;
+  const unpriced = (line: InvoiceDto["lines"][number]) => line.kind === "labour" && line.unitPrice === 0;
 
   return (
     <Container width="wide">
@@ -59,18 +65,52 @@ export default async function AccountInvoicePage({ params }: { params: Promise<{
         </div>
       ) : null}
       <Card title="Invoice" aside={`for ${invoice.jobReference}`}>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-x-4.5 gap-y-3">
-          <Fact label="To">
-            {billedTo}
-            {invoice.billedTo.businessName !== null ? <span className="block text-xs font-normal text-muted-text">Attn {invoice.billedTo.name}</span> : null}
-          </Fact>
-          <Fact label="Date">
-            <span className="tabular-nums">{invoice.issued}</span>
-          </Fact>
-          <Fact label="Due">
-            <span className="tabular-nums">{invoice.due}</span>
-          </Fact>
+        {invoice.status === "Void" ? (
+          <span
+            aria-hidden="true"
+            data-testid="void-stamp"
+            className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center overflow-hidden"
+          >
+            <span className="-rotate-[35deg] font-heading text-[clamp(5rem,18vw,10rem)] font-black text-destructive/40 select-none">VOID</span>
+          </span>
+        ) : null}
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 border-b border-hairline pb-4">
+          <div>
+            <p className="font-heading text-lg font-extrabold text-ink">{invoice.seller.name}</p>
+            {invoice.seller.abn !== null ? <p className="text-small text-muted-text">ABN {invoice.seller.abn}</p> : null}
+            {invoice.seller.address !== null ? <p className="text-small text-muted-text">{invoice.seller.address}</p> : null}
+          </div>
+          <p className="font-heading text-base font-extrabold tracking-[0.04em] text-ink">{invoice.title}</p>
         </div>
+
+        <div className="mt-4 grid gap-x-4.5 gap-y-4 sm:grid-cols-2">
+          <Fact label="Bill to">
+            {billed.isBusiness ? (
+              <>
+                {billed.businessName}
+                <span className="block font-normal text-secondary-text">Attn: {billed.name}</span>
+                {billed.abn !== null ? <span className="block text-small font-normal text-secondary-text">ABN {billed.abn}</span> : null}
+              </>
+            ) : (
+              billed.name
+            )}
+            {billed.address !== null ? <span className="block text-small font-normal text-muted-text">{billed.address}</span> : null}
+          </Fact>
+          <div className="grid grid-cols-2 gap-x-4.5 gap-y-3">
+            <Fact label="Invoice No">{invoice.reference}</Fact>
+            <Fact label="Job">{invoice.jobReference}</Fact>
+            <Fact label="Date">
+              <span className="tabular-nums">{invoice.issued}</span>
+            </Fact>
+            <Fact label="Due">
+              <span className="tabular-nums">{invoice.due}</span>
+            </Fact>
+          </div>
+        </div>
+
+        {invoice.callbackOn !== null && invoice.total === 0 ? (
+          <p className="mt-4 font-bold text-ink">Follow-up visit for {invoice.callbackOn} - no charge</p>
+        ) : null}
 
         <div className="mt-4 overflow-x-auto rounded-card border border-hairline">
           <table className="w-full border-collapse text-sm" data-testid="invoice-lines">
@@ -78,7 +118,7 @@ export default async function AccountInvoicePage({ params }: { params: Promise<{
               <tr className="border-b border-hairline">
                 <th className={th}>Description</th>
                 <th className={`${th} text-right`}>Qty</th>
-                <th className={`${th} text-right`}>Unit price</th>
+                <th className={`${th} text-right`}>Rate</th>
                 <th className={`${th} text-right`}>Amount</th>
               </tr>
             </thead>
@@ -87,7 +127,7 @@ export default async function AccountInvoicePage({ params }: { params: Promise<{
                 <tr key={`${line.description}-${String(index)}`} className="border-b border-hairline last:border-b-0">
                   <td className={td}>{line.description}</td>
                   <td className={`${td} text-right tabular-nums`}>{line.qty}</td>
-                  <td className={`${td} text-right tabular-nums`}>{formatDollars(line.unitPrice)}</td>
+                  <td className={`${td} text-right tabular-nums`}>{unpriced(line) ? "" : formatDollars(line.unitPrice)}</td>
                   <td className={`${td} text-right tabular-nums`}>{formatDollars(line.lineTotal)}</td>
                 </tr>
               ))}
@@ -95,6 +135,12 @@ export default async function AccountInvoicePage({ params }: { params: Promise<{
           </table>
         </div>
         <div className="mt-3 ml-auto grid max-w-xs gap-1 text-small text-secondary-text">
+          <div className="flex justify-between">
+            <span>{invoice.gstApplied ? "Total (includes GST)" : "Total"}</span>
+            <span className="tabular-nums" data-testid="invoice-total">
+              {formatDollars(invoice.total)}
+            </span>
+          </div>
           {invoice.gstApplied ? (
             <div className="flex justify-between">
               <span>GST included</span>
@@ -102,12 +148,14 @@ export default async function AccountInvoicePage({ params }: { params: Promise<{
             </div>
           ) : null}
           <div className="flex justify-between border-t-2 border-ink pt-1.5 font-heading text-base font-extrabold text-ink">
-            <span>Total</span>
-            <span className="tabular-nums" data-testid="invoice-total">
-              {formatDollars(invoice.total)}
+            <span>Amount due</span>
+            <span className="tabular-nums" data-testid="invoice-amount-due">
+              {formatDollars(invoice.amountDue)}
             </span>
           </div>
         </div>
+        {!invoice.gstApplied ? <p className="mt-3 text-small text-muted-text">GST: Not applicable - this business is not registered for GST.</p> : null}
+        <p className="mt-3 text-small text-muted-text">Questions about this bill? Call {invoice.accountsPhone}</p>
 
         <div className="mt-5 flex flex-wrap items-center gap-2.5">
           {invoice.payLink !== null ? (
