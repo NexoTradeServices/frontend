@@ -22,11 +22,38 @@ services:
       - .:/app
       - ts-frontend-node-modules:/app/node_modules
       - ts-frontend-next:/app/.next
+    # Ceilings, not reservations: normal work never reaches them. They exist so
+    # one runaway process (a dev server spinning on a bad cache took the whole
+    # machine down once) hits its cap and the host stays alive. The machine has
+    # 8 cores and 24 GB; these leave room for the OS, Postgres and the browser
+    # even with every container at its cap.
+    cpus: 5
+    mem_limit: 10g
     depends_on:
       - ts-backend
     networks:
       - edge
 
+  # The CI-mirror build (`next build`), in its own container with its OWN .next
+  # volume. The dev server and the build must never share .next: the build's
+  # output poisons the dev server's cache and sends it into a CPU spin. Not
+  # started by `up` (profile); run it on demand, with the dev server left alone:
+  #   docker compose run --rm ts-frontend-build
+  ts-frontend-build:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    init: true
+    profiles: ["tools"]
+    command: ["npm", "run", "build"]
+    volumes:
+      - .:/app
+      - ts-frontend-node-modules:/app/node_modules
+      - ts-frontend-next-build:/app/.next
+    cpus: 4
+    mem_limit: 6g
+
 volumes:
   ts-frontend-node-modules:
   ts-frontend-next:
+  ts-frontend-next-build:
