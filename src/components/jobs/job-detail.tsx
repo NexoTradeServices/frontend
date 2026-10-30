@@ -15,6 +15,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { Pencil } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PlacesField, fullAddress, type PickedAddress } from "@/components/ui/places-field";
 import { LockedField } from "@/components/ui/locked-field";
@@ -1222,11 +1223,14 @@ function CustomerCard({ job, onUpdated }: { job: JobDetail; onUpdated: (next: Jo
               </Tag>
             </span>
           ) : null}
-          <span className="mt-1 block">
-            <button type="button" className={outlinedButton} onClick={() => setChangingEmail(true)}>
-              Change email
-            </button>
-          </span>
+          <button
+            type="button"
+            aria-label="Change email"
+            onClick={() => setChangingEmail(true)}
+            className="ml-1 inline-flex size-11 items-center justify-center rounded-button border border-hairline align-middle text-muted-text"
+          >
+            <Pencil size={16} aria-hidden="true" />
+          </button>
         </Fact>
       </div>
       <ConfirmDialog
