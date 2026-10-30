@@ -32,6 +32,7 @@ import { PHOTO_TOO_BIG, PHOTO_WRONG_TYPE } from "@/components/request-a-job/use-
 import { billedHoursOf, formatHours } from "@/lib/billed-hours";
 import { centsToDollarsText, dollarsTextToCents } from "@/lib/visit-format";
 import { formatDollars } from "@/components/request-a-job/money";
+import { OnMyWayButton, OnMyWaySent, ON_MY_WAY_FAILED, postOnMyWay } from "@/components/contractor-dashboard/on-my-way";
 import type { ApiError, ContractorJobDto, PaymentDto } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -42,6 +43,11 @@ const RECEIPT_UNAVAILABLE = "Photo upload isn't working right now - try again sh
 /** Bob's Payment card re-reads every 5 seconds while unpaid, for up to 30 minutes (Feature 6002). */
 const PAYMENT_POLL_MS = 5_000;
 const PAYMENT_POLL_TRIES = (30 * 60_000) / PAYMENT_POLL_MS;
+
+/** The customer's first name, as the message says it. */
+function firstNameOf(name: string): string {
+  return name.split(" ")[0] ?? name;
+}
 
 const labelClass = "block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase";
 const starClass = "after:ml-0.5 after:text-brand-destructive after:content-['*']";
@@ -331,7 +337,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
   const [errors, setErrors] = useState<Errors>({});
   const [banner, setBanner] = useState<string | undefined>();
   const [receiptMessages, setReceiptMessages] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState<"save" | "complete" | "onsite" | null>(null);
+  const [busy, setBusy] = useState<"save" | "complete" | "onsite" | "onmyway" | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [toastMessage, showToast] = useToast();
   const paymentRef = useRef<HTMLDivElement>(null);
@@ -510,13 +516,25 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
       }
       const next = (await res.json()) as ContractorJobDto;
       // Only the status moved: what he is typing stays as it is.
-      setJob((current) => ({ ...current, jobStatus: next.jobStatus, assignmentStatus: next.assignmentStatus, canOnSite: next.canOnSite }));
+      setJob((current) => ({ ...current, jobStatus: next.jobStatus, assignmentStatus: next.assignmentStatus, canOnSite: next.canOnSite, onMyWay: next.onMyWay }));
       router.refresh();
     } catch {
       setBanner("Couldn't mark you on site - try again.");
     } finally {
       setBusy(null);
     }
+  }
+
+  async function onMyWay() {
+    setBanner(undefined);
+    setBusy("onmyway");
+    const next = await postOnMyWay(job.reference);
+    setBusy(null);
+    if (next === undefined || next === null) {
+      setBanner(ON_MY_WAY_FAILED);
+      return;
+    }
+    setJob((current) => ({ ...current, onMyWay: next }));
   }
 
   function updatePart(index: number, changes: Partial<PartRow>) {
@@ -657,19 +675,32 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
         </div>
 
         <div className="order-2 flex min-w-0 flex-col gap-4 xl:col-start-1 xl:row-start-1">
-          {job.canOnSite && !frozen ? (
+          {(job.canOnSite || job.onMyWay !== null) && !frozen ? (
             <Card title="Arrival">
               <p className="mb-3 text-small text-secondary-text">
-                Tap when you get to the job. The office then sees it as in progress.
+                {job.onMyWay !== null && job.canOnSite
+                  ? `Tap On my way when you leave - ${firstNameOf(job.customerName)} gets a message. Tap I've arrived when you get there - the office sees it as in progress.`
+                  : job.onMyWay !== null
+                    ? `Tap On my way when you leave - ${firstNameOf(job.customerName)} gets a message.`
+                    : "Tap when you get to the job. The office then sees it as in progress."}
               </p>
-              <button
-                type="button"
-                onClick={() => void onSite()}
-                disabled={busy !== null}
-                className="min-h-[52px] w-full rounded-button border border-hairline bg-surface px-[18px] text-sm font-bold text-ink disabled:opacity-50 md:min-h-11 md:w-auto"
-              >
-                I&apos;ve arrived
-              </button>
+              <div className="flex flex-col items-stretch gap-3 md:items-start">
+                {job.onMyWay === null ? null : job.onMyWay.sent ? (
+                  <OnMyWaySent sentLabel={job.onMyWay.sentLabel} />
+                ) : (
+                  <OnMyWayButton busy={busy !== null} onTap={() => void onMyWay()} />
+                )}
+                {job.canOnSite ? (
+                  <button
+                    type="button"
+                    onClick={() => void onSite()}
+                    disabled={busy !== null}
+                    className="min-h-[52px] w-full rounded-button border border-hairline bg-surface px-[18px] text-sm font-bold text-ink disabled:opacity-50 md:min-h-11 md:w-auto"
+                  >
+                    I&apos;ve arrived
+                  </button>
+                ) : null}
+              </div>
             </Card>
           ) : null}
           <Card title="Time on site" aside={`Billed ${formatHours(billed)}h`}>

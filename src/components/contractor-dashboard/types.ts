@@ -4,6 +4,9 @@ import type { JobStatus } from "@/components/ui/status-tag";
 
 export type { JobStatus };
 
+/** Feature 5004: null (no visit booked today), or whether On my way has gone for today's visit. */
+export type OnMyWayDto = null | { sent: false } | { sent: true; sentLabel: string };
+
 export interface JobCardDto {
   reference: string;
   jobStatus: JobStatus;
@@ -15,6 +18,8 @@ export interface JobCardDto {
   opens: boolean;
   /** Feature 6007: a completed job whose invoice is not yet paid -- "Completed - awaiting payment", opening at its Payment card. */
   awaitingPayment: boolean;
+  /** Feature 5004: the On my way button's state for this card; null draws the card as it always was. */
+  onMyWay: OnMyWayDto;
 }
 
 export type ReadinessPen = "own" | "mikes";

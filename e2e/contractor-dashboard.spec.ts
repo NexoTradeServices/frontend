@@ -24,6 +24,8 @@
 //      record page, already proven e2e there -- contractors.spec.ts AC6)
 // 5001 AC1 (UI) an accepted or in-progress card is a link to its job screen; the card still
 //      awaiting his answer is not
+// 5004 AC1 (UI) On my way sits under the card of a job booked today and nowhere else; AC4 the tap turns it
+//      into the sent line while the card's facts still open the job; a failed tap shows the error Banner
 // AC13 the contractor menu shows Dashboard, Rates, Service area and Settlements
 //      (built), the rest still dark
 //
@@ -143,6 +145,42 @@ test.describe(() => {
     // Feature 6003 built it.
     await expect(menu.getByRole("link", { name: "Payouts" })).toBeVisible();
     await expect(menu.getByRole("link", { name: "My details" })).toHaveCount(0);
+  });
+
+  test("5004 AC1, AC4: On my way sits under today's card only; the tap turns it into the sent line, and a failed tap says so", async ({ page, browser, request }) => {
+    const job = await acceptedJobForBob(browser, request, "omw-dash");
+    // A second accepted job left on its own booked day (a throwaway's slot is far off, never today).
+    const later = await acceptedJobForBob(browser, request, "omw-dash-later");
+    const moved = await request.post(`${apiUrl}/api/test-data/jobs/${job.reference}/visit-today`);
+    expect(moved.status()).toBe(200);
+
+    await page.goto("/contractor");
+    await login(page, "bob@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+    const card = page.getByTestId("job-card-with-on-my-way").filter({ hasText: job.reference });
+    await expect(card.getByRole("button", { name: "On my way" })).toBeVisible();
+    // A job booked for another day: its card is drawn as always, with no button.
+    await expect(page.getByRole("link", { name: new RegExp(later.reference) })).toBeVisible();
+    await expect(page.getByTestId("job-card-with-on-my-way").filter({ hasText: later.reference })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: new RegExp(later.reference) }).getByRole("button")).toHaveCount(0);
+
+    // A failed tap: the error Banner above the button, the button still there.
+    await page.route("**/api/contractor/jobs/*/on-my-way", (route) => route.fulfill({ status: 500, json: { error: "internal error" } }));
+    await card.getByRole("button", { name: "On my way" }).click();
+    await expect(card.getByRole("alert")).toHaveText("Couldn't send On my way - try again.");
+    await expect(card.getByRole("button", { name: "On my way" })).toBeEnabled();
+    await page.unroute("**/api/contractor/jobs/*/on-my-way");
+
+    // A real tap: the sent line takes the button's place; the facts still open the job.
+    await card.getByRole("button", { name: "On my way" }).click();
+    await expect(card.getByTestId("on-my-way-sent")).toHaveText(/^On my way sent at \d{1,2}:\d{2}(am|pm)$/);
+    await expect(card.getByRole("button", { name: "On my way" })).toHaveCount(0);
+    await expect(card.getByRole("alert")).toHaveCount(0);
+    await expect(card.getByRole("link", { name: new RegExp(job.reference) })).toHaveAttribute("href", `/contractor/jobs/${job.reference}`);
+
+    // It stays sent after a reload.
+    await page.reload();
+    await expect(page.getByTestId("job-card-with-on-my-way").filter({ hasText: job.reference }).getByTestId("on-my-way-sent")).toBeVisible();
   });
 
   test("6007 AC14: a completed job stays on Bob's dashboard as 'Completed - awaiting payment' until its invoice is paid, and opens at its Payment card", async ({ page, browser, request }) => {
