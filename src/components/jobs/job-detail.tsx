@@ -1227,7 +1227,7 @@ function CustomerCard({ job, onUpdated }: { job: JobDetail; onUpdated: (next: Jo
             type="button"
             aria-label="Change email"
             onClick={() => setChangingEmail(true)}
-            className="ml-1 inline-flex size-11 items-center justify-center rounded-button border border-hairline align-middle text-muted-text"
+            className="ml-1 inline-flex size-11 items-center justify-center rounded-button align-middle text-muted-text transition-colors duration-150 ease-out hover:text-brand-accent focus-visible:text-brand-accent"
           >
             <Pencil size={16} aria-hidden="true" />
           </button>
