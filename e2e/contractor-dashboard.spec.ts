@@ -149,6 +149,8 @@ test.describe(() => {
 
   test("5004 AC1, AC4: On my way sits under today's card only; the tap turns it into the sent line, and a failed tap says so", async ({ page, browser, request }) => {
     const job = await acceptedJobForBob(browser, request, "omw-dash");
+    // A second accepted job left on its own booked day (a throwaway's slot is far off, never today).
+    const later = await acceptedJobForBob(browser, request, "omw-dash-later");
     const moved = await request.post(`${apiUrl}/api/test-data/jobs/${job.reference}/visit-today`);
     expect(moved.status()).toBe(200);
 
@@ -157,9 +159,10 @@ test.describe(() => {
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
     const card = page.getByTestId("job-card-with-on-my-way").filter({ hasText: job.reference });
     await expect(card.getByRole("button", { name: "On my way" })).toBeVisible();
-    // Tom's JOB-1051 is booked for another day: no button, drawn as always.
-    await expect(page.getByTestId("job-card-with-on-my-way").filter({ hasText: "JOB-1051" })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: /JOB-1051/ }).getByRole("button")).toHaveCount(0);
+    // A job booked for another day: its card is drawn as always, with no button.
+    await expect(page.getByRole("link", { name: new RegExp(later.reference) })).toBeVisible();
+    await expect(page.getByTestId("job-card-with-on-my-way").filter({ hasText: later.reference })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: new RegExp(later.reference) }).getByRole("button")).toHaveCount(0);
 
     // A failed tap: the error Banner above the button, the button still there.
     await page.route("**/api/contractor/jobs/*/on-my-way", (route) => route.fulfill({ status: 500, json: { error: "internal error" } }));
