@@ -199,14 +199,14 @@ test("1018 AC2: at 1023px the Top bar carries the menu icon at the left with the
   await expect(drawer).toBeHidden();
 });
 
-test("1018 AC3: Bob gets the same shell with Dashboard, Payouts, Rates and Service area", async ({ page }) => {
+test("1018 AC3: Bob gets the same shell with Dashboard, Calendar, Availability, Payouts, Rates and Service area", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/contractor");
   await login(page, "bob@idelta.com.au");
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 
   const bar = sidebar(page);
-  await expect(bar.getByRole("link")).toHaveText(["Dashboard", "Payouts", "Rates", "Service area"]);
+  await expect(bar.getByRole("link")).toHaveText(["Dashboard", "Calendar", "Availability", "Payouts", "Rates", "Service area"]);
   await expect(bar.getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
   await expect(bar.getByTestId("menu-person")).toContainText("Bob");
   await expect(bar.getByRole("button", { name: "Log out" })).toBeVisible();

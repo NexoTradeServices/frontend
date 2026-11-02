@@ -234,7 +234,7 @@ test("6009 AC8: Bob's Reviews tab shows his average and count, the newest review
   await page.goto("/ops/contractors/CON-014");
   await login(page, "mike@idelta.com.au");
   // The third Record tab, after Details and Service area.
-  await expect(page.getByRole("tab")).toHaveText(["Details", "Service area", "Reviews"]);
+  await expect(page.getByRole("tab")).toHaveText(["Details", "Service area", "Calendar", "Availability", "Reviews"]);
   await page.getByRole("tab", { name: "Reviews" }).click();
   await expect(page).toHaveURL(/\/ops\/contractors\/CON-014\/reviews$/, { timeout: 30_000 });
   await expect(page.getByRole("tab", { name: "Reviews" })).toHaveAttribute("aria-selected", "true");

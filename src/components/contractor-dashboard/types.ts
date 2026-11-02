@@ -35,6 +35,10 @@ export interface ReadinessItemDto {
 export interface DashboardDto {
   ready: boolean;
   missing: ReadinessItemDto[];
+  /** Feature 2004: true until the first Availability save - blocks nothing */
+  setAvailability: boolean;
+  /** Feature 2004: the business widened its hours since he last saw a notice */
+  hoursNotice: { openingTime: string; closingTime: string } | null;
   jobs: JobCardDto[];
 }
 

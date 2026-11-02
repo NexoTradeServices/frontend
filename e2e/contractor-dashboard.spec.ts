@@ -133,7 +133,7 @@ test.describe(() => {
     await expect(page.getByText("$215.00")).toBeVisible(); // Air conditioning call-out
   });
 
-  test("AC13: the contractor menu shows Dashboard, Rates, Service area and Settlements; the rest still dark", async ({ page }) => {
+  test("AC13: the contractor menu shows Dashboard, Calendar, Availability, Rates, Service area and Settlements; the rest still dark", async ({ page }) => {
     await page.goto("/contractor");
     await login(page, "bob@idelta.com.au");
     await page.getByRole("button", { name: "Open menu" }).click();
@@ -141,7 +141,10 @@ test.describe(() => {
     await expect(menu.getByRole("link", { name: "Dashboard" })).toBeVisible();
     await expect(menu.getByRole("link", { name: "Rates" })).toBeVisible();
     await expect(menu.getByRole("link", { name: "Service area" })).toBeVisible();
-    await expect(menu.getByRole("link", { name: "Calendar" })).toHaveCount(0);
+    // Feature 2004 built Calendar and Availability (Availability after Calendar, the Portal menus order).
+    await expect(menu.getByRole("link", { name: "Calendar" })).toBeVisible();
+    await expect(menu.getByRole("link", { name: "Availability" })).toBeVisible();
+    await expect(menu.getByRole("link")).toHaveText(["Dashboard", "Calendar", "Availability", "Payouts", "Rates", "Service area"]);
     // Feature 6003 built it.
     await expect(menu.getByRole("link", { name: "Payouts" })).toBeVisible();
     await expect(menu.getByRole("link", { name: "My details" })).toHaveCount(0);

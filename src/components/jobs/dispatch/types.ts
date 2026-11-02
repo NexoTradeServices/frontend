@@ -37,6 +37,12 @@ export interface CandidateRow {
   distanceKm: number | null;
   pay: { calloutRate: number; standardRate: number };
   rating: Rating | null;
+  /** Feature 2004: a half hour of the hold is switched off in his Availability */
+  notAvailable: boolean;
+  /** Feature 2004: Not available is the only problem - "Change availability" is offered */
+  linkable: boolean;
+  /** Feature 2004: he has never saved his Availability */
+  availabilityNotSet: boolean;
 }
 
 export type ServiceLevel = "normal" | "weekend" | "emergency";

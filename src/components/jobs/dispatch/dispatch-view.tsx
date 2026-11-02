@@ -13,6 +13,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fullAddress } from "@/components/ui/places-field";
+import { ChangeAvailabilityDialog } from "./change-availability-dialog";
 import { CalendarDayView, timeLabelFor, type DayBlock } from "@/components/ui/calendar-day-view";
 import { PrimaryButton } from "@/components/auth/buttons";
 import { formatDateWithDay, weekdayName } from "@/lib/date-format";
@@ -101,6 +102,11 @@ function CandidateRowButton({
     >
       <div className="mb-1 flex flex-wrap items-center gap-2">
         <span className="font-heading text-small font-extrabold text-ink">{row.code}</span>
+        {row.notAvailable ? (
+          <span className="inline-block rounded bg-not-available px-2 py-0.5 text-field-label font-bold tracking-[0.04em] text-secondary-text uppercase">
+            Not available
+          </span>
+        ) : null}
         <span
           className={`inline-block rounded px-2 py-0.5 text-field-label font-bold tracking-[0.04em] uppercase ${
             row.ready ? "bg-success-bg text-brand-success" : "bg-warning-bg text-brand-warning"
@@ -118,6 +124,7 @@ function CandidateRowButton({
           {ratingText}
         </div>
         {row.why ? <div className="font-semibold text-brand-warning">{row.why}</div> : null}
+        {row.availabilityNotSet ? <div className="text-field-label text-muted-text">Availability not set</div> : null}
       </div>
     </button>
   );
@@ -138,6 +145,9 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
   const [dayLoading, setDayLoading] = useState(false);
   const [dispatching, setDispatching] = useState(false);
   const [dispatchError, setDispatchError] = useState<string | undefined>();
+  /** Feature 2004: bumped to re-read the candidate list (after Change availability, and after a refused dispatch). */
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [availabilityFor, setAvailabilityFor] = useState<{ code: string; name: string } | null>(null);
   const openMinutes = minutesOfClock(initial.openingTime);
   const closeMinutes = minutesOfClock(initial.closingTime);
   const startMinuteOptions = startTimesWithin(openMinutes, closeMinutes);
@@ -175,7 +185,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [initial.reference, date, startMinutes, holdMinutes, emergency, reschedule]);
+  }, [initial.reference, date, startMinutes, holdMinutes, emergency, reschedule, refreshTick]);
 
   useEffect(() => {
     let cancelled = false;
@@ -234,6 +244,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
       const payload = (await res.json()) as { toast?: string; error?: string };
       if (!res.ok) {
         setDispatchError(payload.error ?? (reschedule ? "Reschedule failed." : "Dispatch failed."));
+        setRefreshTick((tick) => tick + 1); // the list may have changed under Mike (a time switched off, a clash)
         return;
       }
       router.push(`/ops/jobs/${encodeURIComponent(initial.reference)}?toast=${encodeURIComponent(payload.toast ?? "")}`);
@@ -340,6 +351,15 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 candidates.serves.map((row) => (
                   <div key={row.code}>
                     <CandidateRowButton row={row} picked={pickedCode === row.code} onPick={() => setPickedCode((c) => (c === row.code ? null : row.code))} />
+                    {row.linkable ? (
+                      <button
+                        type="button"
+                        className="-mt-1.5 mb-2.5 min-h-11 py-2.5 text-small font-semibold text-secondary-text underline underline-offset-2"
+                        onClick={() => setAvailabilityFor({ code: row.code, name: row.name })}
+                      >
+                        Change availability
+                      </button>
+                    ) : null}
                     {pickedCode === row.code ? (
                       <CalendarDayView
                         dayLabel={`${row.name.split(" ")[0] ?? row.name}'s ${shortDateOf(date)}`}
@@ -369,6 +389,15 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 candidates.outside.map((row) => (
                   <div key={row.code}>
                     <CandidateRowButton row={row} picked={pickedCode === row.code} onPick={() => setPickedCode((c) => (c === row.code ? null : row.code))} />
+                    {row.linkable ? (
+                      <button
+                        type="button"
+                        className="-mt-1.5 mb-2.5 min-h-11 py-2.5 text-small font-semibold text-secondary-text underline underline-offset-2"
+                        onClick={() => setAvailabilityFor({ code: row.code, name: row.name })}
+                      >
+                        Change availability
+                      </button>
+                    ) : null}
                     {pickedCode === row.code ? (
                       <CalendarDayView
                         dayLabel={`${row.name.split(" ")[0] ?? row.name}'s ${shortDateOf(date)}`}
@@ -502,6 +531,15 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
           </div>
         </Card>
       </div>
+      {availabilityFor !== null ? (
+        <ChangeAvailabilityDialog
+          contractorCode={availabilityFor.code}
+          contractorName={availabilityFor.name}
+          date={date}
+          onClose={() => setAvailabilityFor(null)}
+          onSaved={() => setRefreshTick((tick) => tick + 1)}
+        />
+      ) : null}
     </div>
   );
 }

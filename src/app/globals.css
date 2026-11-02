@@ -22,6 +22,7 @@
   --secondary-text: #4a5561;
   --muted-text: #7a828c;
   --control-off: #cfd4da;
+  --not-available: #d9d6d0;
 
   /* Meaning */
   --brand-accent: #e8762d;
@@ -142,6 +143,7 @@
   --color-secondary-text: var(--secondary-text);
   --color-muted-text: var(--muted-text);
   --color-control-off: var(--control-off);
+  --color-not-available: var(--not-available);
   --color-brand-accent: var(--brand-accent);
   --color-brand-accent-loading: var(--brand-accent-loading);
   --color-on-accent: var(--on-accent);
