@@ -244,6 +244,15 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     await expect(page.getByLabel("What's happening")).toBeVisible();
   });
 
+  test("1021 AC4: a closed state stops the form at the suburb with the words, in place, and Continue goes nowhere (the check's answer faked)", async ({ page }) => {
+    await page.route(/\/api\/enquiries\/coverage/, (route) => route.fulfill({ json: { tier: "state_not_open" } }));
+    await page.goto("/request-a-job");
+    await pickJoondalup(page);
+    await expect(page.getByText("Sorry, we don't currently operate or service in WA.")).toBeVisible();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByLabel("Suburb")).toBeVisible(); // still on the suburb step
+  });
+
   test("AC2: a Saturday date shows the weekend rate, a weekday shows normal", async ({ page }) => {
     const trade = nonPlumbing(formData.serviceTypes);
 

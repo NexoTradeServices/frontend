@@ -14,10 +14,12 @@ export default async function NewContractorPage() {
     cache: "no-store",
   });
   const tradeOptions = res.status === 200 ? ((await res.json()) as { trades: string[] }).trades : [];
+  const statesRes = await fetch(`${apiUrl}/api/operating-states`, { headers: { cookie: cookieStore.toString() }, cache: "no-store" });
+  const openStates = statesRes.status === 200 ? ((await statesRes.json()) as { states: string[] }).states : [];
 
   return (
     <Container width="medium">
-      <ContractorForm mode="create" initial={null} tradeOptions={tradeOptions} />
+      <ContractorForm mode="create" initial={null} tradeOptions={tradeOptions} openStates={openStates} />
     </Container>
   );
 }

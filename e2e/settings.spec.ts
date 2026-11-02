@@ -192,6 +192,16 @@ async function restoreSeededSettings(page: Page): Promise<void> {
     await expect(page.getByText("Saved.")).toBeVisible();
   }
 
+  // Feature 1021: the Operating states card's test unticks NSW and tries VIC; the seed has WA and NSW open.
+  const nsw = page.getByLabel("New South Wales (NSW)");
+  const vic = page.getByLabel("Victoria (VIC)");
+  if (!(await nsw.isChecked()) || (await vic.isChecked())) {
+    await nsw.check();
+    await vic.uncheck();
+    await page.getByRole("button", { name: "Save settings" }).click();
+    await expect(page.getByText("Saved.")).toBeVisible();
+  }
+
   // Feature 2006: the Legal identity card's test writes both fields.
   if ((await page.getByLabel("Legal entity name").inputValue()) !== "Trade Services") {
     await page.getByLabel("Legal entity name").fill("Trade Services");
@@ -505,5 +515,43 @@ test.describe("1020 -- public holidays", () => {
     await page.getByRole("button", { name: "Remove all", exact: true }).click();
     await expect(page.getByText(`Removed all TAS ${String(finished)} holidays.`)).toBeVisible();
     await expect(page.getByRole("list", { name: `TAS ${String(finished)} holidays` })).toHaveCount(0);
+  });
+});
+
+// Feature 1021 -- operating states on Settings
+//
+// AC1  the owner ticks and unticks states and it holds after a reload, with who and when
+// AC2  ticking a state with no holidays this year is refused beside the card, with a link to that state's holidays
+test.describe("1021 -- operating states", () => {
+  test.afterEach(async ({ page }) => {
+    await withPlatformSettingsLock(() => restoreSeededSettings(page));
+  });
+
+  test("AC1, AC2: WA and NSW are ticked; VIC is refused with a link to its holidays; unticking NSW holds after a reload", async ({ page }) => {
+    await withPlatformSettingsLock(async () => {
+      await ensureLoggedInAs(page, "/ops/settings", "owner@idelta.com.au");
+      await expect(page.getByRole("heading", { name: "Operating states" })).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByLabel("Western Australia (WA)")).toBeChecked();
+      await expect(page.getByLabel("New South Wales (NSW)")).toBeChecked();
+      await expect(page.getByLabel("Victoria (VIC)")).not.toBeChecked();
+
+      // AC2: VIC has no holidays this year - the whole Save is refused, the link goes to its holidays.
+      await page.getByLabel("Victoria (VIC)").check();
+      await page.getByRole("button", { name: "Save settings" }).click();
+      await expect(page.getByText("Can't open VIC until its public holidays are entered.")).toBeVisible();
+      await page.getByRole("link", { name: "Enter VIC holidays" }).click();
+      await expect(page).toHaveURL(/holidayState=VIC#public-holidays$/);
+      await expect(page.getByLabel("State", { exact: true })).toHaveValue("VIC");
+
+      // AC1: untick NSW (and take VIC off again), save, reload - it holds and says who and when.
+      await page.getByLabel("Victoria (VIC)").uncheck();
+      await page.getByLabel("New South Wales (NSW)").uncheck();
+      await page.getByRole("button", { name: "Save settings" }).click();
+      await expect(page.getByText("Saved.")).toBeVisible();
+      await page.reload();
+      await expect(page.getByLabel("New South Wales (NSW)")).not.toBeChecked();
+      await expect(page.getByLabel("Western Australia (WA)")).toBeChecked();
+      await expect(page.getByText(/Last changed .* by The owner\./)).toBeVisible();
+    });
   });
 });

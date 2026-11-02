@@ -14,17 +14,20 @@ export default async function ContractorRecordPage({ params }: { params: Promise
 
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
-  const [contractorRes, tradesRes] = await Promise.all([
+  const [contractorRes, tradesRes, statesRes] = await Promise.all([
     fetch(`${apiUrl}/api/contractors/${code}`, { headers: { cookie: cookieHeader }, cache: "no-store" }),
     fetch(`${apiUrl}/api/contractors/trade-options`, { headers: { cookie: cookieHeader }, cache: "no-store" }),
+    fetch(`${apiUrl}/api/operating-states`, { headers: { cookie: cookieHeader }, cache: "no-store" }),
   ]);
   if (contractorRes.status !== 200) return <LoadFailed />;
   const contractor = (await contractorRes.json()) as ContractorDto;
   const tradeOptions = tradesRes.status === 200 ? ((await tradesRes.json()) as { trades: string[] }).trades : [];
 
+  const openStates = statesRes.status === 200 ? ((await statesRes.json()) as { states: string[] }).states : [];
+
   return (
     <Container width="medium">
-      <ContractorForm mode="edit" initial={contractor} tradeOptions={tradeOptions} />
+      <ContractorForm mode="edit" initial={contractor} tradeOptions={tradeOptions} openStates={openStates} />
     </Container>
   );
 }

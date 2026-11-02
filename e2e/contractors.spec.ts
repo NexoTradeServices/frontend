@@ -49,6 +49,7 @@ test("AC11: a real Google pick stores the structured address and round-trips", a
   const name = `E2E Places Case ${tag}`;
   const email = uniqueEmail("ac11");
   await page.getByLabel("Name", { exact: true }).fill(name);
+  await page.getByLabel("Operating state").selectOption("WA");
   await page.getByLabel("Phone", { exact: true }).fill("0412 000 333");
   await page.getByLabel("Email", { exact: true }).fill(email);
 
@@ -88,6 +89,7 @@ test("AC11: with the Places script blocked, the address field is disabled with t
   const name = `E2E Places Blocked ${tag}`;
   const email = uniqueEmail("ac11b");
   await page.getByLabel("Name", { exact: true }).fill(name);
+  await page.getByLabel("Operating state").selectOption("WA");
   await page.getByLabel("Phone", { exact: true }).fill("0412 000 444");
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByRole("button", { name: "Save" }).click();
@@ -119,6 +121,7 @@ test("AC6: a blank licence expiry stops the form with Required.; a past expiry s
 
   const name = `E2E Expiry Case ${uniqueTag("ac6")}`;
   await page.getByLabel("Name", { exact: true }).fill(name);
+  await page.getByLabel("Operating state").selectOption("WA");
   await page.getByLabel("Phone", { exact: true }).fill("0412 000 222");
   await page.getByLabel("Email", { exact: true }).fill(uniqueEmail("ac6"));
   await page.getByLabel("Trade", { exact: true }).selectOption("Plumbing");
@@ -155,6 +158,7 @@ test("6003 AC1: GST registered offers Not asked yet, Yes and No; not asked is a 
 
   const name = `E2E Gst Case ${uniqueTag("gst")}`;
   await page.getByLabel("Name", { exact: true }).fill(name);
+  await page.getByLabel("Operating state").selectOption("WA");
   await page.getByLabel("Phone", { exact: true }).fill("0412 000 555");
   await page.getByLabel("Email", { exact: true }).fill(uniqueEmail("gst"));
   await page.getByRole("button", { name: "Save" }).click();
@@ -246,4 +250,30 @@ test("6009 AC8: Bob's Reviews tab shows his average and count, the newest review
 
   await page.goto("/ops/contractors/CON-021/reviews");
   await expect(page.getByTestId("reviews-empty")).toHaveText("No reviews yet.");
+});
+
+// Feature 1021 -- the Operating state on the contractor form
+//
+// AC7  the new form requires it and lists the open states only, with the hint for a state not listed
+// AC8  Mike sees it on a record (Liam is in NSW) and the Select carries the open states
+test("1021 AC7: the new contractor form requires Operating state, lists WA and NSW only, and says what to do for another state", async ({ page }) => {
+  await page.goto("/ops/contractors/new");
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: "New contractor" })).toBeVisible({ timeout: 10_000 });
+  const select = page.getByLabel("Operating state");
+  await expect(select.locator("option")).toHaveText(["Pick a state", "NSW", "WA"]);
+  await expect(page.getByText("State not listed? We don't operate there yet. Contact platform administrator.")).toBeVisible();
+  await page.getByLabel("Name", { exact: true }).fill("E2E No State");
+  await page.getByLabel("Phone", { exact: true }).fill("0412 000 777");
+  await page.getByLabel("Email", { exact: true }).fill(uniqueEmail("1021"));
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Required.").first()).toBeVisible();
+  await expect(page).toHaveURL(/\/ops\/contractors\/new$/);
+});
+
+test("1021 AC8: Liam's record shows Operating state NSW", async ({ page }) => {
+  await page.goto("/ops/contractors/CON-037");
+  await login(page, "mike@idelta.com.au");
+  await expect(page.getByRole("heading", { name: /CON-037/ })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByLabel("Operating state")).toHaveValue("NSW");
 });

@@ -38,6 +38,8 @@ export interface SuburbPin {
 }
 
 export interface ServiceAreaDto {
+  /** Feature 1021: the contractor's Operating state - the pin must sit in it, and the range read leaves other states out */
+  operatingState: string;
   coreLocation: SuburbPin | null;
   radiusKm: number;
   postcodes: string[];
@@ -66,8 +68,8 @@ function toSuburbPin(picked: PickedAddress): SuburbPin {
   };
 }
 
-async function fetchInRange(lat: number, lng: number, km: number): Promise<InRangePostcode[]> {
-  const res = await fetch(`${apiUrl}/api/suburbs/in-range?lat=${String(lat)}&lng=${String(lng)}&km=${String(km)}`, {
+async function fetchInRange(lat: number, lng: number, km: number, state: string): Promise<InRangePostcode[]> {
+  const res = await fetch(`${apiUrl}/api/suburbs/in-range?lat=${String(lat)}&lng=${String(lng)}&km=${String(km)}&state=${encodeURIComponent(state)}`, {
     credentials: "include",
   });
   if (res.status !== 200) return [];
@@ -129,7 +131,7 @@ export function ServiceArea({
     // renders while there is none.
     if (!pin) return;
     let cancelled = false;
-    fetchInRange(pin.lat, pin.lng, radiusKm)
+    fetchInRange(pin.lat, pin.lng, radiusKm, savedState.operatingState)
       .then((rows) => {
         if (cancelled) return;
         setInRange(rows);
@@ -203,6 +205,15 @@ export function ServiceArea({
     showToast("Changes undone.");
   }
 
+  // Feature 1021: the pin stays inside the contractor's state. The words are the server's, each caller's own;
+  // said here too so a pin in another state (which finds no postcodes to keep) is told why, not "keep one".
+  const stateWords =
+    pin !== null && pin.state !== savedState.operatingState
+      ? mode === "contractor"
+        ? `Your service area must be in ${savedState.operatingState}. Contact the office.`
+        : `${(contractorName ?? "").split(" ")[0] ?? ""}'s service area must be in ${savedState.operatingState}. Change ${(contractorName ?? "").split(" ")[0] ?? ""}'s Operating state first.`
+      : undefined;
+
   async function handleSave() {
     setFormError(undefined);
     setPinError(undefined);
@@ -210,6 +221,13 @@ export function ServiceArea({
     if (!pin) {
       setPinError("Pick the suburb the area is built around.");
       setFormError("Not saved. The service area needs a core location.");
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    if (stateWords !== undefined) {
+      setPinError(stateWords);
+      setFormError(`Not saved. ${stateWords}`);
       window.scrollTo(0, 0);
       return;
     }
@@ -284,7 +302,7 @@ export function ServiceArea({
           variant="suburb"
           value={toPickedAddress(pin)}
           onChange={handlePinChange}
-          error={pinError}
+          error={pinError ?? stateWords}
           onErrorChange={setPinError}
           onPickingChange={setAddressPicking}
           helper="Pick a suburb only."

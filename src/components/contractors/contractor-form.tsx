@@ -70,6 +70,7 @@ function gstValueOf(answer: GstAnswer): boolean | null {
 }
 
 interface Fields {
+  operatingState: string;
   name: string;
   email: string;
   phone: string;
@@ -90,6 +91,7 @@ interface Fields {
 
 function fieldsFromDto(dto: ContractorDto): Fields {
   return {
+    operatingState: dto.operatingState,
     name: dto.name,
     email: dto.email,
     phone: dto.phone,
@@ -109,6 +111,7 @@ function fieldsFromDto(dto: ContractorDto): Fields {
 }
 
 const BLANK_FIELDS: Fields = {
+  operatingState: "",
   name: "",
   email: "",
   phone: "",
@@ -142,7 +145,18 @@ function readyBannerText(contractor: ContractorDto): string {
   return `Ready to dispatch for ${dispatchable.join(", ")}. ${exceptionText}`;
 }
 
-export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create" | "edit"; initial: ContractorDto | null; tradeOptions: string[] }) {
+export function ContractorForm({
+  mode,
+  initial,
+  tradeOptions,
+  openStates,
+}: {
+  mode: "create" | "edit";
+  initial: ContractorDto | null;
+  tradeOptions: string[];
+  /** Feature 1021: the open states, for the Operating state Select */
+  openStates: string[];
+}) {
   const router = useRouter();
   const [contractor, setContractor] = useState<ContractorDto | null>(initial);
   const [fields, setFields] = useState<Fields>(initial ? fieldsFromDto(initial) : BLANK_FIELDS);
@@ -185,6 +199,7 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
     const errs: Record<string, string> = {};
     const trErrs: Record<string, TradeRowErrors> = {};
 
+    if (fields.operatingState === "") errs["operatingState"] = "Required.";
     if (fields.name.trim() === "") errs["name"] = "Required.";
     if (fields.phone.trim() === "") errs["phone"] = "Required.";
     const email = fields.email.trim().toLowerCase();
@@ -236,6 +251,7 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
       fieldErrors: {},
       tradeErrors: {},
       payload: {
+        operatingState: fields.operatingState,
         name: fields.name.trim(),
         email,
         phone: fields.phone.trim(),
@@ -391,6 +407,23 @@ export function ContractorForm({ mode, initial, tradeOptions }: { mode: "create"
         <div className="rounded-card border border-hairline bg-surface p-5">
           <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Contractor</h3>
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+            <SelectField
+              label="Operating state"
+              id="f-operatingState"
+              required
+              options={[
+                ...(fields.operatingState === "" ? [{ value: "", label: "Pick a state" }] : []),
+                ...[...new Set([...openStates, ...(initial ? [initial.operatingState] : [])])].sort().map((state) => ({ value: state, label: state })),
+              ]}
+              value={fields.operatingState}
+              onChange={(e) => set("operatingState", e.target.value)}
+              error={fieldErrors["operatingState"]}
+              helper={
+                fieldErrors["operatingState"]
+                  ? undefined
+                  : "State not listed? We don't operate there yet. Contact platform administrator."
+              }
+            />
             <Field label="Name" id="f-name" required value={fields.name} onChange={(e) => set("name", e.target.value)} error={fieldErrors["name"]} />
             <Field
               label="Email"

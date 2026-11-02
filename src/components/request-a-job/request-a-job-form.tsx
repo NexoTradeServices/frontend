@@ -67,7 +67,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
   const [platformSuburb, setPlatformSuburb] = useState<PlatformSuburb | null>(null);
   const [locationError, setLocationError] = useState<string>();
   /** Feature 3002: what the coverage check said about one pick. Never blocks Continue. */
-  const [coverageAnswer, setCoverageAnswer] = useState<{ query: string; outOfReach: boolean } | null>(null);
+  const [coverageAnswer, setCoverageAnswer] = useState<{ query: string; outOfReach: boolean; notOpen: boolean } | null>(null);
   const [trade, setTrade] = useState<string | null>(null);
   const [tradeError, setTradeError] = useState<string>();
   /** One typed answer per trade question, keyed by the question's own label. Optional -- left blank is fine. */
@@ -105,7 +105,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
   // answer is kept with the pick it belongs to, so a stale one never shows for a newer pick.
   const coverageQuery =
     location !== null
-      ? new URLSearchParams({ postcode: location.postcode, lat: String(location.lat), lng: String(location.lng) }).toString()
+      ? new URLSearchParams({ postcode: location.postcode, lat: String(location.lat), lng: String(location.lng), state: location.state }).toString()
       : platformSuburb !== null
         ? new URLSearchParams({ suburbId: platformSuburb.suburbId }).toString()
         : null;
@@ -115,7 +115,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
     fetch(`${apiUrl}/api/enquiries/coverage?${coverageQuery}`, { signal: controller.signal })
       .then((res) => (res.ok ? (res.json() as Promise<{ tier?: string }>) : null))
       .then((body) => {
-        if (!controller.signal.aborted) setCoverageAnswer({ query: coverageQuery, outOfReach: body?.tier === "out_of_reach" });
+        if (!controller.signal.aborted) setCoverageAnswer({ query: coverageQuery, outOfReach: body?.tier === "out_of_reach", notOpen: body?.tier === "state_not_open" });
       })
       .catch(() => undefined);
     return () => {
@@ -123,6 +123,9 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
     };
   }, [coverageQuery]);
   const outOfReach = coverageQuery !== null && coverageAnswer?.query === coverageQuery && coverageAnswer.outOfReach;
+  // Feature 1021: a closed state stops the form at the suburb, in place; no further step opens.
+  const stateNotOpen = coverageQuery !== null && coverageAnswer?.query === coverageQuery && coverageAnswer.notOpen;
+  const closedStateName = stateOfPick(location, platformSuburb) ?? "that state";
 
   // Feature 3003: learn whether photo upload is switched on the first time the
   // notes step shows.
@@ -146,6 +149,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
         setLocationError("Pick a suburb from the list before continuing.");
         return false;
       }
+      if (stateNotOpen) return false;
       return true;
     }
     if (step === "trade") {
@@ -289,7 +293,10 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
 
           {step === "suburb" ? (
             <>
-              {outOfReach ? (
+              {stateNotOpen ? (
+                <Banner kind="error">Sorry, we don&apos;t currently operate or service in {closedStateName}.</Banner>
+              ) : null}
+              {outOfReach && !stateNotOpen ? (
                 <Banner kind="warning">
                   We don&apos;t currently service your area, but you can still submit your details. We&apos;ll do our
                   best to find a local service provider, subject to availability.

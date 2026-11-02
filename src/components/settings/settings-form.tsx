@@ -17,6 +17,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PrimaryButton } from "@/components/auth/buttons";
 import { Banner } from "@/components/auth/banner";
 import { PlacesField, type PickedAddress } from "@/components/ui/places-field";
+import Link from "next/link";
 import { formatDate } from "@/lib/date-format";
 import { timeLabelFor } from "@/components/ui/calendar-day-view";
 
@@ -43,6 +44,8 @@ export interface SettingsDto {
   /** Feature 1020: "HH:MM" on the half hour. */
   openingTime: string;
   closingTime: string;
+  /** Feature 1021: one row per state, open or closed, with who changed it and when */
+  operatingStates: { state: string; open: boolean; changedAt: string | null; changedBy: string | null }[];
   approvedPublicDomain: string | null;
   payoutCycle: "weekly" | "fortnightly";
   payoutDay: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun" | null;
@@ -63,6 +66,17 @@ const TIMEZONE_OPTIONS = [
   { value: "Australia/Hobart", label: "Australia/Hobart (AEST/AEDT)" },
   { value: "Australia/Darwin", label: "Australia/Darwin (ACST)" },
 ] as const;
+
+const STATE_NAMES: Record<string, string> = {
+  WA: "Western Australia",
+  NSW: "New South Wales",
+  VIC: "Victoria",
+  QLD: "Queensland",
+  SA: "South Australia",
+  TAS: "Tasmania",
+  ACT: "Australian Capital Territory",
+  NT: "Northern Territory",
+};
 
 // Feature 1020: opening hours, half-hour steps from 5:00am to 10:00pm.
 const HOUR_OPTIONS = Array.from({ length: 35 }, (_, i) => {
@@ -132,6 +146,9 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
   const [accountsPhone, setAccountsPhone] = useState(initial.accountsPhone ?? "");
   const [operatorEmail, setOperatorEmail] = useState(initial.operatorEmail);
   const [timezone, setTimezone] = useState(initial.timezone);
+  const [openStates, setOpenStates] = useState<string[]>(initial.operatingStates.filter((row) => row.open).map((row) => row.state));
+  /** Feature 1021: the state the last Save refused to open, for the link to its holidays */
+  const [refusedState, setRefusedState] = useState<string | undefined>();
   const [openingTime, setOpeningTime] = useState(initial.openingTime);
   const [closingTime, setClosingTime] = useState(initial.closingTime);
   const [approvedPublicDomain, setApprovedPublicDomain] = useState(initial.approvedPublicDomain ?? "");
@@ -172,6 +189,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
       timezone,
       openingTime,
       closingTime,
+      operatingStates: openStates,
       approvedPublicDomain: approvedPublicDomain.trim() === "" ? null : approvedPublicDomain.trim(),
       payoutCycle,
       payoutDay,
@@ -193,6 +211,8 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
       });
       const body = (await res.json()) as SettingsDto & { error?: string; field?: string };
       if (!res.ok) {
+        const refused = (body as { state?: string }).state;
+        setRefusedState(body.field === "operatingStates" ? refused : undefined);
         if (body.field) {
           setFieldErrors({ [body.field]: body.error ?? "That value was refused." });
         } else {
@@ -203,6 +223,8 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
       setSettings(body);
       setGstRegistered(body.gstRegistered);
       setApprovedPublicDomain(body.approvedPublicDomain ?? "");
+      setRefusedState(undefined);
+      setOpenStates(body.operatingStates.filter((row) => row.open).map((row) => row.state));
       setOpeningTime(body.openingTime);
       setClosingTime(body.closingTime);
       setSaved(true);
@@ -399,6 +421,62 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
         <p className="text-xs text-muted-text">
           New hours start as Not available for existing contractors, until they switch them on. Jobs already booked stay as they are.
         </p>
+      </div>
+
+      <div className="mb-4.5 rounded-card border border-hairline bg-surface p-5" id="operating-states">
+        <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Operating states</h3>
+        {fieldErrors["operatingStates"] ? (
+          <Banner kind="warning">
+            {fieldErrors["operatingStates"]}
+            {refusedState ? (
+              <>
+                {" "}
+                <Link
+                  href={`/ops/settings?holidayState=${refusedState}#public-holidays`}
+                  className="font-semibold underline underline-offset-2"
+                >
+                  Enter {refusedState} holidays
+                </Link>
+              </>
+            ) : null}
+          </Banner>
+        ) : null}
+        <fieldset className="m-0 border-0 p-0">
+          <legend className="sr-only">States the business operates in</legend>
+          <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+            {settings.operatingStates.map((row) => (
+              <label key={row.state} className="flex min-h-11 cursor-pointer items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  className="size-5 accent-brand-accent"
+                  checked={openStates.includes(row.state)}
+                  onChange={(e) =>
+                    setOpenStates((current) =>
+                      e.target.checked ? [...current, row.state] : current.filter((state) => state !== row.state),
+                    )
+                  }
+                />
+                <span className="text-sm text-ink">
+                  {STATE_NAMES[row.state] ?? row.state} ({row.state})
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <p className="mt-2 text-xs text-muted-text">
+          Jobs already booked in a state you untick carry on. A state opens only once this year&apos;s public holidays are entered.
+        </p>
+        {(() => {
+          const changed = settings.operatingStates
+            .filter((row) => row.changedAt !== null)
+            .sort((a, b) => (b.changedAt ?? "").localeCompare(a.changedAt ?? ""))[0];
+          return changed?.changedAt ? (
+            <p className="mt-1 text-xs text-muted-text">
+              Last changed {formatAuditDate(changed.changedAt)}
+              {changed.changedBy ? ` by ${changed.changedBy}` : ""}.
+            </p>
+          ) : null;
+        })()}
       </div>
 
       <div className="mb-4.5 rounded-card border border-hairline bg-surface p-5">

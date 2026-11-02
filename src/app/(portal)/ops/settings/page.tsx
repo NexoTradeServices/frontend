@@ -42,6 +42,7 @@ export default async function OpsSettingsPage({
       />
       <SettingsForm initial={settings} />
       <PublicHolidaysCard
+        key={`${pick("holidayState") ?? "WA"}-${String(holidayYear)}`}
         timezone={settings.timezone}
         initialState={pick("holidayState")}
         initialYear={Number.isInteger(holidayYear) && holidayYear >= 2000 ? holidayYear : undefined}
