@@ -36,9 +36,22 @@ function candidateSlot(): Slot {
   return { date: day.toISOString().slice(0, 10), startMinutes: 420 + 30 * Math.floor(Math.random() * 18) };
 }
 
+/**
+ * Feature 1020: WA's public holidays (the open read), so a picked day is never one the business is closed.
+ * The migration loads WA's 2026 and 2027 dates, Good Friday and Labour Day among them.
+ */
+async function waHolidays(page: Page): Promise<Set<string>> {
+  const res = await page.request.get(`${apiUrl}/api/public-holidays?state=WA`);
+  if (!res.ok()) return new Set();
+  const { holidays } = (await res.json()) as { holidays: { date: string }[] };
+  return new Set(holidays.map((holiday) => holiday.date));
+}
+
 async function pickFreeSlot(page: Page): Promise<Slot> {
+  const closed = await waHolidays(page);
   for (let attempt = 0; attempt < 60; attempt += 1) {
     const candidate = candidateSlot();
+    if (closed.has(candidate.date)) continue;
     const res = await page.request.get(`${apiUrl}/api/contractors/CON-014/day?date=${candidate.date}`);
     if (!res.ok()) continue;
     const { blocks } = (await res.json()) as { blocks: { startMinutes: number; endMinutes: number }[] };
@@ -64,8 +77,10 @@ export async function pickFreeWeekday(page: Page): Promise<string> {
     const day = new Date(first.getTime() + offset * 86_400_000);
     if (day.getUTCDay() >= 1 && day.getUTCDay() <= 5) weekdays.push(day.toISOString().slice(0, 10));
   }
+  const closed = await waHolidays(page);
   for (let attempt = 0; attempt < 80; attempt += 1) {
     const candidate = weekdays[Math.floor(Math.random() * weekdays.length)] ?? "";
+    if (closed.has(candidate)) continue;
     const res = await page.request.get(`${apiUrl}/api/contractors/CON-014/day?date=${candidate}`);
     if (!res.ok()) continue;
     const { blocks } = (await res.json()) as { blocks: { startMinutes: number; endMinutes: number }[] };
@@ -106,7 +121,7 @@ export async function dispatchThrowawayJob(
       location: { ...FREMANTLE, placeId: `e2e-4003-place-${tag}-${stamp}` },
       trade: "Plumbing",
       selectedOptions: [],
-      preferredDate: "2027-03-01",
+      preferredDate: "2027-03-02",
       preferredWindow: "morning",
       description: "An e2e throwaway job for feature 4003.",
       marketingEmail: false,

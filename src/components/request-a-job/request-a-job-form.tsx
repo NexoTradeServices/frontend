@@ -30,6 +30,7 @@ import { TradeIcon } from "./trade-icon";
 import { PriceBox } from "./price-box";
 import { AdditionalQuestions } from "./additional-questions";
 import { MAX_PHOTOS, PHOTO_UNAVAILABLE, useEnquiryPhotos } from "./use-enquiry-photos";
+import { holidayWords, stateOfPick, usePublicHolidays } from "./holidays";
 import { formatDayName, formatFriendlyDate, isWeekendDate, todayYmd } from "./money";
 import type { FormDataDto, PreferredWindow } from "./types";
 
@@ -73,6 +74,10 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
   const [questionAnswers, setQuestionAnswers] = useState<Record<string, string>>({});
   const [preferredDate, setPreferredDate] = useState(todayYmd());
   const [preferredWindow, setPreferredWindow] = useState<PreferredWindow>("morning");
+  // Feature 1020: a public holiday of the suburb's state is shown as the date's error and stops Next.
+  const holidays = usePublicHolidays(stateOfPick(location, platformSuburb));
+  const holidayName = holidays[preferredDate];
+  const dateError = holidayName === undefined ? undefined : holidayWords(holidayName);
   const [description, setDescription] = useState("");
   const [descriptionError, setDescriptionError] = useState<string>();
   const [name, setName] = useState("");
@@ -150,6 +155,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
       }
       return true;
     }
+    if (step === "schedule") return dateError === undefined;
     if (step === "notes") {
       // The trade's own questions are optional (owner, 09/09/26) -- only
       // the general description is required on this step.
@@ -352,7 +358,8 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
                 min={todayYmd()}
                 value={preferredDate}
                 onChange={(e) => setPreferredDate(e.target.value)}
-                helper="Defaults to today -- move it later if that suits you better."
+                error={dateError}
+                helper={dateError === undefined ? "Defaults to today -- move it later if that suits you better." : undefined}
               />
               <div className="mb-3.5">
                 <span className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']">

@@ -22,8 +22,6 @@ export interface DayBlock {
   kind: "booked" | "hold" | "other";
 }
 
-const DAY_START = 360; // 6:00am
-const DAY_END = 1290; // 9:30pm
 const ROW_HEIGHT = 44; // px -- one half-hour row, the tap-target floor
 
 export function timeLabelFor(minutes: number): string {
@@ -34,8 +32,8 @@ export function timeLabelFor(minutes: number): string {
   return `${String(h12)}:${String(m).padStart(2, "0")}${period}`;
 }
 
-function topOf(minutes: number): number {
-  return ((minutes - DAY_START) / 30) * ROW_HEIGHT;
+function topOf(minutes: number, dayStart: number): number {
+  return ((minutes - dayStart) / 30) * ROW_HEIGHT;
 }
 
 export function CalendarDayView({
@@ -45,6 +43,8 @@ export function CalendarDayView({
   proposedEnd,
   onPickHalfHour,
   onStepDay,
+  openMinutes,
+  closeMinutes,
   loading = false,
 }: {
   /** e.g. "Bob's Mon 14 Sep" -- the caller composes it, this component only draws the grid. */
@@ -54,6 +54,9 @@ export function CalendarDayView({
   proposedEnd: number;
   onPickHalfHour: (minutes: number) => void;
   onStepDay: (delta: -1 | 1) => void;
+  /** The rows run from the opening time to the closing time read from settings (Calendar & Scheduling / Opening hours), never a fixed range. */
+  openMinutes: number;
+  closeMinutes: number;
   loading?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -61,7 +64,7 @@ export function CalendarDayView({
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollTop = Math.max(0, topOf(proposedStart) - ROW_HEIGHT * 2);
+    el.scrollTop = Math.max(0, topOf(proposedStart, openMinutes) - ROW_HEIGHT * 2);
     // Opens at the slot in hand when the day changes -- not re-jumped on
     // every half-hour tap within the same day (the person is scrolled where
     // they are working).
@@ -70,7 +73,7 @@ export function CalendarDayView({
 
   const clashes = blocks.some((block) => block.startMinutes < proposedEnd && block.endMinutes > proposedStart);
   const rows: number[] = [];
-  for (let m = DAY_START; m < DAY_END; m += 30) rows.push(m);
+  for (let m = openMinutes; m < closeMinutes; m += 30) rows.push(m);
 
   return (
     <div className="mt-2 rounded-card border border-hairline bg-surface p-3">
@@ -127,7 +130,7 @@ export function CalendarDayView({
             {blocks.map((block, index) => (
               <div
                 key={`${String(block.startMinutes)}-${String(index)}`}
-                style={{ top: `${String(topOf(block.startMinutes) + 2)}px`, height: `${String(topOf(block.endMinutes) - topOf(block.startMinutes) - 4)}px` }}
+                style={{ top: `${String(topOf(block.startMinutes, openMinutes) + 2)}px`, height: `${String(topOf(block.endMinutes, openMinutes) - topOf(block.startMinutes, openMinutes) - 4)}px` }}
                 className={`absolute inset-x-1.5 overflow-hidden rounded-small-box border px-2 py-1 text-xs ${
                   block.kind === "hold"
                     ? "border-dashed border-status-assigned bg-status-assigned-bg text-status-assigned"
@@ -139,7 +142,7 @@ export function CalendarDayView({
               </div>
             ))}
             <div
-              style={{ top: `${String(topOf(proposedStart) + 2)}px`, height: `${String(Math.max(topOf(proposedEnd) - topOf(proposedStart) - 4, ROW_HEIGHT - 4))}px` }}
+              style={{ top: `${String(topOf(proposedStart, openMinutes) + 2)}px`, height: `${String(Math.max(topOf(proposedEnd, openMinutes) - topOf(proposedStart, openMinutes) - 4, ROW_HEIGHT - 4))}px` }}
               className={`absolute inset-x-6 overflow-hidden rounded-small-box border-2 border-dashed px-2 py-1 text-xs font-semibold ${
                 clashes ? "border-brand-destructive bg-error-bg text-brand-destructive" : "border-brand-accent bg-brand-accent/10 text-ink"
               }`}

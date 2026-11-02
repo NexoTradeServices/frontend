@@ -23,6 +23,7 @@ import { AdditionalQuestions } from "@/components/request-a-job/additional-quest
 import { PriceBox } from "@/components/request-a-job/price-box";
 import { WINDOWS } from "@/components/request-a-job/request-a-job-form";
 import { isWeekendDate, todayYmd } from "@/components/request-a-job/money";
+import { holidayWords, stateOfPick, usePublicHolidays } from "@/components/request-a-job/holidays";
 import type { FormDataDto, PreferredWindow } from "@/components/request-a-job/types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -79,6 +80,10 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
 
   const selectedType = useMemo(() => serviceTypes.find((t) => t.trade === trade) ?? null, [serviceTypes, trade]);
   const weekend = isWeekendDate(preferredDate);
+  // Feature 1020: a public holiday of the job's state is shown as the date's error and stops Save.
+  const holidays = usePublicHolidays(stateOfPick(effectiveSite ?? location, platformSuburb));
+  const holidayName = holidays[preferredDate];
+  const holidayError = holidayName === undefined ? undefined : holidayWords(holidayName);
   const multiplier = selectedType
     ? weekend
       ? selectedType.serviceLevelMultipliers.weekend
@@ -96,6 +101,7 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
     if (trade === "") next.trade = "Pick a trade.";
     if (description.trim() === "") next.description = "Tell us what's happening.";
     if (preferredDate === "") next.preferredDate = "Pick a date.";
+    else if (holidayError !== undefined) next.preferredDate = holidayError;
     if (preferredWindow === null) next.preferredWindow = "Pick a time of day.";
     if (name.trim() === "") next.name = "Enter the customer's name.";
     if (!EMAIL_PATTERN.test(email.trim())) next.email = "Enter the customer's email address.";
@@ -457,7 +463,7 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
               setPreferredDate(event.target.value);
               clearError("preferredDate");
             }}
-            error={errors.preferredDate}
+            error={holidayError ?? errors.preferredDate}
           />
           <fieldset className="mb-3.5">
             <legend className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']">

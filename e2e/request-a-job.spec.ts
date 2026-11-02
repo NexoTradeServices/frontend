@@ -224,6 +224,26 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     await expect(page.getByLabel("Email")).toHaveValue(/^e2e-3001-.*@idelta\.com\.au$/);
   });
 
+  test("1020 AC7: a public holiday of the suburb's state is the date's own error, at once, and stops Continue", async ({ page }) => {
+    const trade = nonPlumbing(formData.serviceTypes);
+    // The open holiday read is faked: the day the test types is Christmas Day for WA.
+    await page.route(/\/api\/public-holidays\?state=WA/, (route) =>
+      route.fulfill({ json: { holidays: [{ date: "2099-12-25", name: "Christmas Day" }] } }),
+    );
+    await page.goto("/request-a-job");
+    await pickJoondalup(page);
+    await page.getByRole("button", { name: "Continue" }).click();
+    await pickTrade(page, trade.trade);
+    await page.getByLabel("Date").fill("2099-12-25");
+    await expect(page.getByText("We're closed on Christmas Day. Please pick another date.")).toBeVisible();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByLabel("Date")).toBeVisible(); // still on the date step
+    await page.getByLabel("Date").fill("2099-12-24");
+    await expect(page.getByText("We're closed on Christmas Day. Please pick another date.")).toHaveCount(0);
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByLabel("What's happening")).toBeVisible();
+  });
+
   test("AC2: a Saturday date shows the weekend rate, a weekday shows normal", async ({ page }) => {
     const trade = nonPlumbing(formData.serviceTypes);
 

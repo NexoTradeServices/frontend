@@ -18,6 +18,7 @@ import { PrimaryButton } from "@/components/auth/buttons";
 import { Banner } from "@/components/auth/banner";
 import { PlacesField, type PickedAddress } from "@/components/ui/places-field";
 import { formatDate } from "@/lib/date-format";
+import { timeLabelFor } from "@/components/ui/calendar-day-view";
 
 export interface SettingsDto {
   id: string;
@@ -39,6 +40,9 @@ export interface SettingsDto {
   accountsPhone: string | null;
   operatorEmail: string;
   timezone: string;
+  /** Feature 1020: "HH:MM" on the half hour. */
+  openingTime: string;
+  closingTime: string;
   approvedPublicDomain: string | null;
   payoutCycle: "weekly" | "fortnightly";
   payoutDay: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun" | null;
@@ -59,6 +63,13 @@ const TIMEZONE_OPTIONS = [
   { value: "Australia/Hobart", label: "Australia/Hobart (AEST/AEDT)" },
   { value: "Australia/Darwin", label: "Australia/Darwin (ACST)" },
 ] as const;
+
+// Feature 1020: opening hours, half-hour steps from 5:00am to 10:00pm.
+const HOUR_OPTIONS = Array.from({ length: 35 }, (_, i) => {
+  const minutes = 300 + i * 30;
+  const clock = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${minutes % 60 === 0 ? "00" : "30"}`;
+  return { value: clock, label: timeLabelFor(minutes) };
+});
 
 const PAYOUT_CYCLE_OPTIONS = [
   { value: "weekly", label: "Weekly" },
@@ -121,6 +132,8 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
   const [accountsPhone, setAccountsPhone] = useState(initial.accountsPhone ?? "");
   const [operatorEmail, setOperatorEmail] = useState(initial.operatorEmail);
   const [timezone, setTimezone] = useState(initial.timezone);
+  const [openingTime, setOpeningTime] = useState(initial.openingTime);
+  const [closingTime, setClosingTime] = useState(initial.closingTime);
   const [approvedPublicDomain, setApprovedPublicDomain] = useState(initial.approvedPublicDomain ?? "");
   const [payoutCycle, setPayoutCycle] = useState(initial.payoutCycle);
   const [payoutDay, setPayoutDay] = useState(initial.payoutDay ?? "fri");
@@ -157,6 +170,8 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
       accountsPhone: accountsPhone.trim() === "" ? null : accountsPhone.trim(),
       operatorEmail,
       timezone,
+      openingTime,
+      closingTime,
       approvedPublicDomain: approvedPublicDomain.trim() === "" ? null : approvedPublicDomain.trim(),
       payoutCycle,
       payoutDay,
@@ -188,6 +203,8 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
       setSettings(body);
       setGstRegistered(body.gstRegistered);
       setApprovedPublicDomain(body.approvedPublicDomain ?? "");
+      setOpeningTime(body.openingTime);
+      setClosingTime(body.closingTime);
       setSaved(true);
     } catch {
       setFormError("Save failed -- check your connection and try again.");
@@ -207,6 +224,10 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
     const domain = approvedPublicDomain.trim().toLowerCase();
     if (domain !== "" && (domain.length > 253 || !PUBLIC_DOMAIN_PATTERN.test(domain))) {
       setFieldErrors({ approvedPublicDomain: PUBLIC_DOMAIN_ERROR });
+      return;
+    }
+    if (closingTime <= openingTime) {
+      setFieldErrors({ closingTime: "Closing time must be after opening time." });
       return;
     }
     if (displayName.trim() === "") {
@@ -346,6 +367,38 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
             />
           </div>
         </div>
+      </div>
+
+      <div className="mb-4.5 rounded-card border border-hairline bg-surface p-5" id="opening-hours">
+        <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Opening hours</h3>
+        <div className="flex flex-wrap gap-4">
+          <div className="min-w-[200px] flex-1">
+            <SelectField
+              id="openingTime"
+              label="Opens"
+              required
+              options={HOUR_OPTIONS}
+              value={openingTime}
+              onChange={(e) => setOpeningTime(e.target.value)}
+              error={fieldErrors["openingTime"]}
+              helper={fieldErrors["openingTime"] ? undefined : "The same every day. No job is booked outside these times."}
+            />
+          </div>
+          <div className="min-w-[200px] flex-1">
+            <SelectField
+              id="closingTime"
+              label="Closes"
+              required
+              options={HOUR_OPTIONS}
+              value={closingTime}
+              onChange={(e) => setClosingTime(e.target.value)}
+              error={fieldErrors["closingTime"]}
+            />
+          </div>
+        </div>
+        <p className="text-xs text-muted-text">
+          New hours start as Not available for existing contractors, until they switch them on. Jobs already booked stay as they are.
+        </p>
       </div>
 
       <div className="mb-4.5 rounded-card border border-hairline bg-surface p-5">

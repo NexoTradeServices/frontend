@@ -256,3 +256,35 @@ test.describe(() => {
     await expectReachable(page, page.getByRole("button", { name: /Dispatch to Bob/ }));
   });
 });
+
+// Feature 1020 -- the hours and holidays on the dispatch page
+test("1020 AC3, AC6: start times and the day view stay inside the opening hours; a refusal shows in the page's Banner", async ({ page, request }) => {
+  await page.goto("/ops/jobs");
+  await login(page, "mike@idelta.com.au");
+  const day = await pickFreeWeekday(page);
+  const reference = await postEnquiry(request, "ac1020", "Plumbing", FREMANTLE, day);
+  await putBillingAddress(page, reference);
+  await page.goto(`/ops/jobs/${reference}/dispatch`);
+  await expect(page.getByRole("heading", { name: `Dispatch ${reference}` })).toBeVisible();
+
+  // AC3: the seeded hours are 7:00am to 7:00pm -- the Start list opens at 7:00am and the last one that
+  // still fits a one-hour job is 6:00pm; nothing earlier or later is offered.
+  const options = await page.locator("#dispatch-start option").allTextContents();
+  expect(options[0]).toBe("7:00am");
+  expect(options[options.length - 1]).toBe("6:00pm");
+  await page.getByRole("button", { name: /Bob Reilly/ }).click();
+  await expect(page.getByRole("button", { name: "Start at 7:00am" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start at 6:30pm" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start at 6:00am" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Start at 7:00pm" })).toHaveCount(0);
+
+  // AC6: the server's refusal for a holiday shows in the dispatch error Banner (the reply faked).
+  await page.route(new RegExp(`/api/jobs/${reference}/dispatch$`), (route) =>
+    route.request().method() === "POST"
+      ? route.fulfill({ status: 400, json: { error: "Closed for Christmas Day. Pick another time.", field: "startMinutes" } })
+      : route.continue(),
+  );
+  await page.getByRole("button", { name: /Dispatch to Bob/ }).click();
+  await expect(page.getByText("Closed for Christmas Day. Pick another time.")).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/ops/jobs/${reference}/dispatch$`));
+});

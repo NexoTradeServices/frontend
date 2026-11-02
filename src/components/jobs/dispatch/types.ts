@@ -12,6 +12,9 @@ export interface DispatchFacts {
   /** Feature 4006: the job's real status, for the page's tag. */
   status: string;
   defaults: { date: string; startMinutes: number; holdMinutes: number };
+  /** Feature 1020: the business hours, "HH:MM" -- the page offers start times inside them and its day view runs between them. */
+  openingTime: string;
+  closingTime: string;
   /** Feature 4006: "reschedule" fixes the contractor who holds the booking; absent at dispatch. */
   mode?: "reschedule";
   contractor?: { code: string; name: string; firstName: string };

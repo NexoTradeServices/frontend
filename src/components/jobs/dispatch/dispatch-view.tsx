@@ -26,8 +26,18 @@ import {
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-const START_MINUTES: number[] = [];
-for (let m = 360; m <= 1230; m += 30) START_MINUTES.push(m); // 6:00am - 8:30pm
+/** "07:00" -> 420. */
+function minutesOfClock(clock: string): number {
+  const [hour, minute] = clock.split(":");
+  return Number(hour) * 60 + Number(minute);
+}
+
+/** Start times inside the business hours: from opening to the last half hour a one-hour job can still finish by closing. */
+function startTimesWithin(openMinutes: number, closeMinutes: number): number[] {
+  const starts: number[] = [];
+  for (let m = openMinutes; m + 60 <= closeMinutes; m += 30) starts.push(m);
+  return starts;
+}
 const HOLD_MINUTES: number[] = [];
 for (let m = 60; m <= 480; m += 30) HOLD_MINUTES.push(m); // 1 - 8 hours
 
@@ -128,6 +138,9 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
   const [dayLoading, setDayLoading] = useState(false);
   const [dispatching, setDispatching] = useState(false);
   const [dispatchError, setDispatchError] = useState<string | undefined>();
+  const openMinutes = minutesOfClock(initial.openingTime);
+  const closeMinutes = minutesOfClock(initial.closingTime);
+  const startMinuteOptions = startTimesWithin(openMinutes, closeMinutes);
 
   useEffect(() => {
     let cancelled = false;
@@ -265,7 +278,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 onChange={(event) => setStartMinutes(Number(event.target.value))}
                 className="min-h-11 w-full rounded-button border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
               >
-                {START_MINUTES.map((minutes) => (
+                {(startMinuteOptions.includes(startMinutes) ? startMinuteOptions : [...startMinuteOptions, startMinutes].sort((a, b) => a - b)).map((minutes) => (
                   <option key={minutes} value={minutes}>
                     {timeLabelFor(minutes)}
                   </option>
@@ -307,6 +320,8 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
               proposedEnd={startMinutes + holdMinutes}
               onPickHalfHour={pickHalfHour}
               onStepDay={stepDay}
+              openMinutes={openMinutes}
+              closeMinutes={closeMinutes}
               loading={dayLoading}
             />
           </Card>
@@ -333,6 +348,8 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                         proposedEnd={startMinutes + holdMinutes}
                         onPickHalfHour={pickHalfHour}
                         onStepDay={stepDay}
+              openMinutes={openMinutes}
+              closeMinutes={closeMinutes}
                         loading={dayLoading}
                       />
                     ) : null}
@@ -360,6 +377,8 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                         proposedEnd={startMinutes + holdMinutes}
                         onPickHalfHour={pickHalfHour}
                         onStepDay={stepDay}
+              openMinutes={openMinutes}
+              closeMinutes={closeMinutes}
                         loading={dayLoading}
                       />
                     ) : null}
