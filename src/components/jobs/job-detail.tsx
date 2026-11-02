@@ -1722,7 +1722,7 @@ function InvoiceCard({
 }) {
   const [resending, setResending] = useState(false);
   const [checking, setChecking] = useState(false);
-  /** "Checked with Stripe at 2:15pm AWST - no payment yet." -- true only at that moment, so never kept past a reload. */
+  /** "Checked with Stripe at 2:15pm - no payment yet." -- true only at that moment, so never kept past a reload. */
   const [checkedLine, setCheckedLine] = useState<string | null>(null);
   const [checkError, setCheckError] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();

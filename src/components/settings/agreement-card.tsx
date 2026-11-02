@@ -16,7 +16,6 @@ import { friendlyDate, openSignedFile } from "@/lib/agreement-files";
 import type { AgreementListDto, AgreementVersionDto } from "@/components/agreement/types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
-const TIMEZONE = "Australia/Perth";
 const NAME_MAX = 36;
 
 const textButton = "min-h-11 py-2.5 text-small font-semibold text-secondary-text underline underline-offset-2";
@@ -43,7 +42,7 @@ async function readList(): Promise<AgreementListDto | null> {
   }
 }
 
-export function AgreementCard({ timezone = TIMEZONE }: { timezone?: string }) {
+export function AgreementCard({ timezone }: { timezone: string }) {
   const [list, setList] = useState<AgreementListDto | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [file, setFile] = useState<File | null>(null);

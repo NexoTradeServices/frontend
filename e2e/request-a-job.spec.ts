@@ -156,7 +156,7 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     await pickTrade(page, trade.trade);
 
     // A fixed weekday, well clear of any weekend.
-    await page.getByLabel("Date").fill("2026-09-09");
+    await page.getByLabel("Date").fill("2027-09-08");
     await expect(page.getByText("Morning", { exact: true })).toBeVisible();
     // 1017 AC5: the evening window ends at 19:00.
     await expect(page.getByText("17:00 - 19:00", { exact: true })).toBeVisible();
@@ -261,9 +261,9 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     await page.getByRole("button", { name: "Continue" }).click();
     await pickTrade(page, trade.trade);
 
-    // 2026-09-12 is a Saturday. The estimate only ever renders on the
+    // 2027-09-11 is a Saturday. The estimate only ever renders on the
     // later Price step (AC10), not here on Schedule.
-    await page.getByLabel("Date").fill("2026-09-12");
+    await page.getByLabel("Date").fill("2027-09-11");
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByLabel("What's happening").fill("Weekend leak.");
     await page.getByRole("button", { name: "Continue" }).click();
@@ -338,7 +338,7 @@ test.describe("Feature 3003 -- enquiry photos", () => {
     await pickJoondalup(page);
     await page.getByRole("button", { name: "Continue" }).click();
     await pickTrade(page, nonPlumbing(formData.serviceTypes).trade);
-    await page.getByLabel("Date").fill("2026-09-09");
+    await page.getByLabel("Date").fill("2027-09-08");
     await page.getByRole("button", { name: "Continue" }).click();
     await expect(page.getByLabel("What's happening")).toBeVisible();
   }
@@ -557,7 +557,7 @@ test.describe("Feature 3006 -- the enquiry form with Google Places down", () => 
     await pickHilton(page);
     await page.getByRole("button", { name: "Continue" }).click();
     await pickTrade(page, nonPlumbing(formData.serviceTypes).trade);
-    await page.getByLabel("Date").fill("2026-09-09");
+    await page.getByLabel("Date").fill("2027-09-08");
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByLabel("What's happening").fill("Mixer tap leaking from the base.");
     await page.getByRole("button", { name: "Continue" }).click();

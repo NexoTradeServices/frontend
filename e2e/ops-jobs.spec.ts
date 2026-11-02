@@ -94,7 +94,7 @@ async function postEnquiry(
       },
       trade: "Plumbing",
       selectedOptions: [],
-      preferredDate: "2026-12-01",
+      preferredDate: "2027-12-01",
       preferredWindow: "morning",
       description: "Kitchen mixer tap is leaking from the base.",
       marketingEmail: false,
@@ -128,7 +128,7 @@ test("AC7: a web enquiry submitted while the queue is open appears within 30 sec
   // same search.
   await page.getByLabel("Search jobs").fill(name);
   await expect(page.getByText(`No job matches "${name}".`)).toBeVisible();
-  const updated = page.getByText(/^Updated \d{1,2}:\d{2}(am|pm) AWST/);
+  const updated = page.getByText(/^Updated \d{1,2}:\d{2}(am|pm)/);
   const before = (await updated.textContent()) ?? "";
   await page.evaluate(() => {
     (window as unknown as { __sameDocument?: boolean }).__sameDocument = true;
@@ -468,7 +468,7 @@ test("3003 AC11: Mike sees the customer's photos in The request card; tapping on
       },
       trade: "Plumbing",
       selectedOptions: [],
-      preferredDate: "2026-12-01",
+      preferredDate: "2027-12-01",
       preferredWindow: "morning",
       description: "Mixer tap leaking from the base.",
       marketingEmail: false,
@@ -599,7 +599,7 @@ test("6002 AC6 / AC9: Check payment with Stripe answers in the Invoice card; onc
   // AC6: nobody has paid at Stripe (dev's sandbox, or the test hook's pretend link) -- the card says so, with when.
   const check = card.getByRole("button", { name: "Check payment with Stripe" });
   await check.click();
-  await expect(card.getByTestId("payment-check")).toHaveText(/^Checked with Stripe at \d{1,2}:\d{2}(am|pm) AWST - no payment yet\.$/);
+  await expect(card.getByTestId("payment-check")).toHaveText(/^Checked with Stripe at \d{1,2}:\d{2}(am|pm) - no payment yet\.$/);
   // Right above the row of buttons, by the one pressed.
   const banner = await card.getByTestId("payment-check").boundingBox();
   const button = await check.boundingBox();
@@ -912,7 +912,7 @@ test("3010 AC2, AC4, AC6: a returning customer's new phone and business name are
         location: { suburb: "Fremantle", state: "WA", country: "AU", postcode: "6160", lat: -32.0569, lng: 115.7439, placeId: "e2e-place-3010" },
         trade: "Plumbing",
         selectedOptions: [],
-        preferredDate: "2026-12-01",
+        preferredDate: "2027-12-01",
         preferredWindow: "morning",
         description: "An e2e throwaway job for feature 3010.",
         marketingEmail: false,

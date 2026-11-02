@@ -186,7 +186,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
       }
       setDayLoading(true);
       const ignore = reschedule ? `&ignoreJob=${encodeURIComponent(initial.reference)}` : "";
-      fetch(`${apiUrl}/api/contractors/${encodeURIComponent(pickedCode)}/day?date=${date}${ignore}`, { credentials: "include" })
+      fetch(`${apiUrl}/api/contractors/${encodeURIComponent(pickedCode)}/day?date=${date}&job=${encodeURIComponent(initial.reference)}${ignore}`, { credentials: "include" })
         .then((res) => (res.ok ? (res.json() as Promise<{ blocks: DayBlock[] }>) : null))
         .then((body) => {
           if (!cancelled) setDayBlocks(body?.blocks ?? []);
@@ -270,7 +270,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
             </div>
             <div>
               <label htmlFor="dispatch-start" className={`mb-[5px] ${labelClass}`}>
-                Start (AWST)
+                Start ({initial.stateLabel})
               </label>
               <select
                 id="dispatch-start"
@@ -309,7 +309,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
 
       {reschedule ? (
         <div className="order-3 min-w-0 xl:order-none xl:col-start-1 xl:row-start-2">
-          <Card title={`${fixedFirstName}'s day`} aside={`${initial.trade} - ${shortDateOf(date)}, ${timeLabelFor(startMinutes)}-${timeLabelFor(startMinutes + holdMinutes)} AWST`}>
+          <Card title={`${fixedFirstName}'s day`} aside={`${initial.trade} - ${shortDateOf(date)}, ${timeLabelFor(startMinutes)}-${timeLabelFor(startMinutes + holdMinutes)} ${initial.stateLabel}`}>
             {pickedRow && !pickedRow.pickable && pickedRow.why ? (
               <p className="mb-2.5 text-xs font-semibold text-brand-warning">{pickedRow.why}</p>
             ) : null}
@@ -328,7 +328,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
         </div>
       ) : (
       <div className="order-3 min-w-0 xl:order-none xl:col-start-1 xl:row-start-2">
-        <Card title="Contractors" aside={`${initial.trade} - ${shortDateOf(date)}, ${timeLabelFor(startMinutes)}-${timeLabelFor(startMinutes + holdMinutes)} AWST`}>
+        <Card title="Contractors" aside={`${initial.trade} - ${shortDateOf(date)}, ${timeLabelFor(startMinutes)}-${timeLabelFor(startMinutes + holdMinutes)} ${initial.stateLabel}`}>
           {candidatesLoading && !candidates ? (
             <p className="text-small text-muted-text">Loading candidates...</p>
           ) : (
@@ -460,7 +460,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
             <div>
               <span className={labelClass}>Time</span>
               <div className="tabular-nums text-secondary-text">
-                {timeLabelFor(startMinutes)}-{timeLabelFor(startMinutes + holdMinutes)} AWST
+                {timeLabelFor(startMinutes)}-{timeLabelFor(startMinutes + holdMinutes)} {initial.stateLabel}
               </div>
             </div>
             <div>

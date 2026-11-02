@@ -22,8 +22,8 @@ import { LockedField } from "@/components/ui/locked-field";
 import { AdditionalQuestions } from "@/components/request-a-job/additional-questions";
 import { PriceBox } from "@/components/request-a-job/price-box";
 import { WINDOWS } from "@/components/request-a-job/request-a-job-form";
-import { isWeekendDate, todayYmd } from "@/components/request-a-job/money";
-import { holidayWords, stateOfPick, usePublicHolidays } from "@/components/request-a-job/holidays";
+import { isWeekendDate } from "@/components/request-a-job/money";
+import { holidayWords, stateOfPick, usePublicHolidays, useStateToday } from "@/components/request-a-job/holidays";
 import type { FormDataDto, PreferredWindow } from "@/components/request-a-job/types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -47,7 +47,7 @@ type FieldKey =
   | "siteContactEmail";
 type Errors = Partial<Record<FieldKey, string>>;
 
-export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
+export function PhoneIntakeForm({ formData, businessToday }: { formData: FormDataDto; businessToday: string }) {
   const router = useRouter();
   const { serviceTypes } = formData;
 
@@ -56,7 +56,7 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
   const [trade, setTrade] = useState("");
   const [description, setDescription] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [preferredDate, setPreferredDate] = useState(todayYmd());
+  const [pickedDate, setPreferredDate] = useState<string | null>(null);
   const [preferredWindow, setPreferredWindow] = useState<PreferredWindow | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -79,6 +79,10 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
   const isBusiness = businessName.trim() !== "";
 
   const selectedType = useMemo(() => serviceTypes.find((t) => t.trade === trade) ?? null, [serviceTypes, trade]);
+  // Feature 1022: today is the job's state's today once the suburb is picked; until then the business clock's, from the page.
+  const stateToday = useStateToday(stateOfPick(effectiveSite ?? location, platformSuburb));
+  const today = stateToday ?? businessToday;
+  const preferredDate = pickedDate ?? today;
   const weekend = isWeekendDate(preferredDate);
   // Feature 1020: a public holiday of the job's state is shown as the date's error and stops Save.
   const holidays = usePublicHolidays(stateOfPick(effectiveSite ?? location, platformSuburb));
@@ -457,7 +461,7 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
             label="Date"
             required
             type="date"
-            min={todayYmd()}
+            min={today}
             value={preferredDate}
             onChange={(event) => {
               setPreferredDate(event.target.value);

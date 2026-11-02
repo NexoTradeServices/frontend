@@ -3,7 +3,7 @@
 // AC1  a new job's Contractor card shows Dispatch, opening the dispatch page
 // AC2  a job with no address at all: Dispatch is off, with the reason
 // AC6  the dispatch page opens on the job's preferred date at its window's
-//      start with a 1-hour hold, the field reading "Start (AWST)"
+//      start with a 1-hour hold, the field reading "Start (WA time)"
 // AC17 picking a contractor opens his day; Previous/Next day moves it
 // AC18 tapping a half hour moves the start there, keeping the hold's length
 // AC19 a busy contractor still opens his day; a Not ready one does not
@@ -66,7 +66,7 @@ async function putBillingAddress(page: Page, reference: string): Promise<void> {
   expect(res.status()).toBe(200);
 }
 
-const MONDAY = "2026-12-07";
+const MONDAY = "2027-03-08"; // inside Bob's licence (30 Jun 2027)
 
 async function expectNoSidewaysScroll(page: Page) {
   const { scrollWidth, clientWidth } = await page.evaluate(() => ({
@@ -146,7 +146,7 @@ test("AC6, AC17, AC18, AC29: the dispatch flow", async ({ page, request }) => {
 
   // AC6: opens on the job's preferred date, the window's start, a 1-hour hold.
   await expect(page.getByLabel("Day", { exact: true })).toHaveValue(monday);
-  await expect(page.getByLabel("Start (AWST)")).toHaveValue("420"); // 7:00am, morning's start
+  await expect(page.getByLabel("Start (WA time)")).toHaveValue("420"); // 7:00am, morning's start
   await expect(page.getByLabel("Hold")).toHaveValue("60");
 
   // The price, for a Monday (normal).
@@ -160,7 +160,7 @@ test("AC6, AC17, AC18, AC29: the dispatch flow", async ({ page, request }) => {
 
   // AC18: tapping a half hour moves the start, the hold stays 1 hour.
   await page.getByRole("button", { name: "Start at 9:00am" }).click();
-  await expect(page.getByLabel("Start (AWST)")).toHaveValue("540"); // 9:00am
+  await expect(page.getByLabel("Start (WA time)")).toHaveValue("540"); // 9:00am
   await expect(page.getByLabel("Hold")).toHaveValue("60");
 
   const goButton = page.getByRole("button", { name: /Dispatch to Bob/ });
@@ -193,7 +193,7 @@ test("AC19: a busy contractor still opens his day; a Not ready one does not", as
   await putBillingAddress(page, second);
   await page.goto(`/ops/jobs/${second}/dispatch`);
   await expect(page.getByRole("heading", { name: `Dispatch ${second}` })).toBeVisible();
-  await expect(page.getByLabel("Start (AWST)")).toHaveValue("420");
+  await expect(page.getByLabel("Start (WA time)")).toHaveValue("420");
 
   const bobBusyRow = page.getByRole("button", { name: /Bob Reilly/ });
   await expect(bobBusyRow.getByText(/Busy/)).toBeVisible({ timeout: 10_000 });
@@ -244,7 +244,7 @@ test.describe(() => {
     await expectNoSidewaysScroll(page);
     await expectTapTargets(page);
     await expectReachable(page, page.getByLabel("Day", { exact: true }));
-    await expectReachable(page, page.getByLabel("Start (AWST)"));
+    await expectReachable(page, page.getByLabel("Start (WA time)"));
     await expectReachable(page, page.getByLabel("Hold"));
     const bobRow = page.getByRole("button", { name: /Bob Reilly/ });
     await expectReachable(page, bobRow);

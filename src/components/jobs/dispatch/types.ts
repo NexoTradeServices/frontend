@@ -12,6 +12,8 @@ export interface DispatchFacts {
   /** Feature 4006: the job's real status, for the page's tag. */
   status: string;
   defaults: { date: string; startMinutes: number; holdMinutes: number };
+  /** Feature 1022: "NSW time" - the label after every time the page shows */
+  stateLabel: string;
   /** Feature 1020: the business hours, "HH:MM" -- the page offers start times inside them and its day view runs between them. */
   openingTime: string;
   closingTime: string;

@@ -40,3 +40,23 @@ export function usePublicHolidays(state: string | null): Record<string, string> 
   }, [state]);
   return state !== null && loaded?.state === state ? loaded.byDate : {};
 }
+
+/**
+ * Today's date in the suburb's state (Feature 1022): at 10pm in Perth a Sydney suburb is already tomorrow, so the date
+ * default and the earliest date come from the server by state, never from the device. Null until the state is known.
+ */
+export function useStateToday(state: string | null): string | null {
+  const [loaded, setLoaded] = useState<{ state: string; date: string } | null>(null);
+  useEffect(() => {
+    if (state === null) return;
+    const controller = new AbortController();
+    fetch(`${apiUrl}/api/enquiries/today?state=${state}`, { signal: controller.signal })
+      .then((res) => (res.ok ? (res.json() as Promise<{ date: string }>) : null))
+      .then((body) => {
+        if (body !== null) setLoaded({ state, date: body.date });
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [state]);
+  return state !== null && loaded?.state === state ? loaded.date : null;
+}

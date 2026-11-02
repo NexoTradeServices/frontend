@@ -16,6 +16,9 @@ export default async function PhoneIntakePage() {
   const res = await fetch(`${apiUrl}/api/enquiries/form-data`, { cache: "no-store" });
   if (res.status !== 200) return <LoadFailed />;
   const formData = (await res.json()) as FormDataDto;
+  // Feature 1022: until the suburb is picked the form starts on the business clock's today, read on the server.
+  const todayRes = await fetch(`${apiUrl}/api/enquiries/today`, { cache: "no-store" });
+  const businessToday = todayRes.status === 200 ? ((await todayRes.json()) as { date: string }).date : new Date().toISOString().slice(0, 10);
 
   return (
     <Container width="medium">
@@ -24,7 +27,7 @@ export default async function PhoneIntakePage() {
         title="New phone job"
         subtitle="Key the job while the customer is on the line."
       />
-      <PhoneIntakeForm formData={formData} />
+      <PhoneIntakeForm formData={formData} businessToday={businessToday} />
     </Container>
   );
 }

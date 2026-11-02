@@ -30,7 +30,7 @@ import { TradeIcon } from "./trade-icon";
 import { PriceBox } from "./price-box";
 import { AdditionalQuestions } from "./additional-questions";
 import { MAX_PHOTOS, PHOTO_UNAVAILABLE, useEnquiryPhotos } from "./use-enquiry-photos";
-import { holidayWords, stateOfPick, usePublicHolidays } from "./holidays";
+import { holidayWords, stateOfPick, usePublicHolidays, useStateToday } from "./holidays";
 import { formatDayName, formatFriendlyDate, isWeekendDate, todayYmd } from "./money";
 import type { FormDataDto, PreferredWindow } from "./types";
 
@@ -72,7 +72,12 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
   const [tradeError, setTradeError] = useState<string>();
   /** One typed answer per trade question, keyed by the question's own label. Optional -- left blank is fine. */
   const [questionAnswers, setQuestionAnswers] = useState<Record<string, string>>({});
-  const [preferredDate, setPreferredDate] = useState(todayYmd());
+  // Feature 1022: today is the SUBURB'S state's today (at 10pm in Perth a Sydney suburb is already tomorrow). Until the
+  // state is known the device's day stands in; the date the person typed always wins over the default.
+  const stateToday = useStateToday(stateOfPick(location, platformSuburb));
+  const today = stateToday ?? todayYmd();
+  const [pickedDate, setPreferredDate] = useState<string | null>(null);
+  const preferredDate = pickedDate ?? today;
   const [preferredWindow, setPreferredWindow] = useState<PreferredWindow>("morning");
   // Feature 1020: a public holiday of the suburb's state is shown as the date's error and stops Next.
   const holidays = usePublicHolidays(stateOfPick(location, platformSuburb));
@@ -362,7 +367,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
                 label="Date"
                 required
                 type="date"
-                min={todayYmd()}
+                min={today}
                 value={preferredDate}
                 onChange={(e) => setPreferredDate(e.target.value)}
                 error={dateError}

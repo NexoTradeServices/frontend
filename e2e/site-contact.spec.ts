@@ -44,7 +44,7 @@ async function postEnquiry(request: APIRequestContext, tag: string, name: string
       },
       trade: "Plumbing",
       selectedOptions: [],
-      preferredDate: "2026-12-01",
+      preferredDate: "2027-12-01",
       preferredWindow: "morning",
       description: "Kitchen mixer tap is leaking from the base.",
       marketingEmail: false,
