@@ -166,8 +166,10 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
   const closedPanel =
     holidayName === undefined ? null : (
       <div role="status" className="rounded-small-box border border-hairline bg-ground p-4">
-        <b className="block text-sm font-extrabold text-ink">Closed on {formatDateWithDay(date)}</b>
-        <span className="text-small text-muted-text">{holidayName}. Pick another day to see who is available.</span>
+        <b className="block text-sm font-extrabold text-ink">
+          Closed on {formatDateWithDay(date)} for {holidayName}
+        </b>
+        <span className="text-small text-muted-text">Pick another day to see who is available.</span>
       </div>
     );
 

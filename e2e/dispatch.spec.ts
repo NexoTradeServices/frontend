@@ -296,8 +296,8 @@ test("1020 AC3, AC6: start times and the day view stay inside the opening hours;
     route.fulfill({ json: { holidays: [{ date: day, name: "Test Day" }] } }),
   );
   await page.reload();
-  await expect(page.getByText(/^Closed on /)).toBeVisible();
-  await expect(page.getByText("Test Day. Pick another day to see who is available.")).toBeVisible();
+  await expect(page.getByText(/^Closed on .* for Test Day$/)).toBeVisible();
+  await expect(page.getByText("Pick another day to see who is available.")).toBeVisible();
   await expect(page.getByRole("button", { name: /Bob Reilly/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Dispatch", exact: true })).toBeDisabled();
 });
