@@ -16,6 +16,7 @@ import { fullAddress } from "@/components/ui/places-field";
 import { ChangeAvailabilityDialog } from "./change-availability-dialog";
 import { CalendarDayView, timeLabelFor, type DayBlock } from "@/components/ui/calendar-day-view";
 import { PrimaryButton } from "@/components/auth/buttons";
+import { usePublicHolidays } from "@/components/request-a-job/holidays";
 import { formatDateWithDay, weekdayName } from "@/lib/date-format";
 import {
   LEVEL_LABELS,
@@ -159,6 +160,16 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
   const openMinutes = minutesOfClock(initial.openingTime);
   const closeMinutes = minutesOfClock(initial.closingTime);
   const startMinuteOptions = startTimesWithin(openMinutes, closeMinutes);
+  // A public holiday of the job's state locks the day: no candidates, no grid, no Dispatch, until another day is picked.
+  const holidays = usePublicHolidays(initial.stateLabel.split(" ")[0] || null);
+  const holidayName = holidays[date];
+  const closedPanel =
+    holidayName === undefined ? null : (
+      <div role="status" className="rounded-small-box border border-hairline bg-ground p-4">
+        <b className="block text-sm font-extrabold text-ink">Closed on {formatDateWithDay(date)}</b>
+        <span className="text-small text-muted-text">{holidayName}. Pick another day to see who is available.</span>
+      </div>
+    );
 
   useEffect(() => {
     let cancelled = false;
@@ -224,7 +235,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
 
   const allRows = candidates ? [...candidates.serves, ...candidates.outside] : [];
   const pickedRow = allRows.find((row) => row.code === pickedCode) ?? null;
-  const canGo = pickedRow !== null && pickedRow.pickable;
+  const canGo = pickedRow !== null && pickedRow.pickable && holidayName === undefined;
 
   function stepDay(delta: -1 | 1) {
     setDate((current) => addDays(current, delta));
@@ -295,6 +306,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 id="dispatch-start"
                 value={startMinutes}
                 onChange={(event) => setStartMinutes(Number(event.target.value))}
+                disabled={holidayName !== undefined}
                 className="min-h-11 w-full rounded-button border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
               >
                 {(startMinuteOptions.includes(startMinutes) ? startMinuteOptions : [...startMinuteOptions, startMinutes].sort((a, b) => a - b)).map((minutes) => (
@@ -312,6 +324,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 id="dispatch-hold"
                 value={holdMinutes}
                 onChange={(event) => setHoldMinutes(Number(event.target.value))}
+                disabled={holidayName !== undefined}
                 className="min-h-11 w-full rounded-button border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
               >
                 {HOLD_MINUTES.map((minutes) => (
@@ -332,6 +345,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
             {pickedRow && !pickedRow.pickable && pickedRow.why ? (
               <p className="mb-2.5 text-xs font-semibold text-brand-warning">{pickedRow.why}</p>
             ) : null}
+            {closedPanel ?? (
             <CalendarDayView
               dayLabel={`${fixedFirstName}'s ${shortDateOf(date)}`}
               blocks={dayBlocks}
@@ -344,12 +358,15 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
               lastStartMinutes={closeMinutes - holdMinutes}
               loading={dayLoading}
             />
+            )}
           </Card>
         </div>
       ) : (
       <div className="order-3 min-w-0 xl:order-none xl:col-start-1 xl:row-start-2">
         <Card title="Contractors" aside={`${initial.trade} - ${shortDateOf(date)}, ${timeLabelFor(startMinutes)}-${timeLabelFor(startMinutes + holdMinutes)} ${initial.stateLabel}`}>
-          {candidatesLoading && !candidates ? (
+          {closedPanel ? (
+            closedPanel
+          ) : candidatesLoading && !candidates ? (
             <p className="text-small text-muted-text">Loading candidates...</p>
           ) : (
             <>
@@ -511,7 +528,9 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
           {dispatchError ? <p className="mb-2 text-xs text-brand-destructive">{dispatchError}</p> : null}
           <div className="flex flex-col gap-2 border-t border-hairline pt-3.5 md:flex-row md:items-center md:justify-end md:gap-3">
             <span className="text-xs text-muted-text md:order-1">
-              {canGo && reschedule
+              {holidayName !== undefined
+                ? "The business is closed that day. Pick another day."
+                : canGo && reschedule
                 ? `${fixedFirstName} is sent one message with the new time to accept or decline. ${initial.customerName.split(" ")[0]} is told only when he accepts.`
                 : canGo
                 ? `An email and text will be sent to ${pickedRow?.name.split(" ")[0]} to accept or decline. ${initial.customerName.split(" ")[0]} will not be notified until he accepts.`
