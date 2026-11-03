@@ -468,7 +468,7 @@ test("1020: Settings carries a Manage holidays link to the Public holidays page,
 test.describe("1020 -- public holidays", () => {
   test.beforeEach(async ({ page }) => {
     await ensureLoggedInAs(page, "/ops/settings/holidays", "owner@idelta.com.au");
-    await expect(page.getByRole("heading", { name: "Public holidays", level: 3 })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "Public holidays", level: 1 })).toBeVisible({ timeout: 10_000 });
   });
 
   test("AC5: add a holiday for NSW 2028, see it listed, a second on the same date is refused, remove it", async ({ page }) => {

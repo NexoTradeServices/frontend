@@ -188,11 +188,6 @@ export function PublicHolidaysCard({
 
   return (
     <div id="public-holidays" className="mb-4.5 rounded-card border border-hairline bg-surface p-4 sm:p-5">
-      <h3 className="font-heading text-base font-extrabold text-ink">Public holidays</h3>
-      <p className="mb-3.5 text-xs text-muted-text">
-        The business is closed on these days. Nothing can be dispatched or booked for them.
-      </p>
-
       <div className="mb-1 flex flex-wrap items-end gap-4">
         <div className="min-w-[140px]">
           <SelectField

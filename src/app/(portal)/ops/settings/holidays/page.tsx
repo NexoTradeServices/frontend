@@ -34,7 +34,7 @@ export default async function OpsPublicHolidaysPage({
     <Container width="medium">
       <PageHeader
         title="Public holidays"
-        subtitle="The business is closed on these days, state by state."
+        subtitle="The business is closed on these days. Nothing can be dispatched or booked for them."
         breadcrumb={{ label: "Settings", href: "/ops/settings" }}
       />
       <PublicHolidaysCard
