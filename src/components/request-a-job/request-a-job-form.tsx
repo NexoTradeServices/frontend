@@ -82,7 +82,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
   // Feature 1020: a public holiday of the suburb's state is shown as the date's error and stops Next.
   const holidays = usePublicHolidays(stateOfPick(location, platformSuburb));
   const holidayName = holidays[preferredDate];
-  const dateError = holidayName === undefined ? undefined : holidayWords(holidayName);
+  const holidayMessage = holidayName === undefined ? undefined : holidayWords(preferredDate, holidayName);
   const [description, setDescription] = useState("");
   const [descriptionError, setDescriptionError] = useState<string>();
   const [name, setName] = useState("");
@@ -164,7 +164,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
       }
       return true;
     }
-    if (step === "schedule") return dateError === undefined;
+    if (step === "schedule") return holidayMessage === undefined;
     if (step === "notes") {
       // The trade's own questions are optional (owner, 09/09/26) -- only
       // the general description is required on this step.
@@ -370,9 +370,11 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
                 min={today}
                 value={preferredDate}
                 onChange={(e) => setPreferredDate(e.target.value)}
-                error={dateError}
-                helper={dateError === undefined ? "Defaults to today -- move it later if that suits you better." : undefined}
+                helper={holidayMessage === undefined ? "Defaults to today -- move it later if that suits you better." : undefined}
               />
+              {holidayMessage !== undefined ? (
+                <Banner kind="warning">{holidayMessage}</Banner>
+              ) : (
               <div className="mb-3.5">
                 <span className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']">
                   Time of day
@@ -400,6 +402,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
                   ))}
                 </div>
               </div>
+              )}
             </>
           ) : null}
 
@@ -568,7 +571,8 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
               <button
                 type="button"
                 onClick={handleContinue}
-                className="min-h-11 rounded-button bg-brand-accent px-5 py-2.5 text-sm font-bold text-on-accent"
+                disabled={step === "schedule" && holidayMessage !== undefined}
+                className="min-h-11 rounded-button bg-brand-accent px-5 py-2.5 text-sm font-bold text-on-accent disabled:cursor-not-allowed disabled:bg-hairline disabled:text-muted-text"
               >
                 Continue
               </button>

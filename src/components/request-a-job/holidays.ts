@@ -6,6 +6,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatDateWithDay } from "@/lib/date-format";
 import type { PickedAddress, PlatformSuburb } from "@/components/ui/places-field";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -18,9 +19,9 @@ export function stateOfPick(location: PickedAddress | null, platformSuburb: Plat
   return null;
 }
 
-/** The words under the date Field for a holiday, or undefined. */
-export function holidayWords(name: string): string {
-  return `We're closed on ${name}. Please pick another date.`;
+/** The message that takes the place of the time-of-day choices when the picked date is a public holiday. */
+export function holidayWords(date: string, name: string): string {
+  return `We're closed on ${formatDateWithDay(date)} for ${name}. Please pick another date.`;
 }
 
 /** date (YYYY-MM-DD) -> holiday name, for `state`; empty until the state is known or the read fails (the server still refuses). */

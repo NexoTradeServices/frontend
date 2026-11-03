@@ -87,7 +87,7 @@ export function PhoneIntakeForm({ formData, businessToday }: { formData: FormDat
   // Feature 1020: a public holiday of the job's state is shown as the date's error and stops Save.
   const holidays = usePublicHolidays(stateOfPick(effectiveSite ?? location, platformSuburb));
   const holidayName = holidays[preferredDate];
-  const holidayError = holidayName === undefined ? undefined : holidayWords(holidayName);
+  const holidayMessage = holidayName === undefined ? undefined : holidayWords(preferredDate, holidayName);
   const multiplier = selectedType
     ? weekend
       ? selectedType.serviceLevelMultipliers.weekend
@@ -105,7 +105,7 @@ export function PhoneIntakeForm({ formData, businessToday }: { formData: FormDat
     if (trade === "") next.trade = "Pick a trade.";
     if (description.trim() === "") next.description = "Tell us what's happening.";
     if (preferredDate === "") next.preferredDate = "Pick a date.";
-    else if (holidayError !== undefined) next.preferredDate = holidayError;
+    else if (holidayMessage !== undefined) next.preferredDate = holidayMessage;
     if (preferredWindow === null) next.preferredWindow = "Pick a time of day.";
     if (name.trim() === "") next.name = "Enter the customer's name.";
     if (!EMAIL_PATTERN.test(email.trim())) next.email = "Enter the customer's email address.";
@@ -467,8 +467,11 @@ export function PhoneIntakeForm({ formData, businessToday }: { formData: FormDat
               setPreferredDate(event.target.value);
               clearError("preferredDate");
             }}
-            error={holidayError ?? errors.preferredDate}
+            error={errors.preferredDate}
           />
+          {holidayMessage !== undefined ? (
+            <Banner kind="warning">{holidayMessage}</Banner>
+          ) : (
           <fieldset className="mb-3.5">
             <legend className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']">
               Time of day
@@ -502,6 +505,7 @@ export function PhoneIntakeForm({ formData, businessToday }: { formData: FormDat
               <p className="mt-[5px] text-xs text-brand-destructive">{errors.preferredWindow}</p>
             ) : null}
           </fieldset>
+          )}
         </div>
       </div>
 
@@ -516,7 +520,13 @@ export function PhoneIntakeForm({ formData, businessToday }: { formData: FormDat
         </div>
       ) : null}
 
-      <PrimaryButton size="compact" loading={submitting} loadingLabel="Creating...">
+      <PrimaryButton
+        size="compact"
+        loading={submitting}
+        loadingLabel="Creating..."
+        disabled={holidayMessage !== undefined}
+        className="disabled:cursor-not-allowed disabled:bg-hairline disabled:text-muted-text"
+      >
         Create job
       </PrimaryButton>
     </form>

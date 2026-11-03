@@ -224,7 +224,7 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     await expect(page.getByLabel("Email")).toHaveValue(/^e2e-3001-.*@idelta\.com\.au$/);
   });
 
-  test("1020 AC7: a public holiday of the suburb's state is the date's own error, at once, and stops Continue", async ({ page }) => {
+  test("1020 AC7: a public holiday of the suburb's state replaces the time-of-day choices at once, and greys Continue", async ({ page }) => {
     const trade = nonPlumbing(formData.serviceTypes);
     // The open holiday read is faked: the day the test types is Christmas Day for WA.
     await page.route(/\/api\/public-holidays\?state=WA/, (route) =>
@@ -235,11 +235,13 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     await page.getByRole("button", { name: "Continue" }).click();
     await pickTrade(page, trade.trade);
     await page.getByLabel("Date").fill("2099-12-25");
-    await expect(page.getByText("We're closed on Christmas Day. Please pick another date.")).toBeVisible();
-    await page.getByRole("button", { name: "Continue" }).click();
-    await expect(page.getByLabel("Date")).toBeVisible(); // still on the date step
+    await expect(page.getByText("We're closed on Sat 25 Dec 2099 for Christmas Day. Please pick another date.")).toBeVisible();
+    // The message takes the place of the time-of-day choices, and Continue is greyed.
+    await expect(page.getByText("Time of day")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
     await page.getByLabel("Date").fill("2099-12-24");
-    await expect(page.getByText("We're closed on Christmas Day. Please pick another date.")).toHaveCount(0);
+    await expect(page.getByText("We're closed on Sat 25 Dec 2099 for Christmas Day. Please pick another date.")).toHaveCount(0);
+    await expect(page.getByText("Time of day")).toBeVisible();
     await page.getByRole("button", { name: "Continue" }).click();
     await expect(page.getByLabel("What's happening")).toBeVisible();
   });
