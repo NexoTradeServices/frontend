@@ -45,6 +45,7 @@ export function CalendarDayView({
   onStepDay,
   openMinutes,
   closeMinutes,
+  lastStartMinutes,
   loading = false,
 }: {
   /** e.g. "Bob's Mon 14 Sep" -- the caller composes it, this component only draws the grid. */
@@ -57,6 +58,8 @@ export function CalendarDayView({
   /** The rows run from the opening time to the closing time read from settings (Calendar & Scheduling / Opening hours), never a fixed range. */
   openMinutes: number;
   closeMinutes: number;
+  /** The latest half hour a start can be tapped at (closing time minus the hold); later rows are greyed and cannot be tapped. */
+  lastStartMinutes?: number;
   loading?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -118,8 +121,9 @@ export function CalendarDayView({
                 <button
                   type="button"
                   onClick={() => onPickHalfHour(minutes)}
+                  disabled={lastStartMinutes !== undefined && minutes > lastStartMinutes}
                   aria-label={`Start at ${timeLabelFor(minutes)}`}
-                  className={`h-11 border-t px-2 text-left hover:bg-secondary ${
+                  className={`h-11 border-t px-2 text-left enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:bg-ground ${
                     half ? "border-dashed border-hairline" : "border-hairline"
                   }`}
                 />

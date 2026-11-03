@@ -275,6 +275,9 @@ test("1020 AC3, AC6: start times and the day view stay inside the opening hours;
   await page.getByRole("button", { name: /Bob Reilly/ }).click();
   await expect(page.getByRole("button", { name: "Start at 7:00am" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Start at 6:30pm" })).toBeVisible();
+  // A one-hour job cannot start in the last half hour: that row is greyed and cannot be tapped.
+  await expect(page.getByRole("button", { name: "Start at 6:30pm" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Start at 6:00pm" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Start at 6:00am" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Start at 7:00pm" })).toHaveCount(0);
 

@@ -341,6 +341,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
               onStepDay={stepDay}
               openMinutes={openMinutes}
               closeMinutes={closeMinutes}
+              lastStartMinutes={closeMinutes - holdMinutes}
               loading={dayLoading}
             />
           </Card>
@@ -378,6 +379,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                         onStepDay={stepDay}
               openMinutes={openMinutes}
               closeMinutes={closeMinutes}
+              lastStartMinutes={closeMinutes - holdMinutes}
                         loading={dayLoading}
                       />
                     ) : null}
@@ -416,6 +418,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                         onStepDay={stepDay}
               openMinutes={openMinutes}
               closeMinutes={closeMinutes}
+              lastStartMinutes={closeMinutes - holdMinutes}
                         loading={dayLoading}
                       />
                     ) : null}
