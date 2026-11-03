@@ -58,6 +58,15 @@ async function putBack(page: Page, removed: Holiday[]): Promise<void> {
   }
 }
 
+/** The bar shows one item at a time ("1 of 3"): go through them with the arrow until the one asked for shows. */
+async function showLine(page: Page, text: string): Promise<void> {
+  const next = page.getByRole("button", { name: "Next item" });
+  for (let tries = 0; tries < 10 && !(await page.getByText(text).isVisible()); tries += 1) {
+    if ((await next.count()) === 0) break;
+    await next.click();
+  }
+}
+
 // One shared WA list, one test at a time: each test below takes rows off it and puts them back.
 test.describe.configure({ mode: "serial" });
 
@@ -70,6 +79,7 @@ test.describe("1020 AC12 -- desktop", () => {
     try {
       await page.goto("/ops/jobs");
       await expect(page.getByText("Needs attention", { exact: true })).toBeVisible();
+      await showLine(page, `WA ${String(YEAR)} has fewer than 7 holidays.`);
       await expect(page.getByText(`WA ${String(YEAR)} has fewer than 7 holidays.`)).toBeVisible();
       await page.getByRole("link", { name: "Add holidays" }).click();
       await expect(page).toHaveURL(/\/ops\/settings\/holidays\?holidayState=WA&holidayYear=\d{4}$/);
@@ -102,6 +112,7 @@ test.describe("1020 AC12 -- desktop", () => {
     try {
       await page.context().clearCookies();
       await openQueueAs(page, "mike@idelta.com.au");
+      await showLine(page, `WA ${String(YEAR)} has fewer than 7 holidays. Contact platform administrator.`);
       await expect(page.getByText(`WA ${String(YEAR)} has fewer than 7 holidays. Contact platform administrator.`)).toBeVisible();
       await expect(page.getByRole("link", { name: "Add holidays" })).toHaveCount(0);
     } finally {
@@ -120,6 +131,7 @@ test.describe("1020 AC12 -- phone", () => {
     const removed = await makeGap(page);
     try {
       await page.goto("/ops/jobs");
+      await showLine(page, `WA ${String(YEAR)} has fewer than 7 holidays.`);
       const words = page.getByText(`WA ${String(YEAR)} has fewer than 7 holidays.`);
       const link = page.getByRole("link", { name: "Add holidays" });
       await expect(words).toBeVisible();
