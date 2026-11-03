@@ -530,7 +530,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
           <div className="flex flex-col gap-2 border-t border-hairline pt-3.5 md:flex-row md:items-center md:justify-end md:gap-3">
             <span className="text-xs text-muted-text md:order-1">
               {holidayName !== undefined
-                ? "The business is closed that day."
+                ? ""
                 : canGo && reschedule
                 ? `${fixedFirstName} is sent one message with the new time to accept or decline. ${initial.customerName.split(" ")[0]} is told only when he accepts.`
                 : canGo
