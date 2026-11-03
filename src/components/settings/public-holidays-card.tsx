@@ -89,6 +89,8 @@ export function PublicHolidaysCard({
     setHolidays(null);
     setState(nextState);
     setYear(nextYear);
+    setDate("");
+    setErrors({});
   }
 
   async function refresh() {
@@ -101,6 +103,7 @@ export function PublicHolidaysCard({
     clearMessages();
     const next: { date?: string; name?: string } = {};
     if (date === "") next.date = "Required.";
+    else if (!date.startsWith(`${String(year)}-`)) next.date = `Pick a date in ${String(year)}.`;
     if (name.trim() === "") next.name = "Required.";
     if (next.date || next.name) {
       setErrors(next);
@@ -264,6 +267,8 @@ export function PublicHolidaysCard({
             label="Date"
             type="date"
             value={date}
+            min={`${String(year)}-01-01`}
+            max={`${String(year)}-12-31`}
             onChange={(e) => {
               setDate(e.target.value);
               setErrors((current) => ({ ...current, date: undefined }));

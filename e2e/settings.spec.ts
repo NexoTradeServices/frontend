@@ -477,6 +477,13 @@ test.describe("1020 -- public holidays", () => {
     for (let year = thisYear; year < 2028; year += 1) await page.getByRole("button", { name: "Next year" }).click();
     await expect(page.getByText("No holidays entered for NSW 2028. Add them so jobs can't be booked on those days.").first()).toBeVisible();
 
+    // The date box follows the year on show: another year is refused beside the box, nothing is added.
+    await page.getByLabel("Date", { exact: true }).fill("2027-01-26");
+    await page.getByLabel("Holiday name").fill("Wrong year");
+    await page.getByRole("button", { name: "Add holiday" }).click();
+    await expect(page.getByText("Pick a date in 2028.")).toBeVisible();
+    await page.getByLabel("Holiday name").fill("");
+
     await page.getByLabel("Date", { exact: true }).fill("2028-01-26");
     await page.getByLabel("Holiday name").fill("Australia Day");
     await page.getByRole("button", { name: "Add holiday" }).click();
