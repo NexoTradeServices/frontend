@@ -514,15 +514,22 @@ test.describe("1020 -- public holidays", () => {
     await expect(page.getByText("1 job is already booked that day")).toBeVisible();
   });
 
-  test("AC9: Remove all appears for a finished year only, asks first, and empties the list", async ({ page }) => {
+  test("AC9: a past year has no add form, shows Remove all, asks first, and empties the list (the rows are faked: a past year cannot be added to)", async ({ page }) => {
+    const finished = new Date().getFullYear() - 1;
+    let rows = [{ id: "fake-1", state: "TAS", date: `${String(finished)}-01-01`, name: "New Year's Day" }];
+    await page.route(/\/api\/holidays\?state=TAS&year=\d+$/, (route) => {
+      if (route.request().method() === "DELETE") {
+        rows = [];
+        return route.fulfill({ status: 200, json: { removed: 1 } });
+      }
+      return route.fulfill({ status: 200, json: { holidays: rows } });
+    });
     await page.getByLabel("State", { exact: true }).selectOption("TAS");
     await expect(page.getByRole("button", { name: /^Remove all TAS/ })).toHaveCount(0); // this year: no Remove all
+    await expect(page.getByRole("button", { name: "Add holiday" })).toBeVisible();
     await page.getByRole("button", { name: "Previous year" }).click();
-    const finished = new Date().getFullYear() - 1;
-    await page.getByLabel("Date", { exact: true }).fill(`${String(finished)}-01-01`);
-    await page.getByLabel("Holiday name").fill("New Year's Day");
-    await page.getByRole("button", { name: "Add holiday" }).click();
-    await expect(page.getByText("Added New Year's Day.")).toBeVisible();
+    await expect(page.getByText("Past years can't be added to.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add holiday" })).toHaveCount(0);
     await page.getByRole("button", { name: `Remove all TAS ${String(finished)} holidays` }).click();
     await expect(page.getByRole("heading", { name: `Remove all TAS ${String(finished)} holidays?` })).toBeVisible();
     await page.getByRole("button", { name: "Cancel" }).click();

@@ -260,44 +260,51 @@ export function PublicHolidaysCard({
 
       <hr className="mt-3.5 mb-3 border-0 border-t border-hairline" />
 
-      <div className="flex flex-wrap gap-4">
-        <div className="min-w-[160px] flex-1">
-          <Field
-            id="holidayDate"
-            label="Date"
-            type="date"
-            value={date}
-            min={`${String(year)}-01-01`}
-            max={`${String(year)}-12-31`}
-            onChange={(e) => {
-              setDate(e.target.value);
-              setErrors((current) => ({ ...current, date: undefined }));
-            }}
-            error={errors.date}
-          />
+      {finished ? (
+        <p className="text-small text-muted-text">Past years can&apos;t be added to.</p>
+      ) : (
+        <>
+
+        <div className="flex flex-wrap gap-4">
+          <div className="min-w-[160px] flex-1">
+            <Field
+              id="holidayDate"
+              label="Date"
+              type="date"
+              value={date}
+              min={`${String(year)}-01-01`}
+              max={`${String(year)}-12-31`}
+              onChange={(e) => {
+                setDate(e.target.value);
+                setErrors((current) => ({ ...current, date: undefined }));
+              }}
+              error={errors.date}
+            />
+          </div>
+          <div className="min-w-[200px] flex-[2]">
+            <Field
+              id="holidayName"
+              label="Holiday name"
+              value={name}
+              maxLength={60}
+              onChange={(e) => {
+                setName(e.target.value);
+                setErrors((current) => ({ ...current, name: undefined }));
+              }}
+              error={errors.name}
+            />
+          </div>
         </div>
-        <div className="min-w-[200px] flex-[2]">
-          <Field
-            id="holidayName"
-            label="Holiday name"
-            value={name}
-            maxLength={60}
-            onChange={(e) => {
-              setName(e.target.value);
-              setErrors((current) => ({ ...current, name: undefined }));
-            }}
-            error={errors.name}
-          />
-        </div>
-      </div>
-      <button
-        type="button"
-        disabled={working}
-        onClick={() => void add()}
-        className="min-h-[52px] w-full rounded-button border border-hairline bg-surface px-4 py-3.5 text-sm font-bold text-ink sm:min-h-11 sm:w-auto sm:py-2.5"
-      >
-        Add holiday
-      </button>
+        <button
+          type="button"
+          disabled={working}
+          onClick={() => void add()}
+          className="min-h-[52px] w-full rounded-button border border-hairline bg-surface px-4 py-3.5 text-sm font-bold text-ink sm:min-h-11 sm:w-auto sm:py-2.5"
+        >
+          Add holiday
+        </button>
+        </>
+      )}
 
       {finished && holidays !== null && holidays.length > 0 ? (
         <div className="mt-2">
