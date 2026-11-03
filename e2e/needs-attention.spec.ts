@@ -72,7 +72,7 @@ test.describe("1020 AC12 -- desktop", () => {
       await expect(page.getByText("Needs attention", { exact: true })).toBeVisible();
       await expect(page.getByText(`WA ${String(YEAR)} has fewer than 7 holidays.`)).toBeVisible();
       await page.getByRole("link", { name: "Add holidays" }).click();
-      await expect(page).toHaveURL(/\/ops\/settings\?holidayState=WA&holidayYear=\d{4}#public-holidays$/);
+      await expect(page).toHaveURL(/\/ops\/settings\/holidays\?holidayState=WA&holidayYear=\d{4}$/);
       await expect(page.getByLabel("State", { exact: true })).toHaveValue("WA");
       await expect(page.getByText(`WA ${String(YEAR)} has fewer than 7 holidays. Check the list is complete.`)).toBeVisible();
 

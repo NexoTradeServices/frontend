@@ -456,10 +456,19 @@ test.describe("1020 -- opening hours", () => {
   });
 });
 
+test("1020: Settings carries a Manage holidays link to the Public holidays page, which links back", async ({ page }) => {
+  await ensureLoggedInAs(page, "/ops/settings", "owner@idelta.com.au");
+  await page.getByRole("link", { name: "Manage holidays" }).click();
+  await expect(page).toHaveURL(/\/ops\/settings\/holidays$/);
+  await expect(page.getByRole("heading", { name: "Public holidays", level: 1 })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("link", { name: "< Settings" }).click();
+  await expect(page).toHaveURL(/\/ops\/settings$/);
+});
+
 test.describe("1020 -- public holidays", () => {
   test.beforeEach(async ({ page }) => {
-    await ensureLoggedInAs(page, "/ops/settings", "owner@idelta.com.au");
-    await expect(page.getByRole("heading", { name: "Public holidays" })).toBeVisible({ timeout: 10_000 });
+    await ensureLoggedInAs(page, "/ops/settings/holidays", "owner@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Public holidays", level: 3 })).toBeVisible({ timeout: 10_000 });
   });
 
   test("AC5: add a holiday for NSW 2028, see it listed, a second on the same date is refused, remove it", async ({ page }) => {
@@ -540,7 +549,7 @@ test.describe("1021 -- operating states", () => {
       await page.getByRole("button", { name: "Save settings" }).click();
       await expect(page.getByText("Can't open VIC until its public holidays are entered.")).toBeVisible();
       await page.getByRole("link", { name: "Enter VIC holidays" }).click();
-      await expect(page).toHaveURL(/holidayState=VIC#public-holidays$/);
+      await expect(page).toHaveURL(/\/ops\/settings\/holidays\?holidayState=VIC$/);
       await expect(page.getByLabel("State", { exact: true })).toHaveValue("VIC");
 
       // AC1: untick NSW (and take VIC off again), save, reload - it holds and says who and when.

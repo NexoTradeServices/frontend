@@ -2,7 +2,6 @@
 // Architecture & Routing / Page inventory: `/ops/settings`, owner only.
 import { cookies } from "next/headers";
 import { getSessionUser } from "@/lib/session";
-import { PublicHolidaysCard } from "@/components/settings/public-holidays-card";
 import { AgreementCard } from "@/components/settings/agreement-card";
 import { SettingsForm, type SettingsDto } from "@/components/settings/settings-form";
 import { Container } from "@/components/frame/container";
@@ -12,19 +11,11 @@ import { OwnerOnly } from "@/components/auth/owner-only";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-export default async function OpsSettingsPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+export default async function OpsSettingsPage() {
   const user = await getSessionUser();
   // Settings is the owner's: an ops login is in its own portal, so the frame
   // stays and the page says so with one Owner only card (Feature 1018).
   if (user?.role !== "owner") return <OwnerOnly user={user} />;
-
-  const query = await searchParams;
-  const pick = (key: string): string | undefined => (typeof query[key] === "string" ? query[key] : undefined);
-  const holidayYear = Number(pick("holidayYear"));
 
   const cookieStore = await cookies();
   const res = await fetch(`${apiUrl}/api/settings`, {
@@ -41,12 +32,6 @@ export default async function OpsSettingsPage({
         subtitle="Business-wide configuration. Changes apply from the moment you save."
       />
       <SettingsForm initial={settings} />
-      <PublicHolidaysCard
-        key={`${pick("holidayState") ?? "WA"}-${String(holidayYear)}`}
-        timezone={settings.timezone}
-        initialState={pick("holidayState")}
-        initialYear={Number.isInteger(holidayYear) && holidayYear >= 2000 ? holidayYear : undefined}
-      />
       <AgreementCard timezone={settings.timezone} />
     </Container>
   );

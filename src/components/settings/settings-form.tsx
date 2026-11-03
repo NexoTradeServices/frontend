@@ -432,7 +432,7 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
               <>
                 {" "}
                 <Link
-                  href={`/ops/settings?holidayState=${refusedState}#public-holidays`}
+                  href={`/ops/settings/holidays?holidayState=${refusedState}`}
                   className="font-semibold underline underline-offset-2"
                 >
                   Enter {refusedState} holidays
@@ -477,6 +477,19 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
             </p>
           ) : null;
         })()}
+      </div>
+
+      <div className="mb-4.5 flex flex-wrap items-center justify-between gap-3 rounded-card border border-hairline bg-surface p-5">
+        <div>
+          <h3 className="font-heading text-base font-extrabold text-ink">Public holidays</h3>
+          <p className="text-xs text-muted-text">The days the business is closed, state by state.</p>
+        </div>
+        <Link
+          href="/ops/settings/holidays"
+          className="inline-flex min-h-11 items-center rounded-button border border-hairline bg-surface px-4 text-sm font-bold text-ink"
+        >
+          Manage holidays
+        </Link>
       </div>
 
       <div className="mb-4.5 rounded-card border border-hairline bg-surface p-5">
