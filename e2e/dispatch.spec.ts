@@ -284,11 +284,11 @@ test("1020 AC3, AC6: start times and the day view stay inside the opening hours;
   // AC6: the server's refusal for a holiday shows in the dispatch error Banner (the reply faked).
   await page.route(new RegExp(`/api/jobs/${reference}/dispatch$`), (route) =>
     route.request().method() === "POST"
-      ? route.fulfill({ status: 400, json: { error: "Closed for Christmas Day. Pick another time.", field: "startMinutes" } })
+      ? route.fulfill({ status: 400, json: { error: "Closed for Christmas Day. Pick another day.", field: "startMinutes" } })
       : route.continue(),
   );
   await page.getByRole("button", { name: /Dispatch to Bob/ }).click();
-  await expect(page.getByText("Closed for Christmas Day. Pick another time.")).toBeVisible();
+  await expect(page.getByText("Closed for Christmas Day. Pick another day.")).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`/ops/jobs/${reference}/dispatch$`));
 
   // 1020: a holiday on the day locks it before anything is picked (the holiday read faked for this day).
@@ -296,8 +296,7 @@ test("1020 AC3, AC6: start times and the day view stay inside the opening hours;
     route.fulfill({ json: { holidays: [{ date: day, name: "Test Day" }] } }),
   );
   await page.reload();
-  await expect(page.getByText(/^Closed on .* for Test Day$/)).toBeVisible();
-  await expect(page.getByText("Pick another day to see who is available.")).toBeVisible();
+  await expect(page.getByText(/^Closed on .* for Test Day\. Pick another day\.$/)).toBeVisible();
   await expect(page.getByRole("button", { name: /Bob Reilly/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Dispatch", exact: true })).toBeDisabled();
 });
