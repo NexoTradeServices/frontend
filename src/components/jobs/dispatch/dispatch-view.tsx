@@ -133,7 +133,15 @@ function CandidateRowButton({
 export function DispatchView({ initial }: { initial: DispatchFacts }) {
   const router = useRouter();
   const [date, setDate] = useState(initial.defaults.date);
-  const [startMinutes, setStartMinutes] = useState(initial.defaults.startMinutes);
+  // A new dispatch starts at the job's preferred window, pulled into the business hours (an evening
+  // job on a 5:30pm close starts at the last start that fits). A reschedule keeps the booked slot as is.
+  const [startMinutes, setStartMinutes] = useState(() => {
+    const wanted = initial.defaults.startMinutes;
+    if (initial.mode === "reschedule") return wanted;
+    const allowed = startTimesWithin(minutesOfClock(initial.openingTime), minutesOfClock(initial.closingTime));
+    if (allowed.length === 0 || allowed.includes(wanted)) return wanted;
+    return allowed.reduce((best, m) => (Math.abs(m - wanted) < Math.abs(best - wanted) ? m : best), allowed[0] ?? wanted);
+  });
   const [holdMinutes, setHoldMinutes] = useState(initial.defaults.holdMinutes);
   const [emergency, setEmergency] = useState(false);
   const reschedule = initial.mode === "reschedule" && initial.contractor !== undefined;
