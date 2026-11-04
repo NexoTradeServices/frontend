@@ -61,3 +61,29 @@ export function useStateToday(state: string | null): string | null {
   }, [state]);
   return state !== null && loaded?.state === state ? loaded.date : null;
 }
+
+/**
+ * Feature 1021: true once the coverage check says the picked place is in a closed state, so the phone form can
+ * say so the moment the place is picked and not at Save. A failed or slow check says false -- the server refuses anyway.
+ */
+export function useStateClosed(location: PickedAddress | null, platformSuburb: PlatformSuburb | null): boolean {
+  const query =
+    location !== null
+      ? new URLSearchParams({ postcode: location.postcode, lat: String(location.lat), lng: String(location.lng), state: location.state }).toString()
+      : platformSuburb !== null
+        ? new URLSearchParams({ suburbId: platformSuburb.suburbId }).toString()
+        : null;
+  const [answer, setAnswer] = useState<{ query: string; closed: boolean } | null>(null);
+  useEffect(() => {
+    if (query === null) return;
+    const controller = new AbortController();
+    fetch(`${apiUrl}/api/enquiries/coverage?${query}`, { signal: controller.signal })
+      .then((res) => (res.ok ? (res.json() as Promise<{ tier?: string }>) : null))
+      .then((body) => {
+        if (!controller.signal.aborted) setAnswer({ query, closed: body?.tier === "state_not_open" });
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [query]);
+  return query !== null && answer?.query === query && answer.closed;
+}

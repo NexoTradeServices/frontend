@@ -11,19 +11,20 @@
 // then the job. All of the addresses are optional; the suburb fills itself from the address picked.
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Field } from "@/components/auth/field";
 import { Banner } from "@/components/auth/banner";
 import { PrimaryButton } from "@/components/auth/buttons";
 import { SelectField } from "@/components/ui/select-field";
 import { PlacesField, fullAddress, type PickedAddress, type PlatformSuburb } from "@/components/ui/places-field";
+import { Toast, useToast } from "@/components/ui/toast";
 import { LockedField } from "@/components/ui/locked-field";
 import { AdditionalQuestions } from "@/components/request-a-job/additional-questions";
 import { PriceBox } from "@/components/request-a-job/price-box";
 import { WINDOWS } from "@/components/request-a-job/request-a-job-form";
 import { isWeekendDate } from "@/components/request-a-job/money";
-import { holidayWords, stateOfPick, usePublicHolidays, useStateToday } from "@/components/request-a-job/holidays";
+import { holidayWords, stateOfPick, useStateClosed, usePublicHolidays, useStateToday } from "@/components/request-a-job/holidays";
 import type { FormDataDto, PreferredWindow } from "@/components/request-a-job/types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -86,6 +87,15 @@ export function PhoneIntakeForm({ formData, businessToday }: { formData: FormDat
   const weekend = isWeekendDate(preferredDate);
   // Feature 1020: a public holiday of the job's state is shown as the date's error and stops Save.
   const holidays = usePublicHolidays(stateOfPick(effectiveSite ?? location, platformSuburb));
+  // Feature 1021: a closed state is said as soon as the place is picked, and Create job is held back.
+  const stateClosed = useStateClosed(effectiveSite ?? location, platformSuburb);
+  const closedStateName = stateOfPick(effectiveSite ?? location, platformSuburb);
+  const closedMessage = stateClosed && closedStateName !== null ? `${closedStateName} is not an operating state.` : undefined;
+  // The message is also a toast, so Mike notices it even when the suburb box is off screen.
+  const [toastMessage, showToast] = useToast();
+  useEffect(() => {
+    if (closedMessage !== undefined) showToast(closedMessage);
+  }, [closedMessage, showToast]);
   const holidayName = holidays[preferredDate];
   const holidayMessage = holidayName === undefined ? undefined : holidayWords(preferredDate, holidayName);
   const multiplier = selectedType
@@ -406,6 +416,11 @@ export function PhoneIntakeForm({ formData, businessToday }: { formData: FormDat
             }}
           />
         )}
+        {closedMessage !== undefined ? (
+          <div className="mt-2">
+            <Banner kind="error">{closedMessage}</Banner>
+          </div>
+        ) : null}
 
         <SelectField
           id="trade"
@@ -524,11 +539,12 @@ export function PhoneIntakeForm({ formData, businessToday }: { formData: FormDat
         size="compact"
         loading={submitting}
         loadingLabel="Creating..."
-        disabled={holidayMessage !== undefined}
+        disabled={holidayMessage !== undefined || closedMessage !== undefined}
         className="disabled:cursor-not-allowed disabled:bg-hairline disabled:text-muted-text"
       >
         Create job
       </PrimaryButton>
+      <Toast message={toastMessage} />
     </form>
   );
 }

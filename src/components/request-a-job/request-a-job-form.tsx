@@ -571,7 +571,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
               <button
                 type="button"
                 onClick={handleContinue}
-                disabled={step === "schedule" && holidayMessage !== undefined}
+                disabled={stateNotOpen || (step === "schedule" && holidayMessage !== undefined)}
                 className="min-h-11 rounded-button bg-brand-accent px-5 py-2.5 text-sm font-bold text-on-accent disabled:cursor-not-allowed disabled:bg-hairline disabled:text-muted-text"
               >
                 Continue

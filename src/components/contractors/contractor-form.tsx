@@ -14,7 +14,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Field } from "@/components/auth/field";
 import { PlacesField, type PickedAddress } from "@/components/ui/places-field";
@@ -177,6 +177,19 @@ export function ContractorForm({
   // underneath (the visible text updates before that round-trip finishes).
   const [addressPicking, setAddressPicking] = useState(false);
   const [toastMessage, showToast] = useToast();
+  // Feature 1021: a newly picked address in another state than the Operating state is said at once and Save is held back.
+  const pickedAddress = fields.address;
+  const onFileAddress = initial?.address ?? null;
+  const addressIsNew =
+    pickedAddress !== null &&
+    (onFileAddress === null || onFileAddress.placeId !== pickedAddress.placeId || onFileAddress.street !== pickedAddress.street);
+  const addressStateMessage =
+    addressIsNew && pickedAddress !== null && fields.operatingState !== "" && pickedAddress.state !== fields.operatingState
+      ? `The address must be in ${fields.operatingState} or change the Operating state first.`
+      : undefined;
+  useEffect(() => {
+    if (addressStateMessage !== undefined) showToast(addressStateMessage);
+  }, [addressStateMessage, showToast]);
 
   function set<K extends keyof Fields>(key: K, value: Fields[K]) {
     setFields((f) => ({ ...f, [key]: value }));
@@ -418,11 +431,6 @@ export function ContractorForm({
               value={fields.operatingState}
               onChange={(e) => set("operatingState", e.target.value)}
               error={fieldErrors["operatingState"]}
-              helper={
-                fieldErrors["operatingState"]
-                  ? undefined
-                  : "State not listed? We don't operate there yet. Contact platform administrator."
-              }
             />
             <Field label="Name" id="f-name" required value={fields.name} onChange={(e) => set("name", e.target.value)} error={fieldErrors["name"]} />
             <Field
@@ -450,7 +458,7 @@ export function ContractorForm({
             label="Address"
             value={fields.address}
             onChange={(v) => set("address", v)}
-            error={addressError ?? fieldErrors["address"]}
+            error={addressStateMessage ?? addressError ?? fieldErrors["address"]}
             onErrorChange={setAddressError}
             onPickingChange={setAddressPicking}
           />
@@ -640,9 +648,13 @@ export function ContractorForm({
           </button>
           <button
             type="submit"
-            disabled={saving || addressPicking}
-            className={`min-h-11 min-w-[140px] rounded-button px-5 py-2.5 text-sm font-bold text-on-accent ${
-              saving || addressPicking ? "bg-brand-accent-loading" : "bg-brand-accent"
+            disabled={saving || addressPicking || addressStateMessage !== undefined}
+            className={`min-h-11 min-w-[140px] rounded-button px-5 py-2.5 text-sm font-bold disabled:cursor-not-allowed ${
+              addressStateMessage !== undefined
+                ? "bg-hairline text-muted-text"
+                : saving || addressPicking
+                  ? "bg-brand-accent-loading text-on-accent"
+                  : "bg-brand-accent text-on-accent"
             }`}
           >
             {saving ? "Saving..." : addressPicking ? "Picking address..." : "Save"}

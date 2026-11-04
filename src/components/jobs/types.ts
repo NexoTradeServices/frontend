@@ -163,6 +163,7 @@ export interface JobDetail {
   source: "web" | "phone";
   trade: string;
   suburb: string;
+  state?: string | null;
   postcode: string;
   wantedDate: string;
   windowLabel: string;

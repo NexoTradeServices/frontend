@@ -262,7 +262,6 @@ test("1021 AC7: the new contractor form requires Operating state, lists WA and N
   await expect(page.getByRole("heading", { name: "New contractor" })).toBeVisible({ timeout: 10_000 });
   const select = page.getByLabel("Operating state");
   await expect(select.locator("option")).toHaveText(["Pick a state", "NSW", "WA"]);
-  await expect(page.getByText("State not listed? We don't operate there yet. Contact platform administrator.")).toBeVisible();
   await page.getByLabel("Name", { exact: true }).fill("E2E No State");
   await page.getByLabel("Phone", { exact: true }).fill("0412 000 777");
   await page.getByLabel("Email", { exact: true }).fill(uniqueEmail("1021"));

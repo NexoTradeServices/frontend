@@ -561,7 +561,7 @@ test.describe("1021 -- operating states", () => {
       // AC2: VIC has no holidays this year - the whole Save is refused, the link goes to its holidays.
       await page.getByLabel("Victoria (VIC)").check();
       await page.getByRole("button", { name: "Save settings" }).click();
-      await expect(page.getByText("Can't open VIC until its public holidays are entered.")).toBeVisible();
+      await expect(page.getByText("Can't open VIC yet. Add its public holidays first.")).toBeVisible();
       await page.getByRole("link", { name: "Enter VIC holidays" }).click();
       await expect(page).toHaveURL(/\/ops\/settings\/holidays\?holidayState=VIC$/);
       await expect(page.getByLabel("State", { exact: true })).toHaveValue("VIC");

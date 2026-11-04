@@ -331,6 +331,6 @@ test("1021 AC9: an NSW contractor picking Fremantle is told the area must be in 
   await pickSuburb(page, "Fremantle WA", /Fremantle WA/);
   await page.getByRole("button", { name: "Save service area" }).click();
   const first = name.split(" ")[0] ?? "";
-  await expect(page.getByText(`${first}'s service area must be in NSW. Change ${first}'s Operating state first.`).first()).toBeVisible();
+  await expect(page.getByText(`${first}'s service area must be in NSW or change ${first}'s Operating state first.`).first()).toBeVisible();
   await expect(page).toHaveURL(/service-area|contractors\/CON-/);
 });

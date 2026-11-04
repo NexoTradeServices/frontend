@@ -17,6 +17,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Pencil } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { stateOfPick, useStateClosed } from "@/components/request-a-job/holidays";
 import { PlacesField, fullAddress, type PickedAddress } from "@/components/ui/places-field";
 import { LockedField } from "@/components/ui/locked-field";
 import { SelectField } from "@/components/ui/select-field";
@@ -127,6 +128,15 @@ function RequestEditCard({
   const [errors, setErrors] = useState<Partial<Record<RequestField, string>>>({});
   const [banner, setBanner] = useState<string>();
   const [saving, setSaving] = useState(false);
+  // Feature 1021: a pick in a closed state is said at once and Save is held back -- except inside the job's own state.
+  const pickedState = stateOfPick(location, platformSuburb);
+  const stateClosed = useStateClosed(location, platformSuburb);
+  const closedMessage =
+    stateClosed && pickedState !== null && pickedState !== (job.state ?? null) ? `${pickedState} is not an operating state.` : undefined;
+  const [closedToast, showClosedToast] = useToast();
+  useEffect(() => {
+    if (closedMessage !== undefined) showClosedToast(closedMessage);
+  }, [closedMessage, showClosedToast]);
 
   useEffect(() => {
     let live = true;
@@ -208,6 +218,7 @@ function RequestEditCard({
 
   return (
     <Card title="The request">
+      <Toast message={closedToast} />
       {banner ? <Banner kind="error">{banner}</Banner> : null}
       <SelectField
         id="request-trade"
@@ -248,6 +259,11 @@ function RequestEditCard({
           }}
         />
       )}
+      {closedMessage !== undefined ? (
+        <div className="mb-3.5">
+          <Banner kind="error">{closedMessage}</Banner>
+        </div>
+      ) : null}
       <Field
         id="request-date"
         label="Date"
@@ -285,7 +301,15 @@ function RequestEditCard({
         {errors.description ? <p className="mt-[5px] text-xs text-brand-destructive">{errors.description}</p> : null}
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2.5">
-        <PrimaryButton type="button" size="compact" loading={saving} loadingLabel="Saving..." onClick={() => void save()}>
+        <PrimaryButton
+          type="button"
+          size="compact"
+          loading={saving}
+          loadingLabel="Saving..."
+          disabled={closedMessage !== undefined}
+          className="disabled:cursor-not-allowed disabled:bg-hairline disabled:text-muted-text"
+          onClick={() => void save()}
+        >
           Save
         </PrimaryButton>
         <button
@@ -1340,6 +1364,16 @@ function AddressesCard({
 
   const picking = billingPicking || sitePicking;
   const effectiveSite = sameAsBilling ? billing : site;
+  // Feature 1021: a job site in a closed state (not the job's own) is said at once, and Save is held back.
+  const siteStateClosed = useStateClosed(job.siteLocked ? null : effectiveSite, null);
+  const closedMessage =
+    siteStateClosed && effectiveSite !== null && effectiveSite.state !== (job.state ?? null)
+      ? `${effectiveSite.state} is not an operating state.`
+      : undefined;
+  const [closedToast, showClosedToast] = useToast();
+  useEffect(() => {
+    if (closedMessage !== undefined) showClosedToast(closedMessage);
+  }, [closedMessage, showClosedToast]);
   // V9: any site pick on a new job moves it; the line shows whenever that
   // changes the suburb or the postcode the job reads.
   const moves =
@@ -1545,6 +1579,11 @@ function AddressesCard({
               onPickingChange={setSitePicking}
             />
           )}
+          {closedMessage !== undefined ? (
+            <div className="mb-3.5">
+              <Banner kind="error">{closedMessage}</Banner>
+            </div>
+          ) : null}
           {moves && effectiveSite ? (
             <p className="mb-3.5 text-xs text-brand-warning">
               Saving addresses moves the job from {job.suburb} {job.postcode} to {effectiveSite.suburb}{" "}
@@ -1619,6 +1658,7 @@ function AddressesCard({
         )}
       </div>
 
+      <Toast message={closedToast} />
       {formError ? <p className="mb-2 text-xs text-brand-destructive">{formError}</p> : null}
       <div
         className={`flex-col gap-2 border-t border-hairline pt-3.5 md:flex-row md:items-center md:justify-end md:gap-3 ${
@@ -1632,8 +1672,8 @@ function AddressesCard({
             onClick={() => void save()}
             loading={saving}
             loadingLabel="Saving..."
-            disabled={picking}
-            className="md:mt-0 md:inline-block md:min-h-11 md:w-auto md:px-[18px] md:py-2.5"
+            disabled={picking || closedMessage !== undefined}
+            className="disabled:cursor-not-allowed disabled:bg-hairline disabled:text-muted-text md:mt-0 md:inline-block md:min-h-11 md:w-auto md:px-[18px] md:py-2.5"
           >
             {picking ? "Picking address..." : "Save"}
           </PrimaryButton>

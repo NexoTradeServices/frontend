@@ -211,7 +211,7 @@ export function ServiceArea({
     pin !== null && pin.state !== savedState.operatingState
       ? mode === "contractor"
         ? `Your service area must be in ${savedState.operatingState}. Contact the office.`
-        : `${(contractorName ?? "").split(" ")[0] ?? ""}'s service area must be in ${savedState.operatingState}. Change ${(contractorName ?? "").split(" ")[0] ?? ""}'s Operating state first.`
+        : `${(contractorName ?? "").split(" ")[0] ?? ""}'s service area must be in ${savedState.operatingState} or change ${(contractorName ?? "").split(" ")[0] ?? ""}'s Operating state first.`
       : undefined;
 
   async function handleSave() {

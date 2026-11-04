@@ -213,6 +213,10 @@ export function SettingsForm({ initial }: { initial: SettingsDto }) {
       if (!res.ok) {
         const refused = (body as { state?: string }).state;
         setRefusedState(body.field === "operatingStates" ? refused : undefined);
+        if (body.field === "operatingStates" && refused) {
+          // The state could not be opened: put its tick back so the box matches what is saved.
+          setOpenStates((current) => current.filter((state) => state !== refused));
+        }
         if (body.field) {
           setFieldErrors({ [body.field]: body.error ?? "That value was refused." });
         } else {
