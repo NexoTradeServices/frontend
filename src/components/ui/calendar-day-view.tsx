@@ -46,6 +46,7 @@ export function CalendarDayView({
   openMinutes,
   closeMinutes,
   lastStartMinutes,
+  zoneLabel,
   loading = false,
 }: {
   /** e.g. "Bob's Mon 14 Sep" -- the caller composes it, this component only draws the grid. */
@@ -60,6 +61,8 @@ export function CalendarDayView({
   closeMinutes: number;
   /** The latest half hour a start can be tapped at (closing time minus the hold); later rows are greyed and cannot be tapped. */
   lastStartMinutes?: number;
+  /** e.g. "NSW time": the state's clock the grid is drawn in, shown on the job's own block so the office sees which clock it is. */
+  zoneLabel?: string;
   loading?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -153,6 +156,7 @@ export function CalendarDayView({
             >
               <b className="tabular-nums">
                 {timeLabelFor(proposedStart)}-{timeLabelFor(proposedEnd)}
+                {zoneLabel ? ` ${zoneLabel}` : ""}
               </b>{" "}
               This job{clashes ? " - clashes" : ""}
             </div>

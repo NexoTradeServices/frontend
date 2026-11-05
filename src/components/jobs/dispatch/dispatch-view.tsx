@@ -357,6 +357,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
               openMinutes={openMinutes}
               closeMinutes={closeMinutes}
               lastStartMinutes={closeMinutes - holdMinutes}
+              zoneLabel={initial.stateLabel.replace(/ time$/, "")}
               loading={dayLoading}
             />
             )}
@@ -398,6 +399,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
               openMinutes={openMinutes}
               closeMinutes={closeMinutes}
               lastStartMinutes={closeMinutes - holdMinutes}
+              zoneLabel={initial.stateLabel.replace(/ time$/, "")}
                         loading={dayLoading}
                       />
                     ) : null}
@@ -437,6 +439,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
               openMinutes={openMinutes}
               closeMinutes={closeMinutes}
               lastStartMinutes={closeMinutes - holdMinutes}
+              zoneLabel={initial.stateLabel.replace(/ time$/, "")}
                         loading={dayLoading}
                       />
                     ) : null}
