@@ -27,7 +27,7 @@ export default async function ContractorDashboardPage() {
         title="Dashboard"
         subtitle="Your work, soonest first."
       />
-      <NeedsAttention ready={dashboard.ready} missing={dashboard.missing} setAvailability={dashboard.setAvailability} hoursNotice={dashboard.hoursNotice} />
+      <NeedsAttention ready={dashboard.ready} missing={dashboard.missing} setAvailability={dashboard.setAvailability} hoursNotice={dashboard.hoursNotice} officePhone={dashboard.officePhone} />
       {dashboard.jobs.length === 0 ? (
         <EmptyDashboard />
       ) : (

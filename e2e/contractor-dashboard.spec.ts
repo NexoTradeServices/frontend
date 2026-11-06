@@ -102,6 +102,7 @@ test.describe(() => {
     await expect(panel.getByText("payout details")).toBeVisible();
     await expect(panel.getByText("insurance renewal (expired)")).toBeVisible();
     await expect(panel.getByText("Call the office")).toHaveCount(2); // payout details and insurance
+    await expect(panel.getByRole("link", { name: /Call the office/ }).first()).toHaveAttribute("href", /^tel:\S/); // the number is tappable
     await expect(panel.getByText("own address")).toHaveCount(0);
     await expect(panel.getByText("emergency contact")).toHaveCount(0);
   });

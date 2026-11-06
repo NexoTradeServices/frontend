@@ -12,7 +12,7 @@ import { useState } from "react";
 import type { ReadinessItemDto } from "./types";
 import { HoursNoticeRow, SetAvailabilityRow, attentionRow, textButton } from "./availability-banners";
 
-function ReadinessRow({ item }: { item: ReadinessItemDto }) {
+function ReadinessRow({ item, officePhone }: { item: ReadinessItemDto; officePhone: string }) {
   return (
     <li className={attentionRow}>
       <span className="font-semibold">{item.copy}</span>
@@ -21,7 +21,12 @@ function ReadinessRow({ item }: { item: ReadinessItemDto }) {
           Fix now
         </Link>
       ) : null}
-      {item.pen === "mikes" ? <span className="shrink-0 text-small font-semibold text-muted-text">Call the office</span> : null}
+      {item.pen === "mikes" ? (
+        // The office's number, tappable: a phone opens the dialler.
+        <a href={`tel:${officePhone}`} className={textButton}>
+          Call the office {officePhone}
+        </a>
+      ) : null}
     </li>
   );
 }
@@ -31,11 +36,13 @@ export function NeedsAttention({
   missing,
   setAvailability,
   hoursNotice,
+  officePhone,
 }: {
   ready: boolean;
   missing: ReadinessItemDto[];
   setAvailability: boolean;
   hoursNotice: { openingTime: string; closingTime: string } | null;
+  officePhone: string;
 }) {
   const [dismissed, setDismissed] = useState(false);
   const showHours = hoursNotice !== null && !dismissed;
@@ -57,7 +64,7 @@ export function NeedsAttention({
         {showHours && hoursNotice !== null ? <HoursNoticeRow hoursNotice={hoursNotice} onSeen={() => setDismissed(true)} /> : null}
         {setAvailability ? <SetAvailabilityRow /> : null}
         {missing.map((item) => (
-          <ReadinessRow key={item.key} item={item} />
+          <ReadinessRow key={item.key} item={item} officePhone={officePhone} />
         ))}
       </ul>
     </section>

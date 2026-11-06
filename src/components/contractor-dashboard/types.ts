@@ -39,6 +39,8 @@ export interface DashboardDto {
   setAvailability: boolean;
   /** Feature 2004: the business widened its hours since he last saw a notice */
   hoursNotice: { openingTime: string; closingTime: string } | null;
+  /** The office's number, for "Call the office" (Feature 2005, at UAT). */
+  officePhone: string;
   jobs: JobCardDto[];
 }
 

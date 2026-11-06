@@ -23,6 +23,7 @@ describe("AC7 -- the readiness row links to the agreement page", () => {
         ready: false,
         setAvailability: false,
         hoursNotice: null,
+        officePhone: "08 0000 0000",
         missing: [
           {
             key: "agreement",
