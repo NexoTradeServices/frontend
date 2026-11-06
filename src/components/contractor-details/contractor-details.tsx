@@ -108,8 +108,7 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
         className={card}
         data-testid="my-details-form"
       >
-        <h3 className="font-heading text-base font-extrabold text-ink">Your details</h3>
-        <p className="mt-1 mb-4 text-small text-secondary-text">
+        <p className="mb-4 text-small text-secondary-text">
           Fields with a padlock are set by the office. Please call the office to change them.
         </p>
         <div className="grid grid-cols-1 gap-x-3.5 sm:grid-cols-2">
@@ -132,8 +131,10 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
               onPickingChange={setAddressPicking}
             />
           </div>
+          <hr className="mb-3.5 border-hairline sm:col-span-2" />
           <Field label="Emergency contact name" id="d-ecName" placeholder="Jen Reilly" value={fields.emergencyContactName} onChange={(e) => set("emergencyContactName", e.target.value)} />
           <Field label="Emergency contact phone" id="d-ecPhone" placeholder="0400 000 000" value={fields.emergencyContactPhone} onChange={(e) => set("emergencyContactPhone", e.target.value)} />
+          <hr className="mb-3.5 border-hairline sm:col-span-2" />
           {office.specialties.map((s) => (
             <LockedField key={s.trade} label={s.trade} value={`Licence ${s.licenceNumber}, expires ${fmtDate(s.licenceExpiry)}`} />
           ))}
@@ -145,12 +146,14 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
                 : "Not set"
             }
           />
+          <hr className="mb-3.5 border-hairline sm:col-span-2" />
           <LockedField label="BSB" value={office.payoutBsb ?? "Not set"} />
           <LockedField label="Account number" value={office.payoutAccountNo ?? "Not set"} />
           <LockedField label="Account name" value={office.payoutAccountName ?? "Not set"} />
+          <hr className="mb-3.5 border-hairline sm:col-span-2" />
           <LockedField label="Status" value={office.status === "active" ? "Active" : "Deactivated"} />
         </div>
-        <div className="flex justify-end border-t border-hairline pt-4">
+        <div className="flex justify-end">
           <button
             type="submit"
             disabled={saving || addressPicking}

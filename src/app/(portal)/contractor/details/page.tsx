@@ -19,7 +19,7 @@ export default async function ContractorDetailsPage() {
 
   return (
     <Container width="medium">
-      <PageHeader title="My details" subtitle="Keep your name, phone, address and emergency contact up to date." />
+      <PageHeader title="My details" />
       <ContractorDetails initial={details} />
     </Container>
   );

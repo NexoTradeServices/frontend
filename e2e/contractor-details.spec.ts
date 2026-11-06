@@ -46,9 +46,9 @@ test("AC1: My details is on the menu and opens the page", async ({ page }) => {
   await page.getByRole("navigation", { name: "Menu" }).getByRole("link", { name: "My details" }).click();
   await expect(page).toHaveURL(/\/contractor\/details$/);
   await expect(page.getByRole("heading", { name: "My details", level: 1 })).toBeVisible();
-  // one form in one card, the hint under its heading, Save at the end
+  // one form in one card, the hint at its top, Save at the end
   const form = page.getByTestId("my-details-form");
-  await expect(form.getByRole("heading", { name: "Your details" })).toBeVisible();
+  await expect(form.getByRole("heading")).toHaveCount(0); // no second heading: the page title is My details
   await expect(form.getByText("Fields with a padlock are set by the office. Please call the office to change them.")).toBeVisible();
   await expect(form.getByRole("button", { name: "Save", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: /^(Address|Emergency contact|Bank details|Set by the office)/ })).toHaveCount(0);
