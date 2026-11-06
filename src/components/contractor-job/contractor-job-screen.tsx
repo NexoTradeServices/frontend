@@ -840,6 +840,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               idPrefix="entry"
               errors={errors}
               canAdd={false}
+              lockedCount={arrived ? job.lockedVisits : 0}
               onChange={(next) => {
                 setRows(next);
                 setErrors({});
