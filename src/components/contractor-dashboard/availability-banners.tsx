@@ -46,7 +46,7 @@ export function HoursNoticeRow({ hoursNotice, onSeen }: { hoursNotice: { opening
 export function SetAvailabilityRow() {
   return (
     <li className={attentionRow}>
-      <span>Set your availability so the office knows when you can work. Until you do, every time inside opening hours counts as available.</span>
+      <span>Set your availability if you have preferred hours. If you do not set any, every open hour counts as available by default.</span>
       <Link href="/contractor/availability" className={textButton}>
         Set your availability
       </Link>
