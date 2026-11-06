@@ -112,8 +112,9 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
           Fields with a padlock are set by the office. Please call the office to change them.
         </p>
         <div className="grid grid-cols-1 gap-x-3.5 sm:grid-cols-2">
-          <Field label="Name" id="d-name" required value={fields.name} onChange={(e) => set("name", e.target.value)} error={errors["name"]} />
           <LockedField label="Contractor code" value={office.code} />
+          <LockedField label="Status" value={office.status === "active" ? "Active" : "Deactivated"} />
+          <Field label="Name" id="d-name" required value={fields.name} onChange={(e) => set("name", e.target.value)} error={errors["name"]} />
           <LockedField label="Email" value={office.email} helper="This is your login." />
           <Field label="Phone" id="d-phone" required value={fields.phone} onChange={(e) => set("phone", e.target.value)} error={errors["phone"]} helper="Job texts come here." />
           <Field label="Business name" id="d-businessName" placeholder="Reilly Plumbing" value={fields.businessName} onChange={(e) => set("businessName", e.target.value)} />
@@ -150,8 +151,6 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
           <LockedField label="BSB" value={office.payoutBsb ?? "Not set"} />
           <LockedField label="Account number" value={office.payoutAccountNo ?? "Not set"} />
           <LockedField label="Account name" value={office.payoutAccountName ?? "Not set"} />
-          <hr className="mb-3.5 border-brand-accent sm:col-span-2" />
-          <LockedField label="Status" value={office.status === "active" ? "Active" : "Deactivated"} />
         </div>
         <div className="flex justify-end">
           <button
