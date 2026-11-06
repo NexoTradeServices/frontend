@@ -7,8 +7,9 @@
 //
 // The customer's and contractor's plain wording (AC1, AC5-AC7) is proven against the real routes in the backend
 // (tests/time-labels.test.ts, tests/time-zones.test.ts). Runs against the seeded dev database; the job is a throwaway.
-import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
+import { test, expect, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 import { login } from "./helpers/login";
+import { BASE_URL, testRunStorageState } from "./helpers/test-run";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
 const NEWTOWN = { suburb: "Newtown", state: "NSW", country: "AU", postcode: "2042", lat: -33.897644, lng: 151.180228 };
@@ -28,6 +29,26 @@ async function pickDayForLiam(page: Page): Promise<string> {
     if (((await res.json()) as { blocks: unknown[] }).blocks.length === 0) return iso;
   }
   throw new Error("no free weekday for Liam");
+}
+
+/** Liam can only be dispatched once his service area is saved; a fresh seeded database has none, so save one as Liam when it is empty. */
+async function liamHasAnArea(browser: Browser): Promise<void> {
+  const context = await browser.newContext({ baseURL: BASE_URL, storageState: testRunStorageState() });
+  try {
+    const liam = await context.newPage();
+    await liam.goto("/contractor/service-area");
+    await login(liam, "liam@idelta.com.au");
+    await expect(liam.getByRole("heading", { name: "Service area" }).first()).toBeVisible({ timeout: 20_000 });
+    const current = await liam.request.get(`${apiUrl}/api/contractor/service-area`);
+    expect(current.status()).toBe(200);
+    if (((await current.json()) as { postcodes: string[] }).postcodes.length > 0) return;
+    const saved = await liam.request.put(`${apiUrl}/api/contractor/service-area`, {
+      data: { coreLocation: { ...NEWTOWN, placeId: "e2e-1022-liam-area" }, radiusKm: 30, postcodes: ["2042"] },
+    });
+    expect(saved.status()).toBe(200);
+  } finally {
+    await context.close();
+  }
 }
 
 async function postSydneyEnquiry(request: APIRequestContext, date: string): Promise<string> {
@@ -51,7 +72,8 @@ async function postSydneyEnquiry(request: APIRequestContext, date: string): Prom
   return ((await res.json()) as { reference: string }).reference;
 }
 
-test("1022 AC2, AC3, AC8: Hannah's Newtown job dispatches to Liam in NSW time and Mike reads NSW time everywhere it is a booked time", async ({ page, request }) => {
+test("1022 AC2, AC3, AC8: Hannah's Newtown job dispatches to Liam in NSW time and Mike reads NSW time everywhere it is a booked time", async ({ page, request, browser }) => {
+  await liamHasAnArea(browser);
   await page.goto("/ops/jobs");
   await login(page, "mike@idelta.com.au");
   await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible({ timeout: 15_000 });

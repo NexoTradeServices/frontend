@@ -93,11 +93,11 @@ test("AC4, AC8: Copy to next week saves the unsaved taps with it, moves to that 
 
 test("AC8: leaving the week with unsaved taps asks; Stay keeps them, Leave drops them", async ({ page }) => {
   await openBob(page, WEEK_LEAVE);
-  await slot(page, WEEK_LEAVE, 3, "10:00am", "available").click();
+  await slot(page, WEEK_LEAVE, 3, "6:00pm", "available").click();
   await page.getByRole("button", { name: "Next week", exact: true }).click();
   await expect(page.getByRole("alertdialog").getByRole("heading", { name: "Leave without saving?" })).toBeVisible();
   await page.getByRole("button", { name: "Stay" }).click();
-  await expect(slot(page, WEEK_LEAVE, 3, "10:00am", "not available")).toBeVisible();
+  await expect(slot(page, WEEK_LEAVE, 3, "6:00pm", "not available")).toBeVisible();
   await page.getByRole("button", { name: "Next week", exact: true }).click();
   await page.getByRole("button", { name: "Leave" }).click();
   await expect(page.getByRole("heading", { name: /Week of 17 May/ })).toBeVisible();
@@ -140,7 +140,9 @@ test("AC6: tapping a half hour a job holds says to ring the office, and changes 
   await openBob(page, WEEK_SAVE);
   const cal = await page.request.get(`${apiUrl}/api/contractor/calendar?from=${new Date().toISOString().slice(0, 10)}&to=${new Date(Date.now() + 21 * 86_400_000).toISOString().slice(0, 10)}`);
   const days = ((await cal.json()) as { days: { date: string; blocks: { startMinutes: number; status: string }[] }[] }).days;
-  const day = days.find((d) => d.blocks.some((b) => b.startMinutes >= 420 && b.startMinutes < 1140 && b.status !== "finished"));
+  // a day after today: the half hours of today that have gone by read Past, not booked
+  const todayPerth = new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Perth" }).format(new Date());
+  const day = days.find((d) => d.date > todayPerth && d.blocks.some((b) => b.startMinutes >= 420 && b.startMinutes < 1140 && b.status !== "finished"));
   test.skip(day === undefined, "Bob has no job in the next three weeks");
   if (day === undefined) return;
   await page.goto(`/contractor/availability?week=${day.date}`);
