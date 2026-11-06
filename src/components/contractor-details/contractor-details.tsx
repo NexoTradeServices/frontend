@@ -131,10 +131,10 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
               onPickingChange={setAddressPicking}
             />
           </div>
-          <hr className="mb-3.5 border-hairline sm:col-span-2" />
+          <hr className="mb-3.5 border-brand-accent sm:col-span-2" />
           <Field label="Emergency contact name" id="d-ecName" placeholder="Jen Reilly" value={fields.emergencyContactName} onChange={(e) => set("emergencyContactName", e.target.value)} />
           <Field label="Emergency contact phone" id="d-ecPhone" placeholder="0400 000 000" value={fields.emergencyContactPhone} onChange={(e) => set("emergencyContactPhone", e.target.value)} />
-          <hr className="mb-3.5 border-hairline sm:col-span-2" />
+          <hr className="mb-3.5 border-brand-accent sm:col-span-2" />
           {office.specialties.map((s) => (
             <LockedField key={s.trade} label={s.trade} value={`Licence ${s.licenceNumber}, expires ${fmtDate(s.licenceExpiry)}`} />
           ))}
@@ -146,11 +146,11 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
                 : "Not set"
             }
           />
-          <hr className="mb-3.5 border-hairline sm:col-span-2" />
+          <hr className="mb-3.5 border-brand-accent sm:col-span-2" />
           <LockedField label="BSB" value={office.payoutBsb ?? "Not set"} />
           <LockedField label="Account number" value={office.payoutAccountNo ?? "Not set"} />
           <LockedField label="Account name" value={office.payoutAccountName ?? "Not set"} />
-          <hr className="mb-3.5 border-hairline sm:col-span-2" />
+          <hr className="mb-3.5 border-brand-accent sm:col-span-2" />
           <LockedField label="Status" value={office.status === "active" ? "Active" : "Deactivated"} />
         </div>
         <div className="flex justify-end">
