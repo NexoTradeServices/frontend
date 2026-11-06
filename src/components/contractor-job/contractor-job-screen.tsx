@@ -357,6 +357,8 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
   // Feature 5002: the Return visit card (opened by Book a return visit) and what the last booking said.
   const [returning, setReturning] = useState(false);
   const [draft, setDraft] = useState<ReturnDraft>(() => emptyDraft(initial.timezone));
+  const [overOff, setOverOff] = useState(false);
+  const [askingOff, setAskingOff] = useState(false);
   const [dayState, setDayState] = useState<{ closed: string | null } | null>(null);
   const [returnError, setReturnError] = useState<string | undefined>();
   const [bookedLabel, setBookedLabel] = useState<string | null>(null);
@@ -568,6 +570,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
       });
       const payload = (await res.json()) as ContractorJobDto & ApiError & { returnBooked?: { label: string } | null };
       if (!res.ok) {
+        setReturning(true);
         if (payload.field === "startMinutes" || payload.field === "slot" || payload.field === "date" || payload.field === "holdMinutes" || payload.field === "status") setReturnError(payload.error);
         else if (payload.field === "reason" || payload.field === "otherText") setReturnError(payload.error);
         else place(payload, entryAt, partAt);
@@ -1064,7 +1067,12 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
         confirmLabel={draft.choice === "notyet" ? "Put on hold" : "Confirm return visit"}
         confirmDisabled={!draftReady(draft, dayState) || uploading}
         busy={busy !== null}
-        onConfirm={() => void sendReturn()}
+        onConfirm={() => {
+          if (overOff) {
+            setReturning(false);
+            setAskingOff(true);
+          } else void sendReturn();
+        }}
         onClose={() => {
           setReturning(false);
           setReturnError(undefined);
@@ -1080,8 +1088,25 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
           }}
           error={returnError}
           onDay={setDayState}
+          onOverlap={setOverOff}
         />
       </FormDialog>
+
+      <ConfirmDialog
+        open={askingOff}
+        title="Book over your Not available time?"
+        confirmLabel="Book it"
+        onConfirm={() => {
+          setAskingOff(false);
+          void sendReturn();
+        }}
+        onCancel={() => {
+          setAskingOff(false);
+          setReturning(true);
+        }}
+      >
+        You marked this time Not available. Booking the return visit will make it Available again.
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={confirming}

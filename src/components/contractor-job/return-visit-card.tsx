@@ -77,6 +77,7 @@ export function ReturnVisitCard({
   onChange,
   error,
   onDay,
+  onOverlap,
 }: {
   reference: string;
   zone: string;
@@ -86,6 +87,8 @@ export function ReturnVisitCard({
   error?: string;
   /** Tells the screen what the day says (a holiday), so it can grey the Primary. */
   onDay?: (day: { closed: string | null } | null) => void;
+  /** Tells the screen when the picked time sits over time he switched off, so it can ask before booking it. */
+  onOverlap?: (over: boolean) => void;
 }) {
   const [day, setDay] = useState<DayData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -143,6 +146,13 @@ export function ReturnVisitCard({
   const close = day === null ? 1140 : minutesOfClock(day.closingTime);
   const end = draft.startMinutes + draft.holdMinutes;
   const overlapsOff = day !== null && day.notAvailable.some((run) => run.startMinutes < end && run.endMinutes > draft.startMinutes && run.startMinutes < close && run.endMinutes > open);
+  const overlapReported = useRef(false);
+  const overlapNow = overlapsOff && draft.choice === "pick" && draft.startPicked && !day?.closed;
+  useEffect(() => {
+    if (overlapReported.current === overlapNow) return;
+    overlapReported.current = overlapNow;
+    onOverlap?.(overlapNow);
+  });
 
   function stepDay(delta: -1 | 1) {
     tapped.current = false;
