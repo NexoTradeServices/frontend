@@ -145,7 +145,7 @@ test("AC6: tapping a half hour a job holds says to ring the office, and changes 
   if (day === undefined) return;
   await page.goto(`/contractor/availability?week=${day.date}`);
   await expect(page.getByTestId("availability-grid")).toBeVisible({ timeout: 15_000 });
-  const locked = page.locator('[data-state="booked"], [data-state="to_answer"]').first();
+  const locked = page.locator('[data-state="booked"], [data-state="in_progress"], [data-state="to_answer"]').first();
   await locked.click();
   await expect(page.getByText("This time has a job. Ring the office to change it.")).toBeVisible();
   void request;

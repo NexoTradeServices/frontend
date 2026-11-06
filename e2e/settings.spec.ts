@@ -576,6 +576,11 @@ test.describe("1021 -- operating states", () => {
       await expect(page.getByLabel("New South Wales (NSW)")).not.toBeChecked();
       await expect(page.getByLabel("Western Australia (WA)")).toBeChecked();
       await expect(page.getByText(/Last changed .* by The owner\./)).toBeVisible();
+
+      // Put NSW back: the seed has it open, and the Sydney job test (1022) needs Liam's state open.
+      await page.getByLabel("New South Wales (NSW)").check();
+      await page.getByRole("button", { name: "Save settings" }).click();
+      await expect(page.getByText("Saved.")).toBeVisible();
     });
   });
 });
