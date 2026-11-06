@@ -35,6 +35,7 @@ import { centsToDollarsText, dollarsTextToCents } from "@/lib/visit-format";
 import { formatDollars } from "@/components/request-a-job/money";
 import { OnMyWayButton, OnMyWaySent, ON_MY_WAY_FAILED, postOnMyWay } from "@/components/contractor-dashboard/on-my-way";
 import { Banner } from "@/components/auth/banner";
+import { FormDialog } from "@/components/ui/form-dialog";
 import { ReturnVisitCard, draftReady, emptyDraft, type ReturnDraft } from "./return-visit-card";
 import type { ApiError, ContractorJobDto, PaymentDto } from "./types";
 
@@ -359,7 +360,6 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
   const [dayState, setDayState] = useState<{ closed: string | null } | null>(null);
   const [returnError, setReturnError] = useState<string | undefined>();
   const [bookedLabel, setBookedLabel] = useState<string | null>(null);
-  const returnRef = useRef<HTMLDivElement>(null);
 
   const frozen = job.frozen;
   // Feature 5002: the work (time, parts, notes, the buttons) opens when Bob has arrived; between visits the screen only says when the next one is.
@@ -537,7 +537,6 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
     setErrors(problems);
     if (Object.keys(problems).length > 0) return;
     setReturning(true);
-    setTimeout(() => returnRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }
 
   /** Confirm return visit / Put on hold: the screen's times, notes and parts go with the booking, in one go. */
@@ -821,7 +820,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                 setErrors({});
               }}
             />
-            {job.canBookReturn && working && !returning ? (
+            {job.canBookReturn && working ? (
               <button
                 type="button"
                 onClick={openReturn}
@@ -992,21 +991,6 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
             ) : null}
           </Card>
           ) : null}
-          {returning ? (
-            <div ref={returnRef} className="scroll-mt-4">
-              <ReturnVisitCard
-                reference={job.reference}
-                zone={job.timezone}
-                draft={draft}
-                onChange={(next) => {
-                  setReturnError(undefined);
-                  setDraft(next);
-                }}
-                error={returnError}
-                onDay={setDayState}
-              />
-            </div>
-          ) : null}
         </div>
       </div>
 
@@ -1018,62 +1002,60 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                 Not saved yet
               </span>
             ) : null}
-            {returning ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setReturning(false);
-                    setReturnError(undefined);
-                  }}
-                  disabled={busy !== null}
-                  className="min-h-[52px] flex-1 rounded-button border border-hairline bg-surface px-4 text-sm font-bold text-ink md:min-h-11 md:flex-none"
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void sendReturn()}
-                  disabled={!draftReady(draft, dayState) || busy !== null || uploading}
-                  className={`min-h-[52px] flex-[2] rounded-button px-4 text-sm font-bold md:min-h-11 md:flex-none ${
-                    draftReady(draft, dayState) ? "bg-brand-accent text-on-accent" : "bg-hairline text-muted-text"
-                  } disabled:cursor-not-allowed`}
-                >
-                  {busy === "save" ? "Saving..." : draft.choice === "notyet" ? "Put on hold" : "Confirm return visit"}
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => void send(false)}
-                  disabled={!changed || busy !== null || uploading}
-                  className={`min-h-[52px] flex-1 rounded-button px-4 text-sm font-bold md:min-h-11 md:flex-none ${
-                    changed ? "border border-hairline bg-surface text-ink" : "bg-hairline text-muted-text"
-                  } disabled:cursor-not-allowed`}
-                >
-                  {busy === "save" ? "Saving..." : "Save"}
-                </button>
-                {onHold ? null : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const problems = check(true);
-                      setErrors(problems);
-                      setBanner(undefined);
-                      if (Object.keys(problems).length === 0) setConfirming(true);
-                    }}
-                    disabled={busy !== null || uploading}
-                    className="min-h-[52px] flex-[2] rounded-button bg-brand-success px-4 text-sm font-bold text-on-accent disabled:opacity-50 md:min-h-11 md:flex-none"
-                  >
-                    Complete job
-                  </button>
-                )}
-              </>
+            <button
+              type="button"
+              onClick={() => void send(false)}
+              disabled={!changed || busy !== null || uploading}
+              className={`min-h-[52px] flex-1 rounded-button px-4 text-sm font-bold md:min-h-11 md:flex-none ${
+                changed ? "border border-hairline bg-surface text-ink" : "bg-hairline text-muted-text"
+              } disabled:cursor-not-allowed`}
+            >
+              {busy === "save" ? "Saving..." : "Save"}
+            </button>
+            {onHold ? null : (
+              <button
+                type="button"
+                onClick={() => {
+                  const problems = check(true);
+                  setErrors(problems);
+                  setBanner(undefined);
+                  if (Object.keys(problems).length === 0) setConfirming(true);
+                }}
+                disabled={busy !== null || uploading}
+                className="min-h-[52px] flex-[2] rounded-button bg-brand-success px-4 text-sm font-bold text-on-accent disabled:opacity-50 md:min-h-11 md:flex-none"
+              >
+                Complete job
+              </button>
             )}
           </div>
         </div>
       ) : null}
+
+      <FormDialog
+        open={returning}
+        title="Return visit"
+        testId="return-visit-card"
+        confirmLabel={draft.choice === "notyet" ? "Put on hold" : "Confirm return visit"}
+        confirmDisabled={!draftReady(draft, dayState) || uploading}
+        busy={busy !== null}
+        onConfirm={() => void sendReturn()}
+        onClose={() => {
+          setReturning(false);
+          setReturnError(undefined);
+        }}
+      >
+        <ReturnVisitCard
+          reference={job.reference}
+          zone={job.timezone}
+          draft={draft}
+          onChange={(next) => {
+            setReturnError(undefined);
+            setDraft(next);
+          }}
+          error={returnError}
+          onDay={setDayState}
+        />
+      </FormDialog>
 
       <ConfirmDialog
         open={confirming}

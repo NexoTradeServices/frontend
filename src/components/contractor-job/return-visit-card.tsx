@@ -1,8 +1,8 @@
-// The Return visit card -- Feature 5002, Organisms / Calendar and charts (Return visit card) with the Calendar day.
+// The Return visit form -- Feature 5002, Organisms / Calendar and charts (Return visit card) with the Calendar day. It sits in a Form dialog.
 //
 // Bob's "Book a return visit": a required Reason (Part on order, More time needed, Other with its words), then either
 // Pick a time (a date, how long, and a tap on his own day) or Not yet (with an optional note for the office). The card
-// only collects the answers; the bottom bar's Confirm return visit / Put on hold sends them with the screen's times,
+// only collects the answers; the dialog's Confirm return visit / Put on hold sends them with the screen's times,
 // notes and parts. Time he has switched off is still tappable -- booking it switches it on, and the card says so.
 "use client";
 
@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { Banner } from "@/components/auth/banner";
 import { Field } from "@/components/auth/field";
 import { SelectField } from "@/components/ui/select-field";
+import { ChoiceCards } from "@/components/ui/choice-cards";
 import { CalendarDayView, timeLabelFor, type DayBlock } from "@/components/ui/calendar-day-view";
 import { formatDateWithDay } from "@/lib/date-format";
 
@@ -115,16 +116,14 @@ export function ReturnVisitCard({
   }
 
   return (
-    <div className="rounded-card border border-hairline bg-surface p-4 sm:p-5" data-testid="return-visit-card">
-      <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Return visit</h3>
-      <SelectField
+    <div>
+      <ChoiceCards
         label="Reason"
         id="rv-reason"
         required
         value={draft.reason}
-        onChange={(e) => set({ reason: e.target.value as ReturnReasonValue })}
+        onChange={(reason) => set({ reason })}
         options={[
-          { value: "", label: "Pick a reason" },
           { value: "part_on_order", label: "Part on order" },
           { value: "more_time_needed", label: "More time needed" },
           { value: "other", label: "Other" },
@@ -133,16 +132,15 @@ export function ReturnVisitCard({
       {draft.reason === "other" ? (
         <Field label="What is it?" id="rv-other" required value={draft.otherText} onChange={(e) => set({ otherText: e.target.value })} />
       ) : null}
-      <SelectField
-        label="Return date"
+      <ChoiceCards
+        label="Return visit"
         id="rv-choice"
         required
         value={draft.choice}
-        onChange={(e) => set({ choice: e.target.value as ReturnDraft["choice"] })}
+        onChange={(choice) => set({ choice })}
         options={[
-          { value: "", label: "Pick one" },
-          { value: "pick", label: "Pick a time" },
-          { value: "notyet", label: "Not yet" },
+          { value: "pick", label: "I know the time", hint: "Pick a day and a time on your calendar" },
+          { value: "notyet", label: "Not yet", hint: "The office books it and tells the customer" },
         ]}
       />
       {draft.choice === "notyet" ? (
