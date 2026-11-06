@@ -17,6 +17,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Pencil } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { stateOfPick, useStateClosed } from "@/components/request-a-job/holidays";
 import { PlacesField, fullAddress, type PickedAddress } from "@/components/ui/places-field";
 import { LockedField } from "@/components/ui/locked-field";
 import { SelectField } from "@/components/ui/select-field";
@@ -127,6 +128,15 @@ function RequestEditCard({
   const [errors, setErrors] = useState<Partial<Record<RequestField, string>>>({});
   const [banner, setBanner] = useState<string>();
   const [saving, setSaving] = useState(false);
+  // Feature 1021: a pick in a closed state is said at once and Save is held back -- except inside the job's own state.
+  const pickedState = stateOfPick(location, platformSuburb);
+  const stateClosed = useStateClosed(location, platformSuburb);
+  const closedMessage =
+    stateClosed && pickedState !== null && pickedState !== (job.state ?? null) ? `${pickedState} is not an operating state.` : undefined;
+  const [closedToast, showClosedToast] = useToast();
+  useEffect(() => {
+    if (closedMessage !== undefined) showClosedToast(closedMessage);
+  }, [closedMessage, showClosedToast]);
 
   useEffect(() => {
     let live = true;
@@ -208,6 +218,7 @@ function RequestEditCard({
 
   return (
     <Card title="The request">
+      <Toast message={closedToast} />
       {banner ? <Banner kind="error">{banner}</Banner> : null}
       <SelectField
         id="request-trade"
@@ -248,6 +259,11 @@ function RequestEditCard({
           }}
         />
       )}
+      {closedMessage !== undefined ? (
+        <div className="mb-3.5">
+          <Banner kind="error">{closedMessage}</Banner>
+        </div>
+      ) : null}
       <Field
         id="request-date"
         label="Date"
@@ -285,7 +301,15 @@ function RequestEditCard({
         {errors.description ? <p className="mt-[5px] text-xs text-brand-destructive">{errors.description}</p> : null}
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2.5">
-        <PrimaryButton type="button" size="compact" loading={saving} loadingLabel="Saving..." onClick={() => void save()}>
+        <PrimaryButton
+          type="button"
+          size="compact"
+          loading={saving}
+          loadingLabel="Saving..."
+          disabled={closedMessage !== undefined}
+          className="disabled:cursor-not-allowed disabled:bg-hairline disabled:text-muted-text"
+          onClick={() => void save()}
+        >
           Save
         </PrimaryButton>
         <button
@@ -403,37 +427,6 @@ const LEVEL_LABELS: Record<"normal" | "weekend" | "emergency", string> = {
   emergency: "Emergency",
 };
 
-/**
- * Feature 4003, Quick fixes: the job actions the platform has not built yet,
- * each shown only where it would work, outlined, greyed and disabled, naming
- * the feature that switches it on. Architect skill, Writing the plan, step 2a.
- * Feature 4006 took Reassign, Reschedule and Cancel out of
- * this list: they are real buttons (JobActions, below). Feature 6004 did the same for Mark no-show
- * and Raise callback. Feature 6007 did the same for Correct & reissue: a real link in the Invoice card.
- */
-const ACTION_PLACEHOLDERS: { label: string; feature: string; statuses: JobDetail["status"][] }[] = [
-  { label: "On hold", feature: "5002", statuses: ["scheduled", "in_progress"] },
-];
-
-function ActionPlaceholders({ job }: { job: JobDetail }) {
-  const shown = ACTION_PLACEHOLDERS.filter((action) => action.statuses.includes(job.status));
-  if (shown.length === 0) return null;
-  return (
-    <div className="mt-3.5 flex flex-wrap gap-2 border-t border-hairline pt-3" data-testid="action-placeholders">
-      {shown.map((action) => (
-        <button
-          key={action.label}
-          type="button"
-          disabled
-          className="min-h-11 rounded-button border border-hairline bg-transparent px-3.5 text-small font-bold text-muted-text"
-        >
-          {action.label} - coming in {action.feature}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 /** Feature 4003, plan decision 10: every booking on the job but the one in play, newest first. */
 function EarlierBookings({ bookings }: { bookings: EarlierBooking[] }) {
   if (bookings.length === 0) return null;
@@ -525,7 +518,10 @@ async function postAction(path: string, body: Record<string, unknown>): Promise<
 
 /** Feature 4006: Reschedule, Reassign and Cancel job, shown by the page's own `actions`. */
 function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobDetail, message: string) => void }) {
-  const [dialog, setDialog] = useState<"take-off" | "cancel" | "callback" | "no-show" | null>(null);
+  const [dialog, setDialog] = useState<"take-off" | "cancel" | "callback" | "no-show" | "hold" | null>(null);
+  const [holdReason, setHoldReason] = useState("");
+  const [holdOther, setHoldOther] = useState("");
+  const [holdError, setHoldError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [reason, setReason] = useState("");
@@ -537,9 +533,9 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
   const [charge, setCharge] = useState(true);
   const router = useRouter();
 
-  const { reschedule, takeOff, cancel } = job.actions;
+  const { reschedule, takeOff, cancel, hold } = job.actions;
   const { canRaiseCallback, canMarkNoShow } = job;
-  if (!reschedule && !takeOff && !cancel && !canRaiseCallback && !canMarkNoShow) return null;
+  if (!reschedule && !takeOff && !cancel && !canRaiseCallback && !canMarkNoShow && !hold) return null;
   const contractorFirst = job.contractor ? firstNameOf(job.contractor.name) : "the contractor";
 
   function close() {
@@ -552,6 +548,32 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
     setCallbackText("");
     setCallbackError(undefined);
     setCharge(true);
+    setHoldReason("");
+    setHoldOther("");
+    setHoldError(undefined);
+  }
+
+  async function confirmHold() {
+    setHoldError(undefined);
+    setError(undefined);
+    if (holdReason === "") {
+      setHoldError("Required.");
+      return;
+    }
+    if (holdReason === "other" && holdOther.trim() === "") {
+      setHoldError("Say what it is.");
+      return;
+    }
+    setBusy(true);
+    const result = await postAction(`/api/jobs/${encodeURIComponent(job.reference)}/hold`, { reason: holdReason, otherText: holdOther.trim() });
+    setBusy(false);
+    if (!result.ok) {
+      if (result.field === "reason" || result.field === "otherText") setHoldError(result.error);
+      else setError(result.error);
+      return;
+    }
+    close();
+    onChanged(result.job, result.toast);
   }
 
   async function confirmCallback() {
@@ -649,6 +671,11 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
             Reassign
           </button>
         ) : null}
+        {hold ? (
+          <button type="button" className={outlinedButton} onClick={() => setDialog("hold")}>
+            Put on hold
+          </button>
+        ) : null}
         {cancel ? (
           <button type="button" className={outlinedButton} onClick={() => setDialog("cancel")}>
             Cancel job
@@ -665,6 +692,64 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
           </button>
         ) : null}
       </div>
+
+      <ConfirmDialog
+        open={dialog === "hold"}
+        title={`Put ${job.reference} on hold?`}
+        confirmLabel="Put on hold"
+        cancelLabel="Not now"
+        loading={busy}
+        loadingLabel="Putting on hold..."
+        onConfirm={() => void confirmHold()}
+        onCancel={close}
+        fields={
+          <>
+            <SelectField
+              id="hold-reason"
+              label="Reason"
+              required
+              value={holdReason}
+              error={holdReason === "other" ? undefined : holdError}
+              options={[
+                { value: "", label: "Pick a reason" },
+                { value: "part_on_order", label: "Part on order" },
+                { value: "more_time_needed", label: "More time needed" },
+                { value: "other", label: "Other" },
+              ]}
+              onChange={(event) => {
+                setHoldReason(event.target.value);
+                setHoldError(undefined);
+              }}
+            />
+            {holdReason === "other" ? (
+              <div className="mb-3.5">
+                <label
+                  htmlFor="hold-other"
+                  className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']"
+                >
+                  What is it?
+                </label>
+                <input
+                  id="hold-other"
+                  value={holdOther}
+                  maxLength={500}
+                  onChange={(event) => {
+                    setHoldOther(event.target.value);
+                    setHoldError(undefined);
+                  }}
+                  className={`min-h-[44px] w-full rounded-button border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
+                    holdError ? "border-brand-destructive" : "border-hairline"
+                  }`}
+                />
+                {holdError ? <p className="mt-[5px] text-xs text-brand-destructive">{holdError}</p> : null}
+              </div>
+            ) : null}
+            {error && dialog === "hold" ? <p className="mt-2 text-xs text-brand-destructive">{error}</p> : null}
+          </>
+        }
+      >
+        {job.status === "scheduled" ? `A booked time comes off, and ${firstNameOf(job.customer.name)} and the site contact are told by email and text.` : "The booked visit stays as it is until you book the return."}
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={dialog === "callback"}
@@ -810,6 +895,53 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
   );
 }
 
+/**
+ * Feature 5002: where the office looks for a return visit. While the job waits (on hold) it is the one card that
+ * asks for the office, in the Needs attention colours, with the Reason, Bob's note and the Primary that books it;
+ * once booked it stays as the record of why the job came back.
+ */
+function ReturnVisitCard({ job }: { job: JobDetail }) {
+  const visit = job.returnVisit;
+  if (visit === null) return null;
+  const waiting = job.status === "on_hold";
+  return (
+    <section
+      data-testid="return-visit-facts"
+      className={`rounded-card border p-5 ${waiting ? "border-brand-warning/30 bg-warning-bg" : "border-hairline bg-surface"}`}
+    >
+      <h2 className="font-heading text-base font-extrabold text-ink">
+        Return visit
+        <span className="ml-2 align-middle">
+          <Tag tone={waiting ? "warning" : "neutral"}>{waiting ? "Needs booking" : "Booked"}</Tag>
+        </span>
+      </h2>
+      <div className="mt-3.5 grid gap-3">
+        <Fact label="Status">{job.contractor?.standing ?? (waiting ? "On hold - no return date yet" : "")}</Fact>
+        <Fact label="Reason">
+          {visit.reasonLabel}
+          {visit.otherText ? <span className="font-normal text-secondary-text"> - {visit.otherText}</span> : null}
+        </Fact>
+        {visit.officeNote ? (
+          <Fact label="Note for the office">
+            <p className="max-w-[62ch] font-normal whitespace-pre-wrap">{visit.officeNote}</p>
+          </Fact>
+        ) : null}
+        <Fact label="Asked for by">
+          {visit.byName} <span className="font-normal text-muted-text">- {visit.atLabel}</span>
+        </Fact>
+      </div>
+      {job.actions.bookReturn ? (
+        <PrimaryLink
+          href={`/ops/jobs/${encodeURIComponent(job.reference)}/dispatch?mode=return`}
+          className="mt-3.5 md:inline-block md:min-h-11 md:w-auto md:px-[18px] md:py-2.5"
+        >
+          Book return visit
+        </PrimaryLink>
+      ) : null}
+    </section>
+  );
+}
+
 function ContractorCard({
   job,
   onChanged,
@@ -860,7 +992,6 @@ function ContractorCard({
       )}
       <EarlierBookings bookings={job.earlierBookings} />
       <JobActions job={job} onChanged={onChanged} />
-      <ActionPlaceholders job={job} />
     </Card>
   );
 }
@@ -981,6 +1112,13 @@ function TimeOnSiteCard({
         }}
       />
       {formError ? <p className="mb-2 text-xs text-brand-destructive">{formError}</p> : null}
+      {visit.completionNotes ? (
+        <div className="mt-3.5 border-t border-hairline pt-3.5" data-testid="work-summary">
+          <Fact label="Contractor work summary">
+            <p className="max-w-[62ch] font-normal whitespace-pre-wrap">{visit.completionNotes}</p>
+          </Fact>
+        </div>
+      ) : null}
       <div className="mt-3.5 flex flex-col gap-2 border-t border-hairline pt-3.5 md:flex-row md:items-center md:justify-end md:gap-3">
         {pending && !saving ? <span className="text-xs font-semibold text-brand-warning">Not saved yet</span> : null}
         <button
@@ -1340,6 +1478,16 @@ function AddressesCard({
 
   const picking = billingPicking || sitePicking;
   const effectiveSite = sameAsBilling ? billing : site;
+  // Feature 1021: a job site in a closed state (not the job's own) is said at once, and Save is held back.
+  const siteStateClosed = useStateClosed(job.siteLocked ? null : effectiveSite, null);
+  const closedMessage =
+    siteStateClosed && effectiveSite !== null && effectiveSite.state !== (job.state ?? null)
+      ? `${effectiveSite.state} is not an operating state.`
+      : undefined;
+  const [closedToast, showClosedToast] = useToast();
+  useEffect(() => {
+    if (closedMessage !== undefined) showClosedToast(closedMessage);
+  }, [closedMessage, showClosedToast]);
   // V9: any site pick on a new job moves it; the line shows whenever that
   // changes the suburb or the postcode the job reads.
   const moves =
@@ -1545,6 +1693,11 @@ function AddressesCard({
               onPickingChange={setSitePicking}
             />
           )}
+          {closedMessage !== undefined ? (
+            <div className="mb-3.5">
+              <Banner kind="error">{closedMessage}</Banner>
+            </div>
+          ) : null}
           {moves && effectiveSite ? (
             <p className="mb-3.5 text-xs text-brand-warning">
               Saving addresses moves the job from {job.suburb} {job.postcode} to {effectiveSite.suburb}{" "}
@@ -1619,6 +1772,7 @@ function AddressesCard({
         )}
       </div>
 
+      <Toast message={closedToast} />
       {formError ? <p className="mb-2 text-xs text-brand-destructive">{formError}</p> : null}
       <div
         className={`flex-col gap-2 border-t border-hairline pt-3.5 md:flex-row md:items-center md:justify-end md:gap-3 ${
@@ -1632,8 +1786,8 @@ function AddressesCard({
             onClick={() => void save()}
             loading={saving}
             loadingLabel="Saving..."
-            disabled={picking}
-            className="md:mt-0 md:inline-block md:min-h-11 md:w-auto md:px-[18px] md:py-2.5"
+            disabled={picking || closedMessage !== undefined}
+            className="disabled:cursor-not-allowed disabled:bg-hairline disabled:text-muted-text md:mt-0 md:inline-block md:min-h-11 md:w-auto md:px-[18px] md:py-2.5"
           >
             {picking ? "Picking address..." : "Save"}
           </PrimaryButton>
@@ -1722,7 +1876,7 @@ function InvoiceCard({
 }) {
   const [resending, setResending] = useState(false);
   const [checking, setChecking] = useState(false);
-  /** "Checked with Stripe at 2:15pm AWST - no payment yet." -- true only at that moment, so never kept past a reload. */
+  /** "Checked with Stripe at 2:15pm - no payment yet." -- true only at that moment, so never kept past a reload. */
   const [checkedLine, setCheckedLine] = useState<string | null>(null);
   const [checkError, setCheckError] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();
@@ -2524,7 +2678,8 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
             actual dependency (no address, no dispatch). Desktop's two-column
             arrangement (Request+Contractor+Messages+Notes left, Rating+Customer+Addresses
             right) rides the explicit xl: column/row placement. */}
-        <div className="order-1 min-w-0 xl:order-none xl:col-start-1 xl:row-start-1">
+        <div className="order-1 grid min-w-0 gap-4 xl:order-none xl:col-start-1 xl:row-start-1">
+          <ReturnVisitCard job={job} />
           <RequestCard
             job={job}
             editing={editing}

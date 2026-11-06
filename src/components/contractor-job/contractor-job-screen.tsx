@@ -25,6 +25,7 @@ import {
   TimeEntryRows,
   freshKey,
   isBlankRow,
+  newEntryRow,
   rowsFromEntries,
   type TimeEntryRow,
 } from "@/components/ui/time-entry-rows";
@@ -33,6 +34,9 @@ import { billedHoursOf, formatHours } from "@/lib/billed-hours";
 import { centsToDollarsText, dollarsTextToCents } from "@/lib/visit-format";
 import { formatDollars } from "@/components/request-a-job/money";
 import { OnMyWayButton, OnMyWaySent, ON_MY_WAY_FAILED, postOnMyWay } from "@/components/contractor-dashboard/on-my-way";
+import { Banner } from "@/components/auth/banner";
+import { FormDialog } from "@/components/ui/form-dialog";
+import { ReturnVisitCard, draftReady, emptyDraft, type ReturnDraft } from "./return-visit-card";
 import type { ApiError, ContractorJobDto, PaymentDto } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -257,6 +261,14 @@ function pickOf(value: boolean | null): CallbackPick {
 }
 
 /** What would be saved, as one string -- Save stays Quiet until it differs from what is stored. */
+/** Feature 5002: arriving for a return visit opens that visit's own row -- there is no "+ Add a visit" for Bob. */
+function withVisitRow(rows: TimeEntryRow[], view: ContractorJobDto): TimeEntryRow[] {
+  if (view.assignmentStatus !== "in_progress" || view.frozen) return rows;
+  const last = rows[rows.length - 1];
+  if (rows.length >= view.visitsAllowed || (last !== undefined && isBlankRow(last))) return rows;
+  return [...rows, newEntryRow(view.timezone)];
+}
+
 function snapshotOf(rows: TimeEntryRow[], notes: string, parts: PartRow[], pick: CallbackPick): string {
   return JSON.stringify({
     pick,
@@ -322,7 +334,7 @@ async function uploadReceipt(
 export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) {
   const router = useRouter();
   const [job, setJob] = useState(initial);
-  const [rows, setRows] = useState<TimeEntryRow[]>(() => rowsFromEntries(initial.timeEntries, initial.timezone));
+  const [rows, setRows] = useState<TimeEntryRow[]>(() => withVisitRow(rowsFromEntries(initial.timeEntries, initial.timezone), initial));
   const [notes, setNotes] = useState(initial.completionNotes);
   const [parts, setParts] = useState<PartRow[]>(() => partRowsOf(initial));
   const [pick, setPick] = useState<CallbackPick>(() => pickOf(initial.callbackChargeable));
@@ -342,8 +354,23 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
   const [toastMessage, showToast] = useToast();
   const paymentRef = useRef<HTMLDivElement>(null);
   const [scrollToPayment, setScrollToPayment] = useState(false);
+  // Feature 5002: the Return visit card (opened by Book a return visit) and what the last booking said.
+  const [returning, setReturning] = useState(false);
+  const [draft, setDraft] = useState<ReturnDraft>(() => emptyDraft(initial.timezone));
+  const [dayState, setDayState] = useState<{ closed: string | null } | null>(null);
+  const [returnError, setReturnError] = useState<string | undefined>();
+  const [bookedLabel, setBookedLabel] = useState<string | null>(null);
 
   const frozen = job.frozen;
+  // Feature 5002: the work (time, parts, notes, the buttons) opens when Bob has arrived; between visits the screen only says when the next one is.
+  const arrived = job.assignmentStatus === "in_progress";
+  const working = arrived && !frozen;
+  const idle = !arrived && !frozen;
+  // between visits (and after Complete) what is saved shows, locked; the Locked-at-completion words are only for a completed job
+  const readOnly = !working;
+  // a visit has been worked and saved: the notes and parts show, empty or not, until the next arrival
+  const visited = rows.some((row) => !isBlankRow(row));
+  const onHold = job.jobStatus === "on_hold";
   const isCallback = job.callbackOn !== null;
   const changed = snapshotOf(rows, notes, parts, pick) !== saved;
   const uploading = parts.some((part) => part.uploading);
@@ -439,7 +466,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
 
   function adopt(next: ContractorJobDto) {
     setJob(next);
-    const nextRows = rowsFromEntries(next.timeEntries, next.timezone);
+    const nextRows = withVisitRow(rowsFromEntries(next.timeEntries, next.timezone), next);
     const nextParts = partRowsOf(next);
     setRows(nextRows);
     setNotes(next.completionNotes);
@@ -502,6 +529,65 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
     }
   }
 
+  /** Book a return visit: nothing is saved. A time for today first, then the card opens and the page scrolls to it. */
+  function openReturn() {
+    setBanner(undefined);
+    setReturnError(undefined);
+    setBookedLabel(null);
+    const problems = check(false);
+    const today = emptyDraft(job.timezone).date; // tomorrow in the job's zone; today is one day before
+    const todayText = new Date(Date.parse(`${today}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+    if (!rows.some((row) => !isBlankRow(row) && row.date === todayText)) problems["rows"] = "Enter today's time on site first.";
+    setErrors(problems);
+    if (Object.keys(problems).length > 0) return;
+    setReturning(true);
+  }
+
+  /** Confirm return visit / Put on hold: the screen's times, notes and parts go with the booking, in one go. */
+  async function sendReturn() {
+    setBanner(undefined);
+    setReturnError(undefined);
+    const problems = check(false);
+    setErrors(problems);
+    if (Object.keys(problems).length > 0) return;
+    const { body, entryAt, partAt } = buildRequest();
+    setBusy("save");
+    try {
+      const res = await fetch(`${apiUrl}/api/contractor/jobs/${encodeURIComponent(job.reference)}/return-visit`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...body,
+          reason: draft.reason,
+          otherText: draft.reason === "other" ? draft.otherText : undefined,
+          ...(draft.choice === "notyet"
+            ? { notYet: true, officeNote: draft.officeNote }
+            : { slot: { date: draft.date, startMinutes: draft.startMinutes, holdMinutes: draft.holdMinutes } }),
+        }),
+      });
+      const payload = (await res.json()) as ContractorJobDto & ApiError & { returnBooked?: { label: string } | null };
+      if (!res.ok) {
+        setReturning(true);
+        if (payload.field === "startMinutes" || payload.field === "slot" || payload.field === "date" || payload.field === "holdMinutes" || payload.field === "status") setReturnError(payload.error);
+        else if (payload.field === "reason" || payload.field === "otherText") setReturnError(payload.error);
+        else place(payload, entryAt, partAt);
+        return;
+      }
+      adopt(payload);
+      setReturning(false);
+      setDraft(emptyDraft(job.timezone));
+      setDayState(null);
+      if (payload.returnBooked) setBookedLabel(payload.returnBooked.label);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      router.refresh();
+    } catch {
+      setBanner("Save failed - check your connection and try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function onSite() {
     setBanner(undefined);
     setBusy("onsite");
@@ -517,6 +603,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
       const next = (await res.json()) as ContractorJobDto;
       // Only the status moved: what he is typing stays as it is.
       setJob((current) => ({ ...current, jobStatus: next.jobStatus, assignmentStatus: next.assignmentStatus, canOnSite: next.canOnSite, onMyWay: next.onMyWay }));
+      setRows((current) => withVisitRow(current, next));
       router.refresh();
     } catch {
       setBanner("Couldn't mark you on site - try again.");
@@ -599,6 +686,20 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
             {banner}
           </p>
         ) : null}
+        {bookedLabel !== null ? (
+          <div className="col-span-full" data-testid="return-booked">
+            <Banner kind="success">
+              Return visit booked for {bookedLabel}. {firstNameOf(job.customerName)} has been told by email and text.
+            </Banner>
+          </div>
+        ) : null}
+        {onHold ? (
+          <div className="col-span-full" data-testid="on-hold-banner">
+            <Banner kind="warning">
+              <b>On hold.</b> The office will book the return visit and tell {firstNameOf(job.customerName)}. You can still save your notes.
+            </Banner>
+          </div>
+        ) : null}
 
         <div className="order-1 flex min-w-0 flex-col gap-4 xl:col-start-2 xl:row-start-1 xl:row-span-3">
           {job.payment === null ? null : (
@@ -675,7 +776,35 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
         </div>
 
         <div className="order-2 flex min-w-0 flex-col gap-4 xl:col-start-1 xl:row-start-1">
-          {(job.canOnSite || job.onMyWay !== null) && !frozen ? (
+          {job.returnVisit !== null ? (
+            <Card title="Return visit">
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2" data-testid="return-visit-summary">
+                <Fact label="Reason">
+                  {job.returnVisit.reason === "part_on_order"
+                    ? "Part on order"
+                    : job.returnVisit.reason === "more_time_needed"
+                      ? "More time needed"
+                      : job.returnVisit.otherText === ""
+                        ? "Other"
+                        : `Other - ${job.returnVisit.otherText}`}
+                </Fact>
+                <Fact label="When">{onHold ? "Not booked yet - the office will book it" : (job.slotLabel ?? "No date yet")}</Fact>
+              </div>
+              {onHold && job.returnVisit.officeNote !== "" ? (
+                <div className="mt-3.5">
+                  <Fact label="Note for the office">{job.returnVisit.officeNote}</Fact>
+                </div>
+              ) : null}
+              {idle && !job.canOnSite && !onHold ? <p className="mt-3.5 text-small text-secondary-text">I&apos;ve arrived appears on the day.</p> : null}
+            </Card>
+          ) : idle && !job.canOnSite && job.onMyWay === null && job.jobStatus === "scheduled" && job.slotLabel !== null ? (
+            <Card title="Next visit">
+              <p className="text-small text-secondary-text" data-testid="next-visit">
+                {job.slotLabel}. I&apos;ve arrived appears on the day.
+              </p>
+            </Card>
+          ) : null}
+          {(job.canOnSite || job.onMyWay !== null) && idle ? (
             <Card title="Arrival">
               <p className="mb-3 text-small text-secondary-text">
                 {job.onMyWay !== null && job.canOnSite
@@ -703,19 +832,33 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               </div>
             </Card>
           ) : null}
+          {frozen || arrived || rows.some((row) => !isBlankRow(row)) ? (
           <Card title="Time on site" aside={`Billed ${formatHours(billed)}h`}>
             <TimeEntryRows
-              rows={rows}
-              mode={frozen ? "frozen" : "edit"}
+              rows={frozen || arrived ? rows : rows.filter((row) => !isBlankRow(row))}
+              mode={frozen ? "frozen" : arrived ? "edit" : "facts"}
               zone={job.timezone}
               idPrefix="entry"
               errors={errors}
+              canAdd={false}
+              lockedCount={arrived ? job.lockedVisits : 0}
               onChange={(next) => {
                 setRows(next);
                 setErrors({});
               }}
             />
+            {job.canBookReturn && working ? (
+              <button
+                type="button"
+                onClick={openReturn}
+                disabled={busy !== null || uploading}
+                className="mt-3.5 min-h-[52px] w-full rounded-button border border-brand-accent bg-surface px-4 text-sm font-bold text-brand-accent disabled:opacity-50 md:min-h-11 md:w-auto"
+              >
+                Book a return visit
+              </button>
+            ) : null}
           </Card>
+          ) : null}
         </div>
 
         <div className="order-3 flex min-w-0 flex-col gap-4 xl:col-start-1 xl:row-start-2">
@@ -744,9 +887,10 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               )}
             </Card>
           ) : null}
+{frozen || working || visited ? (
           <Card title="Work notes">
-            {frozen ? (
-              <LockedValue label="Work notes" hideLabel value={notes === "" ? "-" : notes} message />
+            {readOnly ? (
+              <LockedValue label="Work notes" hideLabel value={notes === "" ? "-" : notes} message={frozen} />
             ) : (
               <div className="mb-3.5">
                 <label htmlFor="completion-notes" className="sr-only">
@@ -771,17 +915,19 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               </div>
             )}
           </Card>
+          ) : null}
         </div>
 
         <div className="order-4 min-w-0 xl:col-start-1 xl:row-start-3">
+{frozen || working || visited ? (
           <Card title="Parts used" aside={`Up to ${capLabel} in total`}>
-            {parts.length === 0 && frozen ? <p className="text-small text-muted-text">No parts.</p> : null}
+            {parts.length === 0 && readOnly ? <p className="text-small text-muted-text">No parts.</p> : null}
             {parts.map((part, index) => {
               const at = (field: string): string | undefined => errors[`part.${String(index)}.${field}`] || undefined;
               const id = `part-${String(index)}`;
               return (
                 <div key={part.key} className={index > 0 ? "mt-3.5 border-t border-hairline pt-3.5" : undefined} data-testid="part-row">
-                  {frozen ? (
+                  {readOnly ? (
                     <>
                       <LockedValue label="Part" value={part.name} />
                       <div className="grid grid-cols-[5.5rem_1fr] gap-x-3.5">
@@ -861,7 +1007,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                 </div>
               );
             })}
-            {!frozen ? (
+            {working ? (
               <button
                 type="button"
                 onClick={() => setParts((current) => [...current, newPart()])}
@@ -871,10 +1017,11 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               </button>
             ) : null}
           </Card>
+          ) : null}
         </div>
       </div>
 
-      {!frozen ? (
+      {working ? (
         <div className="fixed inset-x-0 bottom-0 z-10 border-t border-hairline bg-surface px-4 pt-3 pb-5 md:static md:mt-3.5 md:border-0 md:bg-transparent md:p-0">
           <div className="flex flex-wrap items-center gap-2.5 md:flex-nowrap md:justify-end">
             {changed ? (
@@ -892,22 +1039,50 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
             >
               {busy === "save" ? "Saving..." : "Save"}
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                const problems = check(true);
-                setErrors(problems);
-                setBanner(undefined);
-                if (Object.keys(problems).length === 0) setConfirming(true);
-              }}
-              disabled={busy !== null || uploading}
-              className="min-h-[52px] flex-[2] rounded-button bg-brand-success px-4 text-sm font-bold text-on-accent disabled:opacity-50 md:min-h-11 md:flex-none"
-            >
-              Complete job
-            </button>
+            {onHold ? null : (
+              <button
+                type="button"
+                onClick={() => {
+                  const problems = check(true);
+                  setErrors(problems);
+                  setBanner(undefined);
+                  if (Object.keys(problems).length === 0) setConfirming(true);
+                }}
+                disabled={busy !== null || uploading}
+                className="min-h-[52px] flex-[2] rounded-button bg-brand-success px-4 text-sm font-bold text-on-accent disabled:opacity-50 md:min-h-11 md:flex-none"
+              >
+                Complete job
+              </button>
+            )}
           </div>
         </div>
       ) : null}
+
+      <FormDialog
+        open={returning}
+        title="Return visit"
+        testId="return-visit-card"
+        confirmLabel={draft.choice === "notyet" ? "Put on hold" : "Confirm return visit"}
+        confirmDisabled={!draftReady(draft, dayState) || uploading}
+        busy={busy !== null}
+        onConfirm={() => void sendReturn()}
+        onClose={() => {
+          setReturning(false);
+          setReturnError(undefined);
+        }}
+      >
+        <ReturnVisitCard
+          reference={job.reference}
+          zone={job.timezone}
+          draft={draft}
+          onChange={(next) => {
+            setReturnError(undefined);
+            setDraft(next);
+          }}
+          error={returnError}
+          onDay={setDayState}
+        />
+      </FormDialog>
 
       <ConfirmDialog
         open={confirming}

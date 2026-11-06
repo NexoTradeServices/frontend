@@ -162,3 +162,49 @@ test("AC1: a contractor cannot open the page, and the endpoint refuses him", asy
   await page.goto("/ops/jobs/new");
   await expect(page.getByRole("heading", { name: "New phone job" })).toHaveCount(0);
 });
+
+test("1020 AC7: a public holiday of the suburb's state shows as the date's error and Create job creates nothing", async ({ page }) => {
+  if (MOCKS_GOOGLE_PLACES) await installMockGooglePlaces(page);
+  await page.route(/\/api\/public-holidays\?state=WA/, (route) =>
+    route.fulfill({ json: { holidays: [{ date: "2099-12-25", name: "Christmas Day" }] } }),
+  );
+  let posted = 0;
+  await page.route(/\/api\/jobs\/phone/, (route) => {
+    posted += 1;
+    return route.continue();
+  });
+  await page.goto("/ops/jobs/new");
+  await login(page, "mike@idelta.com.au");
+  const suburb = page.getByLabel("Suburb");
+  await expect(suburb).toBeEnabled({ timeout: 10_000 });
+  await suburb.fill("Fremantle");
+  await expect(page.getByText("Google suggestions")).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: /Fremantle/ }).first().click();
+  await expect(suburb).toHaveValue(/Fremantle WA/, { timeout: 20_000 });
+  await fillCustomerAndJob(page, "1020");
+  await page.getByLabel("Date").fill("2099-12-25");
+  await expect(page.getByText("We're closed on Fri 25 Dec 2099 for Christmas Day. Please pick another date.")).toBeVisible();
+  // The message takes the place of the time-of-day choices, and Create job is greyed.
+  await expect(page.getByText("Time of day")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Create job" })).toBeDisabled();
+  expect(posted).toBe(0);
+});
+
+test("1021 AC5: a closed state is refused as the suburb Field's own error and nothing is created (the server's answer faked)", async ({ page }) => {
+  if (MOCKS_GOOGLE_PLACES) await installMockGooglePlaces(page);
+  await page.route(/\/api\/jobs\/phone/, (route) =>
+    route.fulfill({ status: 400, json: { error: "NSW is not an operating state.", field: "location" } }),
+  );
+  await page.goto("/ops/jobs/new");
+  await login(page, "mike@idelta.com.au");
+  const suburb = page.getByLabel("Suburb");
+  await expect(suburb).toBeEnabled({ timeout: 10_000 });
+  await suburb.fill("Fremantle");
+  await expect(page.getByText("Google suggestions")).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: /Fremantle/ }).first().click();
+  await expect(suburb).toHaveValue(/Fremantle WA/, { timeout: 20_000 });
+  await fillCustomerAndJob(page, "1021");
+  await page.getByRole("button", { name: "Create job" }).click();
+  await expect(page.getByText("NSW is not an operating state.")).toBeVisible();
+  await expect(page).toHaveURL(/\/ops\/jobs\/new$/);
+});

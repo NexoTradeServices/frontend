@@ -87,3 +87,18 @@ export async function giveInvoiceItsPayLink(request: APIRequestContext, job: Dis
     )
     .toBe(true);
 }
+
+/** Feature 5002: the visit is today (the test-data route moves the job's block to today). */
+export async function visitToday(request: APIRequestContext, job: DispatchedJob): Promise<void> {
+  const moved = await request.post(`${apiUrl}/api/test-data/jobs/${job.reference}/visit-today`);
+  expect(moved.status()).toBe(200);
+}
+
+/** Feature 5002: Bob's visit is today and he taps I've arrived -- the time, parts and notes open only then. */
+export async function openJobScreenArrived(page: Page, request: APIRequestContext, job: DispatchedJob): Promise<void> {
+  await visitToday(request, job);
+  await openJobScreen(page, job);
+  await page.getByRole("button", { name: "I've arrived" }).click();
+  await expect(page.getByText("In progress", { exact: true })).toBeVisible();
+  await expect(page.locator("#entry-0-start")).toBeVisible();
+}

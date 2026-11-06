@@ -15,13 +15,15 @@
 // 6002 AC10 with the QR code open, the customer paying turns the card to "Paid - nothing more to
 //      collect." within seconds, without a reload; the QR button goes, the total stays
 //
+// 5002 (at the end of this file): Book a return visit, Not yet / Put on hold, Back
+//
 // AC1-AC3, AC5, AC8 and AC9 are proven in the backend (tests/contractor-job.test.ts,
 // tests/billed-hours.test.ts, tests/ops-jobs.test.ts); the browser proves what needs one.
 //
 // Phone width: Bob's screen is designed Mobile first. Every test dispatches a throwaway job
 // of its own (helpers/accepted-job.ts), labelled `e2e` and swept by the suite.
 import { test, expect, type Page } from "@playwright/test";
-import { acceptedJobForBob, completeJobAsBob, giveInvoiceItsPayLink, openJobScreen } from "./helpers/accepted-job";
+import { acceptedJobForBob, completeJobAsBob, giveInvoiceItsPayLink, openJobScreen, openJobScreenArrived, visitToday } from "./helpers/accepted-job";
 import { decodeQr } from "./helpers/qr";
 import { login } from "./helpers/login";
 import { installMockCloudinary } from "./helpers/mock-cloudinary";
@@ -56,7 +58,7 @@ test.describe("Bob's job screen, on a phone", () => {
   }) => {
     await installMockCloudinary(page);
     const job = await acceptedJobForBob(browser, request, "ac4", { siteContact: { name: "Lena Park", phone: "0400 002 050" } });
-    await openJobScreen(page, job);
+    await openJobScreenArrived(page, request, job);
 
     // The job's facts: the ask-for NAME, never her number.
     await expect(page.getByText("Lena Park")).toBeVisible();
@@ -81,12 +83,9 @@ test.describe("Bob's job screen, on a phone", () => {
     await expect(page.locator("#entry-0-end-minute")).not.toHaveValue("");
     await pickTime(page, "#entry-0-start", "8:07am");
     await pickTime(page, "#entry-0-end", "11:05am");
-    await page.getByRole("button", { name: "+ Add a visit" }).click();
-    await page.locator("#entry-1-date").fill("2026-10-09");
-    await pickTime(page, "#entry-1-start", "9:00am");
-    await pickTime(page, "#entry-1-end", "9:20am");
-    await page.locator("#entry-1-note").fill("Back for the washer");
-    await expect(page.getByText("Billed 3.5h")).toBeVisible();
+    // A second visit row only comes from a booked return: no add link on a job with one visit (the two-row save is proven in the back end).
+    await expect(page.getByRole("button", { name: "+ Add a visit" })).toHaveCount(0);
+    await expect(page.getByText(/Billed 3(\.0)?h/)).toBeVisible();
 
     await page.locator("#completion-notes").fill("Replaced the cartridge.");
 
@@ -108,13 +107,11 @@ test.describe("Bob's job screen, on a phone", () => {
     await page.reload();
     await expectTime(page, "#entry-0-start", "8:07am");
     await expectTime(page, "#entry-0-end", "11:05am");
-    await expect(page.locator("#entry-1-date")).toHaveValue("2026-10-09");
-    await expect(page.locator("#entry-1-note")).toHaveValue("Back for the washer");
     await expect(page.locator("#completion-notes")).toHaveValue("Replaced the cartridge.");
     await expect(page.locator("#part-0-name")).toHaveValue("Tap cartridge");
     await expect(page.locator("#part-0-price")).toHaveValue("45.00");
     await expect(page.getByText("bunnings-re...")).toBeVisible();
-    await expect(page.getByText("Billed 3.5h")).toBeVisible();
+    await expect(page.getByText(/Billed 3(\.0)?h/)).toBeVisible();
   });
 
   test("AC7: Complete with nothing entered is refused on those fields; then the dialog asks once and the screen locks", async ({
@@ -123,7 +120,7 @@ test.describe("Bob's job screen, on a phone", () => {
     request,
   }) => {
     const job = await acceptedJobForBob(browser, request, "ac7");
-    await openJobScreen(page, job);
+    await openJobScreenArrived(page, request, job);
 
     // Nothing entered: the refusal is on the fields, not a banner, and no dialog opens.
     await page.getByRole("button", { name: "Complete job" }).click();
@@ -183,7 +180,7 @@ test.describe("Bob's job screen, on a phone", () => {
     request,
   }) => {
     const job = await acceptedJobForBob(browser, request, "pay-qr");
-    await openJobScreen(page, job);
+    await openJobScreenArrived(page, request, job);
     await completeOnScreen(page);
 
     const payment = page.locator("section").filter({ has: page.getByRole("heading", { name: "Payment" }) });
@@ -262,7 +259,7 @@ test.describe("Bob's job screen, on a phone", () => {
     request,
   }) => {
     const job = await acceptedJobForBob(browser, request, "pay-wait");
-    await openJobScreen(page, job);
+    await openJobScreenArrived(page, request, job);
     // Stripe may or may not have answered by the time Complete returns; this test is about the
     // waiting wording, so every read of the completed job is handed the waiting state.
     await page.route(/\/api\/contractor\/jobs\/[^/]+(\/complete)?$/, async (route) => {
@@ -316,6 +313,7 @@ test.describe("Bob's job screen, on a phone", () => {
   }) => {
     await installMockCloudinary(page, { signatureStatus: 503 });
     const job = await acceptedJobForBob(browser, request, "onsite");
+    await visitToday(request, job);
     await openJobScreen(page, job);
 
     await expect(page.getByText("Scheduled", { exact: true })).toBeVisible();
@@ -332,5 +330,99 @@ test.describe("Bob's job screen, on a phone", () => {
     await pickTime(page, "#entry-0-end", "11:05am");
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByText(`Saved ${job.reference}.`)).toBeVisible();
+  });
+});
+
+// Feature 5002 -- Book a return visit, on Bob's phone.
+//
+// AC1  Book a return visit sits under Time on site; the bottom bar offers Save and Complete job
+// AC2  Book a return visit saves nothing: no time for today -> "Enter today's time on site first."; otherwise the card opens
+// AC3  the Primary stays greyed until the Reason and the return choice are in
+// AC4  Pick a time then Confirm return visit books it and shows the banner
+// AC5  Not yet then Put on hold: the On hold banner, no buttons left
+// AC6  Back closes the card with nothing booked and what was typed kept
+const todayPerth = (): string => new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Perth" }).format(new Date());
+
+test.describe("Bob's return visit, on a phone", () => {
+  test.use(MOBILE_VIEWPORT);
+
+  test("5002 AC1, AC2, AC3, AC6: Book a return visit sits under Time on site and the bar has Save and Complete job; no time today is refused; the pop-up opens, greys its Primary, and Cancel keeps what was typed", async ({
+    page,
+    browser,
+    request,
+  }) => {
+    const job = await acceptedJobForBob(browser, request, "rv1");
+    await openJobScreenArrived(page, request, job);
+
+    for (const name of ["Save", "Book a return visit", "Complete job"]) await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+
+    // AC2: nothing typed yet -> the words, no card
+    await page.getByRole("button", { name: "Book a return visit" }).click();
+    await expect(page.getByText("Enter today's time on site first.")).toBeVisible();
+    await expect(page.getByTestId("return-visit-card")).toHaveCount(0);
+
+    // a time for today opens the card
+    await page.locator("#entry-0-date").fill(todayPerth());
+    await pickTime(page, "#entry-0-start", "9:00am");
+    await pickTime(page, "#entry-0-end", "10:00am");
+    await page.getByRole("button", { name: "Book a return visit" }).click();
+    await expect(page.getByTestId("return-visit-card")).toBeVisible();
+
+    // AC3: greyed until both answers are in
+    const confirm = page.getByRole("button", { name: "Confirm return visit" });
+    await expect(confirm).toBeDisabled();
+    await page.getByRole("radio", { name: "Part on order" }).click();
+    await expect(confirm).toBeDisabled();
+    await page.getByRole("radio", { name: "I know the time" }).click();
+    await expect(confirm).toBeEnabled(); // the day loads and the first free half hour is proposed
+
+    // AC6: Cancel closes the pop-up, nothing booked, the typed time stays
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(page.getByTestId("return-visit-card")).toHaveCount(0);
+    await expect(page.locator("#entry-0-date")).toHaveValue(todayPerth());
+    const saved = await page.request.get(`${process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au"}/api/contractor/jobs/${job.reference}`);
+    expect(((await saved.json()) as { timeEntries: unknown[] }).timeEntries).toHaveLength(0); // nothing was saved by Back
+  });
+
+  test("5002 AC4: Pick a time then Confirm return visit books it, saves the visit and shows the banner", async ({ page, browser, request }) => {
+    const job = await acceptedJobForBob(browser, request, "rv2");
+    await openJobScreenArrived(page, request, job);
+    await page.locator("#entry-0-date").fill(todayPerth());
+    await pickTime(page, "#entry-0-start", "9:00am");
+    await pickTime(page, "#entry-0-end", "10:00am");
+    await page.getByRole("button", { name: "Book a return visit" }).click();
+    await page.getByRole("radio", { name: "More time needed" }).click();
+    await page.getByRole("radio", { name: "I know the time" }).click();
+    await page.getByRole("button", { name: "Start at 1:00pm" }).click();
+    await page.getByRole("button", { name: "Confirm return visit" }).click();
+    await expect(page.getByTestId("return-booked")).toContainText(/Return visit booked for .* 1:00pm\. .* has been told by email and text\./);
+    await expect(page.getByTestId("return-visit-card")).toHaveCount(0);
+    // the visit he typed was saved with the booking, and the screen now waits for the next visit: no arrival, no boxes, no buttons
+    await page.reload();
+    await expect(page.getByTestId("return-visit-summary")).toContainText("More time needed");
+    await expect(page.getByText("I've arrived appears on the day.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "I've arrived" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Time on site" })).toBeVisible();
+    await expect(page.locator("#entry-0-date")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Book a return visit" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Complete job" })).toHaveCount(0);
+  });
+
+  test("5002 AC5: Not yet then Put on hold shows the On hold banner and leaves no buttons", async ({ page, browser, request }) => {
+    const job = await acceptedJobForBob(browser, request, "rv3");
+    await openJobScreenArrived(page, request, job);
+    await page.locator("#entry-0-date").fill(todayPerth());
+    await pickTime(page, "#entry-0-start", "9:00am");
+    await pickTime(page, "#entry-0-end", "10:00am");
+    await page.getByRole("button", { name: "Book a return visit" }).click();
+    await page.getByRole("radio", { name: "Other" }).click();
+    await page.getByLabel("What is it?").fill("Waiting on the owner's tiles");
+    await page.getByRole("radio", { name: "Not yet" }).click();
+    await page.getByLabel("Note for the office").fill("Owner says Friday.");
+    await page.getByRole("button", { name: "Put on hold" }).click();
+    await expect(page.getByTestId("on-hold-banner")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Book a return visit" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Complete job" })).toHaveCount(0);
   });
 });

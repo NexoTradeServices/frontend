@@ -10,11 +10,13 @@
 // counted -- and Send new time swaps the bookings.
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fullAddress } from "@/components/ui/places-field";
+import { ChangeAvailabilityDialog } from "./change-availability-dialog";
 import { CalendarDayView, timeLabelFor, type DayBlock } from "@/components/ui/calendar-day-view";
 import { PrimaryButton } from "@/components/auth/buttons";
+import { usePublicHolidays } from "@/components/request-a-job/holidays";
 import { formatDateWithDay, weekdayName } from "@/lib/date-format";
 import {
   LEVEL_LABELS,
@@ -26,8 +28,18 @@ import {
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-const START_MINUTES: number[] = [];
-for (let m = 360; m <= 1230; m += 30) START_MINUTES.push(m); // 6:00am - 8:30pm
+/** "07:00" -> 420. */
+function minutesOfClock(clock: string): number {
+  const [hour, minute] = clock.split(":");
+  return Number(hour) * 60 + Number(minute);
+}
+
+/** Start times inside the business hours: from opening to the last half hour a one-hour job can still finish by closing. */
+function startTimesWithin(openMinutes: number, closeMinutes: number): number[] {
+  const starts: number[] = [];
+  for (let m = openMinutes; m + 60 <= closeMinutes; m += 30) starts.push(m);
+  return starts;
+}
 const HOLD_MINUTES: number[] = [];
 for (let m = 60; m <= 480; m += 30) HOLD_MINUTES.push(m); // 1 - 8 hours
 
@@ -107,7 +119,8 @@ function CandidateRowButton({
           {distanceText} - {payText}
           {ratingText}
         </div>
-        {row.why ? <div className="font-semibold text-brand-warning">{row.why}</div> : null}
+        {row.why && !row.notAvailable ? <div className="font-semibold text-brand-warning">{row.why}</div> : null}
+        {row.availabilityNotSet ? <div className="text-field-label text-muted-text">Availability not set</div> : null}
       </div>
     </button>
   );
@@ -116,18 +129,48 @@ function CandidateRowButton({
 export function DispatchView({ initial }: { initial: DispatchFacts }) {
   const router = useRouter();
   const [date, setDate] = useState(initial.defaults.date);
-  const [startMinutes, setStartMinutes] = useState(initial.defaults.startMinutes);
+  // A new dispatch starts at the job's preferred window, pulled into the business hours (an evening
+  // job on a 5:30pm close starts at the last start that fits). A reschedule keeps the booked slot as is.
+  const [startMinutes, setStartMinutes] = useState(() => {
+    const wanted = initial.defaults.startMinutes;
+    if (initial.mode === "reschedule" || initial.mode === "return") return wanted;
+    const allowed = startTimesWithin(minutesOfClock(initial.openingTime), minutesOfClock(initial.closingTime));
+    if (allowed.length === 0 || allowed.includes(wanted)) return wanted;
+    return allowed.reduce((best, m) => (Math.abs(m - wanted) < Math.abs(best - wanted) ? m : best), allowed[0] ?? wanted);
+  });
   const [holdMinutes, setHoldMinutes] = useState(initial.defaults.holdMinutes);
   const [emergency, setEmergency] = useState(false);
-  const reschedule = initial.mode === "reschedule" && initial.contractor !== undefined;
+  // Feature 5002: a return visit is a reschedule-shaped page -- the contractor is fixed -- that books a second block.
+  const returning = initial.mode === "return" && initial.contractor !== undefined;
+  const reschedule = (initial.mode === "reschedule" || initial.mode === "return") && initial.contractor !== undefined;
   const fixedFirstName = initial.contractor?.firstName ?? "";
   const [pickedCode, setPickedCode] = useState<string | null>(reschedule ? (initial.contractor?.code ?? null) : null);
   const [candidates, setCandidates] = useState<CandidatesResponse | null>(null);
   const [candidatesLoading, setCandidatesLoading] = useState(true);
   const [dayBlocks, setDayBlocks] = useState<DayBlock[]>([]);
+  const [dayOff, setDayOff] = useState<{ startMinutes: number; endMinutes: number }[]>([]);
+  /** which pick + day + refresh the loaded blocks belong to, so a stale day from another contractor is never used */
+  const [dayFor, setDayFor] = useState("");
   const [dayLoading, setDayLoading] = useState(false);
   const [dispatching, setDispatching] = useState(false);
   const [dispatchError, setDispatchError] = useState<string | undefined>();
+  /** Feature 2004: bumped to re-read the candidate list (after Change availability, and after a refused dispatch). */
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [availabilityFor, setAvailabilityFor] = useState<{ code: string; name: string } | null>(null);
+  const openMinutes = minutesOfClock(initial.openingTime);
+  const closeMinutes = minutesOfClock(initial.closingTime);
+  const startMinuteOptions = startTimesWithin(openMinutes, closeMinutes);
+  // A public holiday of the job's state locks the day: no candidates, no grid, no Dispatch, until another day is picked.
+  const holidays = usePublicHolidays(initial.stateLabel.split(" ")[0] || null);
+  const holidayName = holidays[date];
+  const closedPanel =
+    holidayName === undefined ? null : (
+      <div role="status" className="rounded-small-box border border-hairline bg-ground p-4">
+        <b className="block text-sm font-extrabold text-ink">
+          Closed on {formatDateWithDay(date)} for {holidayName}. Pick another day.
+        </b>
+      </div>
+    );
 
   useEffect(() => {
     let cancelled = false;
@@ -142,7 +185,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
         startMinutes: String(startMinutes),
         holdMinutes: String(holdMinutes),
         emergency: String(emergency),
-        ...(reschedule ? { mode: "reschedule" } : {}),
+        ...(reschedule ? { mode: returning ? "return" : "reschedule" } : {}),
       });
       fetch(`${apiUrl}/api/jobs/${encodeURIComponent(initial.reference)}/dispatch/candidates?${params.toString()}`, {
         credentials: "include",
@@ -162,24 +205,31 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [initial.reference, date, startMinutes, holdMinutes, emergency, reschedule]);
+  }, [initial.reference, date, startMinutes, holdMinutes, emergency, reschedule, returning, refreshTick]);
 
   useEffect(() => {
     let cancelled = false;
     const timer = window.setTimeout(() => {
       if (!pickedCode) {
         setDayBlocks([]);
+        setDayOff([]);
         return;
       }
       setDayLoading(true);
-      const ignore = reschedule ? `&ignoreJob=${encodeURIComponent(initial.reference)}` : "";
-      fetch(`${apiUrl}/api/contractors/${encodeURIComponent(pickedCode)}/day?date=${date}${ignore}`, { credentials: "include" })
-        .then((res) => (res.ok ? (res.json() as Promise<{ blocks: DayBlock[] }>) : null))
+      const ignore = reschedule && !returning ? `&ignoreJob=${encodeURIComponent(initial.reference)}` : "";
+      fetch(`${apiUrl}/api/contractors/${encodeURIComponent(pickedCode)}/day?date=${date}&job=${encodeURIComponent(initial.reference)}${ignore}`, { credentials: "include" })
+        .then((res) => (res.ok ? (res.json() as Promise<{ blocks: DayBlock[]; notAvailable?: { startMinutes: number; endMinutes: number }[] }>) : null))
         .then((body) => {
-          if (!cancelled) setDayBlocks(body?.blocks ?? []);
+          if (cancelled) return;
+          setDayBlocks(body?.blocks ?? []);
+          setDayOff(body?.notAvailable ?? []);
+          setDayFor(`${pickedCode}|${date}|${String(refreshTick)}`);
         })
         .catch(() => {
-          if (!cancelled) setDayBlocks([]);
+          if (cancelled) return;
+          setDayBlocks([]);
+          setDayOff([]);
+          setDayFor("");
         })
         .finally(() => {
           if (!cancelled) setDayLoading(false);
@@ -189,17 +239,39 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [pickedCode, date, reschedule, initial.reference]);
+  }, [pickedCode, date, reschedule, returning, initial.reference, refreshTick]);
 
   const allRows = candidates ? [...candidates.serves, ...candidates.outside] : [];
   const pickedRow = allRows.find((row) => row.code === pickedCode) ?? null;
-  const canGo = pickedRow !== null && pickedRow.pickable;
+  const canGo = pickedRow !== null && pickedRow.pickable && holidayName === undefined;
+
+  // Feature 2004: the moment a contractor is picked, the proposed start is the first half hour at or after the time asked for
+  // that this contractor can take - never over a booked, in-progress, to-answer or switched-off time. Mike's own choice of
+  // start (the Start list or a tap on the grid) is what it looks forward from.
+  const wantedStart = useRef(startMinutes);
+  useEffect(() => {
+    if (reschedule || pickedRow === null || holidayName !== undefined || dayFor !== `${pickedCode ?? ""}|${date}|${String(refreshTick)}`) return;
+    const free = (from: number) =>
+      !dayOff.some((run) => run.startMinutes < from + holdMinutes && run.endMinutes > from) &&
+      !dayBlocks.some((block) => block.startMinutes < from + holdMinutes && block.endMinutes > from);
+    let target = wantedStart.current;
+    for (let from = wantedStart.current; from + holdMinutes <= closeMinutes; from += 30) {
+      if (free(from)) {
+        target = from;
+        break;
+      }
+    }
+    if (target !== startMinutes) {
+      setStartMinutes(target);
+    }
+  }, [reschedule, pickedRow, pickedCode, holidayName, dayFor, date, refreshTick, dayOff, dayBlocks, holdMinutes, closeMinutes, startMinutes]);
 
   function stepDay(delta: -1 | 1) {
     setDate((current) => addDays(current, delta));
   }
 
   function pickHalfHour(minutes: number) {
+    wantedStart.current = minutes;
     setStartMinutes(minutes);
   }
 
@@ -208,7 +280,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
     setDispatching(true);
     setDispatchError(undefined);
     try {
-      const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(initial.reference)}/${reschedule ? "reschedule" : "dispatch"}`, {
+      const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(initial.reference)}/${returning ? "return-visit" : reschedule ? "reschedule" : "dispatch"}`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -220,12 +292,18 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
       });
       const payload = (await res.json()) as { toast?: string; error?: string };
       if (!res.ok) {
-        setDispatchError(payload.error ?? (reschedule ? "Reschedule failed." : "Dispatch failed."));
+        // Mike's list was out of date: say plainly what happened and what to do (the grey hours on the day are now up to date).
+        setDispatchError(
+          res.status === 409 && payload.error?.startsWith("Not available at that time")
+            ? `${pickedRow.name.split(" ")[0] ?? pickedRow.name} has just switched that time off. Nothing was sent. Pick a free time (the grey hours are off) or another contractor.`
+            : (payload.error ?? (returning ? "Booking the return visit failed." : reschedule ? "Reschedule failed." : "Dispatch failed.")),
+        );
+        setRefreshTick((tick) => tick + 1); // the list may have changed under Mike (a time switched off, a clash)
         return;
       }
       router.push(`/ops/jobs/${encodeURIComponent(initial.reference)}?toast=${encodeURIComponent(payload.toast ?? "")}`);
     } catch {
-      setDispatchError(`${reschedule ? "Reschedule" : "Dispatch"} failed - check your connection and try again.`);
+      setDispatchError(`${returning ? "Booking the return visit" : reschedule ? "Reschedule" : "Dispatch"} failed - check your connection and try again.`);
     } finally {
       setDispatching(false);
     }
@@ -257,15 +335,19 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
             </div>
             <div>
               <label htmlFor="dispatch-start" className={`mb-[5px] ${labelClass}`}>
-                Start (AWST)
+                Start ({initial.stateLabel})
               </label>
               <select
                 id="dispatch-start"
                 value={startMinutes}
-                onChange={(event) => setStartMinutes(Number(event.target.value))}
+                onChange={(event) => {
+                  wantedStart.current = Number(event.target.value);
+                  setStartMinutes(Number(event.target.value));
+                }}
+                disabled={holidayName !== undefined}
                 className="min-h-11 w-full rounded-button border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
               >
-                {START_MINUTES.map((minutes) => (
+                {(startMinuteOptions.includes(startMinutes) ? startMinuteOptions : [...startMinuteOptions, startMinutes].sort((a, b) => a - b)).map((minutes) => (
                   <option key={minutes} value={minutes}>
                     {timeLabelFor(minutes)}
                   </option>
@@ -280,6 +362,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 id="dispatch-hold"
                 value={holdMinutes}
                 onChange={(event) => setHoldMinutes(Number(event.target.value))}
+                disabled={holidayName !== undefined}
                 className="min-h-11 w-full rounded-button border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
               >
                 {HOLD_MINUTES.map((minutes) => (
@@ -296,25 +379,43 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
 
       {reschedule ? (
         <div className="order-3 min-w-0 xl:order-none xl:col-start-1 xl:row-start-2">
-          <Card title={`${fixedFirstName}'s day`} aside={`${initial.trade} - ${shortDateOf(date)}, ${timeLabelFor(startMinutes)}-${timeLabelFor(startMinutes + holdMinutes)} AWST`}>
+          <Card title={`${fixedFirstName}'s day`} aside={`${initial.trade} - ${shortDateOf(date)}, ${timeLabelFor(startMinutes)}-${timeLabelFor(startMinutes + holdMinutes)} ${initial.stateLabel}`}>
             {pickedRow && !pickedRow.pickable && pickedRow.why ? (
               <p className="mb-2.5 text-xs font-semibold text-brand-warning">{pickedRow.why}</p>
             ) : null}
+            {returning && pickedRow?.linkable ? (
+              <button
+                type="button"
+                className="-mt-1.5 mb-2.5 min-h-11 py-2.5 text-small font-semibold text-secondary-text underline underline-offset-2"
+                onClick={() => setAvailabilityFor({ code: pickedRow.code, name: pickedRow.name })}
+              >
+                Change availability
+              </button>
+            ) : null}
+            {closedPanel ?? (
             <CalendarDayView
               dayLabel={`${fixedFirstName}'s ${shortDateOf(date)}`}
               blocks={dayBlocks}
+              notAvailable={dayOff}
               proposedStart={startMinutes}
               proposedEnd={startMinutes + holdMinutes}
               onPickHalfHour={pickHalfHour}
               onStepDay={stepDay}
+              openMinutes={openMinutes}
+              closeMinutes={closeMinutes}
+              lastStartMinutes={closeMinutes - holdMinutes}
+              zoneLabel={initial.stateLabel.replace(/ time$/, "")}
               loading={dayLoading}
             />
+            )}
           </Card>
         </div>
       ) : (
       <div className="order-3 min-w-0 xl:order-none xl:col-start-1 xl:row-start-2">
-        <Card title="Contractors" aside={`${initial.trade} - ${shortDateOf(date)}, ${timeLabelFor(startMinutes)}-${timeLabelFor(startMinutes + holdMinutes)} AWST`}>
-          {candidatesLoading && !candidates ? (
+        <Card title="Contractors" aside={`${initial.trade} - ${shortDateOf(date)}, ${timeLabelFor(startMinutes)}-${timeLabelFor(startMinutes + holdMinutes)} ${initial.stateLabel}`}>
+          {closedPanel ? (
+            closedPanel
+          ) : candidatesLoading && !candidates ? (
             <p className="text-small text-muted-text">Loading candidates...</p>
           ) : (
             <>
@@ -325,14 +426,28 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 candidates.serves.map((row) => (
                   <div key={row.code}>
                     <CandidateRowButton row={row} picked={pickedCode === row.code} onPick={() => setPickedCode((c) => (c === row.code ? null : row.code))} />
+                    {row.linkable ? (
+                      <button
+                        type="button"
+                        className="-mt-1.5 mb-2.5 min-h-11 py-2.5 text-small font-semibold text-secondary-text underline underline-offset-2"
+                        onClick={() => setAvailabilityFor({ code: row.code, name: row.name })}
+                      >
+                        Change availability
+                      </button>
+                    ) : null}
                     {pickedCode === row.code ? (
                       <CalendarDayView
                         dayLabel={`${row.name.split(" ")[0] ?? row.name}'s ${shortDateOf(date)}`}
                         blocks={dayBlocks}
+                        notAvailable={dayOff}
                         proposedStart={startMinutes}
                         proposedEnd={startMinutes + holdMinutes}
                         onPickHalfHour={pickHalfHour}
                         onStepDay={stepDay}
+              openMinutes={openMinutes}
+              closeMinutes={closeMinutes}
+              lastStartMinutes={closeMinutes - holdMinutes}
+              zoneLabel={initial.stateLabel.replace(/ time$/, "")}
                         loading={dayLoading}
                       />
                     ) : null}
@@ -352,14 +467,28 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 candidates.outside.map((row) => (
                   <div key={row.code}>
                     <CandidateRowButton row={row} picked={pickedCode === row.code} onPick={() => setPickedCode((c) => (c === row.code ? null : row.code))} />
+                    {row.linkable ? (
+                      <button
+                        type="button"
+                        className="-mt-1.5 mb-2.5 min-h-11 py-2.5 text-small font-semibold text-secondary-text underline underline-offset-2"
+                        onClick={() => setAvailabilityFor({ code: row.code, name: row.name })}
+                      >
+                        Change availability
+                      </button>
+                    ) : null}
                     {pickedCode === row.code ? (
                       <CalendarDayView
                         dayLabel={`${row.name.split(" ")[0] ?? row.name}'s ${shortDateOf(date)}`}
                         blocks={dayBlocks}
+                        notAvailable={dayOff}
                         proposedStart={startMinutes}
                         proposedEnd={startMinutes + holdMinutes}
                         onPickHalfHour={pickHalfHour}
                         onStepDay={stepDay}
+              openMinutes={openMinutes}
+              closeMinutes={closeMinutes}
+              lastStartMinutes={closeMinutes - holdMinutes}
+              zoneLabel={initial.stateLabel.replace(/ time$/, "")}
                         loading={dayLoading}
                       />
                     ) : null}
@@ -418,10 +547,13 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
           </label>
           {candidates ? (
             <div className="mt-3 rounded-small-box border border-hairline bg-ground p-3.5">
-              <span className={labelClass}>Price to quote the customer</span>
+              <span className={labelClass}>{returning ? "Price of the return visit" : "Price to quote the customer"}</span>
               <div className="font-heading text-lg font-extrabold tabular-nums text-ink">
-                First hour (includes call-out) {candidates.price.calloutRate}, then {candidates.price.standardRate}/h
+                {returning
+                  ? `${candidates.price.standardRate}/h - no call-out`
+                  : `First hour (includes call-out) ${candidates.price.calloutRate}, then ${candidates.price.standardRate}/h`}
               </div>
+              {returning ? <p className="mt-1 text-xs text-muted-text">The call-out was charged on the first visit.</p> : null}
             </div>
           ) : null}
         </Card>
@@ -441,7 +573,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
             <div>
               <span className={labelClass}>Time</span>
               <div className="tabular-nums text-secondary-text">
-                {timeLabelFor(startMinutes)}-{timeLabelFor(startMinutes + holdMinutes)} AWST
+                {timeLabelFor(startMinutes)}-{timeLabelFor(startMinutes + holdMinutes)} {initial.stateLabel}
               </div>
             </div>
             <div>
@@ -452,7 +584,11 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
           {dispatchError ? <p className="mb-2 text-xs text-brand-destructive">{dispatchError}</p> : null}
           <div className="flex flex-col gap-2 border-t border-hairline pt-3.5 md:flex-row md:items-center md:justify-end md:gap-3">
             <span className="text-xs text-muted-text md:order-1">
-              {canGo && reschedule
+              {holidayName !== undefined
+                ? ""
+                : canGo && returning
+                ? `${initial.customerName.split(" ")[0]} is told the new time by email and text.`
+                : canGo && reschedule
                 ? `${fixedFirstName} is sent one message with the new time to accept or decline. ${initial.customerName.split(" ")[0]} is told only when he accepts.`
                 : canGo
                 ? `An email and text will be sent to ${pickedRow?.name.split(" ")[0]} to accept or decline. ${initial.customerName.split(" ")[0]} will not be notified until he accepts.`
@@ -465,11 +601,11 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 type="button"
                 onClick={() => void dispatch()}
                 loading={dispatching}
-                loadingLabel={reschedule ? "Sending..." : "Dispatching..."}
+                loadingLabel={returning ? "Booking..." : reschedule ? "Sending..." : "Dispatching..."}
                 size="compact"
                 className="md:order-2"
               >
-                {reschedule ? "Send new time" : pickedRow ? `Dispatch to ${pickedRow.name.split(" ")[0] ?? pickedRow.name}` : "Dispatch"}
+                {returning ? "Confirm return visit" : reschedule ? "Send new time" : pickedRow ? `Dispatch to ${pickedRow.name.split(" ")[0] ?? pickedRow.name}` : "Dispatch"}
               </PrimaryButton>
             ) : (
               <button
@@ -477,12 +613,21 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 disabled
                 className="min-h-[52px] w-full rounded-button border border-hairline bg-ground px-4 text-sm font-bold text-muted-text md:order-2 md:min-h-11 md:w-auto md:px-[18px]"
               >
-                {reschedule ? "Send new time" : "Dispatch"}
+                {returning ? "Confirm return visit" : reschedule ? "Send new time" : "Dispatch"}
               </button>
             )}
           </div>
         </Card>
       </div>
+      {availabilityFor !== null ? (
+        <ChangeAvailabilityDialog
+          contractorCode={availabilityFor.code}
+          contractorName={availabilityFor.name}
+          date={date}
+          onClose={() => setAvailabilityFor(null)}
+          onSaved={() => setRefreshTick((tick) => tick + 1)}
+        />
+      ) : null}
     </div>
   );
 }

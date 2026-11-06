@@ -56,7 +56,7 @@ test("AC1, AC8, AC9: Reschedule opens the page fixed on Bob; Send new time moves
 
     const newDay = await pickFreeWeekday(page);
     await page.getByLabel("Day", { exact: true }).fill(newDay);
-    await page.getByLabel("Start (AWST)").selectOption("420");
+    await page.getByLabel("Start (WA time)").selectOption("420");
     const send = page.getByRole("button", { name: "Send new time" });
     await expect(send).toBeEnabled({ timeout: 15_000 });
     await send.click();

@@ -21,7 +21,7 @@
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
 import { login } from "./helpers/login";
 import { BASE_URL, testRunStorageState } from "./helpers/test-run";
-import { acceptedJobForBob, openJobScreen } from "./helpers/accepted-job";
+import { acceptedJobForBob, openJobScreenArrived } from "./helpers/accepted-job";
 import { pickTime } from "./helpers/time-box";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 
@@ -44,7 +44,7 @@ async function postEnquiry(request: APIRequestContext, tag: string, name: string
       },
       trade: "Plumbing",
       selectedOptions: [],
-      preferredDate: "2026-12-01",
+      preferredDate: "2027-12-01",
       preferredWindow: "morning",
       description: "Kitchen mixer tap is leaking from the base.",
       marketingEmail: false,
@@ -198,7 +198,7 @@ test("5001 AC10: a job completed through Bob's job screen shows the site contact
   const bob = await browser.newContext({ ...MOBILE_VIEWPORT, baseURL: BASE_URL, storageState: testRunStorageState() });
   try {
     const bobsPage = await bob.newPage();
-    await openJobScreen(bobsPage, job);
+    await openJobScreenArrived(bobsPage, request, job);
     await pickTime(bobsPage, "#entry-0-start", "8:07am");
     await pickTime(bobsPage, "#entry-0-end", "11:05am");
     await bobsPage.locator("#completion-notes").fill("Replaced the cartridge.");

@@ -20,7 +20,8 @@ export interface OwnAgreementDto {
   version: { id: string; label: string; issuedAt: string } | null;
   accepted: boolean;
   acceptedAt: string | null;
-  timezone?: string;
+  /** the server's business zone; the screens never carry a zone of their own (Feature 1022) */
+  timezone: string;
   contractorCode: string;
 }
 

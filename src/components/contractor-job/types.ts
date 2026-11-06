@@ -70,6 +70,14 @@ export interface ContractorJobDto {
   maxContractorPartAmount: number;
   frozen: boolean;
   canOnSite: boolean;
+  /** Feature 5002: Book a return visit is offered. */
+  canBookReturn: boolean;
+  /** Feature 5002: how many visit rows Bob may hold -- one per booked block. */
+  visitsAllowed: number;
+  /** Feature 5002: how many of the first saved visit rows are earlier visits, now locked. */
+  lockedVisits: number;
+  /** Feature 5002: the Reason on this visit's latest return, or null when no return was asked for. The note for the office shows only while the job is on hold. */
+  returnVisit: { reason: "part_on_order" | "more_time_needed" | "other"; otherText: string; officeNote: string } | null;
   /** Feature 5004: null (no visit booked today), or whether On my way has gone for today's visit. */
   onMyWay: OnMyWayDto;
   timezone: string;

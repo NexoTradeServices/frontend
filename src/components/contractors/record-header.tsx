@@ -13,7 +13,7 @@ export function ContractorRecordHeader({
   activeTab,
 }: {
   contractor: ContractorDto | null;
-  activeTab: "details" | "service-area" | "reviews";
+  activeTab: "details" | "service-area" | "reviews" | "calendar" | "availability";
 }) {
   const headTags: { kind: "active" | "suspended"; label: string }[] = contractor
     ? [{ kind: contractor.status === "active" ? "active" : "suspended", label: contractor.status === "active" ? "Active" : "Deactivated" }]
@@ -69,6 +69,26 @@ export function ContractorRecordHeader({
             }`}
           >
             Service area
+          </Link>
+          <Link
+            href={`/ops/contractors/${contractor.code}/calendar`}
+            role="tab"
+            aria-selected={activeTab === "calendar"}
+            className={`pb-2 text-sm font-bold ${
+              activeTab === "calendar" ? "border-b-2 border-brand-accent text-ink" : "text-muted-text"
+            }`}
+          >
+            Calendar
+          </Link>
+          <Link
+            href={`/ops/contractors/${contractor.code}/availability`}
+            role="tab"
+            aria-selected={activeTab === "availability"}
+            className={`pb-2 text-sm font-bold ${
+              activeTab === "availability" ? "border-b-2 border-brand-accent text-ink" : "text-muted-text"
+            }`}
+          >
+            Availability
           </Link>
           <Link
             href={`/ops/contractors/${contractor.code}/reviews`}

@@ -156,7 +156,7 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     await pickTrade(page, trade.trade);
 
     // A fixed weekday, well clear of any weekend.
-    await page.getByLabel("Date").fill("2026-09-09");
+    await page.getByLabel("Date").fill("2027-09-08");
     await expect(page.getByText("Morning", { exact: true })).toBeVisible();
     // 1017 AC5: the evening window ends at 19:00.
     await expect(page.getByText("17:00 - 19:00", { exact: true })).toBeVisible();
@@ -224,6 +224,37 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     await expect(page.getByLabel("Email")).toHaveValue(/^e2e-3001-.*@idelta\.com\.au$/);
   });
 
+  test("1020 AC7: a public holiday of the suburb's state replaces the time-of-day choices at once, and greys Continue", async ({ page }) => {
+    const trade = nonPlumbing(formData.serviceTypes);
+    // The open holiday read is faked: the day the test types is Christmas Day for WA.
+    await page.route(/\/api\/public-holidays\?state=WA/, (route) =>
+      route.fulfill({ json: { holidays: [{ date: "2099-12-25", name: "Christmas Day" }] } }),
+    );
+    await page.goto("/request-a-job");
+    await pickJoondalup(page);
+    await page.getByRole("button", { name: "Continue" }).click();
+    await pickTrade(page, trade.trade);
+    await page.getByLabel("Date").fill("2099-12-25");
+    await expect(page.getByText("We're closed on Fri 25 Dec 2099 for Christmas Day. Please pick another date.")).toBeVisible();
+    // The message takes the place of the time-of-day choices, and Continue is greyed.
+    await expect(page.getByText("Time of day")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
+    await page.getByLabel("Date").fill("2099-12-24");
+    await expect(page.getByText("We're closed on Fri 25 Dec 2099 for Christmas Day. Please pick another date.")).toHaveCount(0);
+    await expect(page.getByText("Time of day")).toBeVisible();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByLabel("What's happening")).toBeVisible();
+  });
+
+  test("1021 AC4: a closed state stops the form at the suburb with the words, in place, and Continue is greyed (the check's answer faked)", async ({ page }) => {
+    await page.route(/\/api\/enquiries\/coverage/, (route) => route.fulfill({ json: { tier: "state_not_open" } }));
+    await page.goto("/request-a-job");
+    await pickJoondalup(page);
+    await expect(page.getByText("Sorry, we don't currently operate or service in WA.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled(); // 1021: Continue is greyed, so it goes nowhere
+    await expect(page.getByLabel("Suburb")).toBeVisible(); // still on the suburb step
+  });
+
   test("AC2: a Saturday date shows the weekend rate, a weekday shows normal", async ({ page }) => {
     const trade = nonPlumbing(formData.serviceTypes);
 
@@ -232,9 +263,9 @@ test.describe("Feature 3001 -- enquiry form to job created", () => {
     await page.getByRole("button", { name: "Continue" }).click();
     await pickTrade(page, trade.trade);
 
-    // 2026-09-12 is a Saturday. The estimate only ever renders on the
+    // 2027-09-11 is a Saturday. The estimate only ever renders on the
     // later Price step (AC10), not here on Schedule.
-    await page.getByLabel("Date").fill("2026-09-12");
+    await page.getByLabel("Date").fill("2027-09-11");
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByLabel("What's happening").fill("Weekend leak.");
     await page.getByRole("button", { name: "Continue" }).click();
@@ -309,7 +340,7 @@ test.describe("Feature 3003 -- enquiry photos", () => {
     await pickJoondalup(page);
     await page.getByRole("button", { name: "Continue" }).click();
     await pickTrade(page, nonPlumbing(formData.serviceTypes).trade);
-    await page.getByLabel("Date").fill("2026-09-09");
+    await page.getByLabel("Date").fill("2027-09-08");
     await page.getByRole("button", { name: "Continue" }).click();
     await expect(page.getByLabel("What's happening")).toBeVisible();
   }
@@ -528,7 +559,7 @@ test.describe("Feature 3006 -- the enquiry form with Google Places down", () => 
     await pickHilton(page);
     await page.getByRole("button", { name: "Continue" }).click();
     await pickTrade(page, nonPlumbing(formData.serviceTypes).trade);
-    await page.getByLabel("Date").fill("2026-09-09");
+    await page.getByLabel("Date").fill("2027-09-08");
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByLabel("What's happening").fill("Mixer tap leaking from the base.");
     await page.getByRole("button", { name: "Continue" }).click();

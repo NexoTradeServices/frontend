@@ -47,12 +47,13 @@ function uniqueEmail(tag: string): string {
   return `e2e-${uniqueTag(tag)}@idelta.com.au`;
 }
 
-async function addThrowawayContractor(page: Page, tag: string): Promise<{ name: string }> {
+async function addThrowawayContractor(page: Page, tag: string, state = "WA"): Promise<{ name: string }> {
   await page.goto("/ops/contractors/new");
   await login(page, "mike@idelta.com.au");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
   const name = `E2E Service Area ${uniqueTag(tag)}`;
   await page.getByLabel("Name", { exact: true }).fill(name);
+  await page.getByLabel("Operating state").selectOption(state);
   await page.getByLabel("Phone", { exact: true }).fill("0412 000 555");
   await page.getByLabel("Email", { exact: true }).fill(uniqueEmail(tag));
   await page.getByRole("button", { name: "Save" }).click();
@@ -320,4 +321,16 @@ test.describe(() => {
     await expect(page.getByText("40 km")).toBeVisible();
     await widenWait;
   });
+});
+
+// Feature 1021 AC9: a pin outside the contractor's Operating state is refused in the office's words.
+test("1021 AC9: an NSW contractor picking Fremantle is told the area must be in NSW, and nothing is saved", async ({ page }) => {
+  if (MOCKS_GOOGLE_PLACES) await installMockGooglePlaces(page);
+  const { name } = await addThrowawayContractor(page, "ac9", "NSW");
+  await openServiceAreaTab(page, name, { hasPin: false });
+  await pickSuburb(page, "Fremantle WA", /Fremantle WA/);
+  await page.getByRole("button", { name: "Save service area" }).click();
+  const first = name.split(" ")[0] ?? "";
+  await expect(page.getByText(`${first}'s service area must be in NSW or change ${first}'s Operating state first.`).first()).toBeVisible();
+  await expect(page).toHaveURL(/service-area|contractors\/CON-/);
 });

@@ -14,7 +14,6 @@ import { friendlyDate, openSignedFile } from "@/lib/agreement-files";
 import type { OwnAgreementDto } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
-const DEFAULT_ZONE = "Australia/Perth";
 
 const outlinedButton =
   "min-h-[52px] w-full rounded-button border border-hairline bg-surface px-4 py-3.5 text-sm font-bold text-ink sm:min-h-11 sm:w-auto sm:py-2.5";
@@ -143,7 +142,7 @@ export function AgreementPanel() {
     );
   }
 
-  const zone = agreement.timezone ?? DEFAULT_ZONE;
+  const zone = agreement.timezone;
   const label = agreement.version.label;
 
   if (agreement.accepted && agreement.acceptedAt) {

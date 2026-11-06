@@ -3,7 +3,7 @@
 // AC1  a new job's Contractor card shows Dispatch, opening the dispatch page
 // AC2  a job with no address at all: Dispatch is off, with the reason
 // AC6  the dispatch page opens on the job's preferred date at its window's
-//      start with a 1-hour hold, the field reading "Start (AWST)"
+//      start with a 1-hour hold, the field reading "Start (WA time)"
 // AC17 picking a contractor opens his day; Previous/Next day moves it
 // AC18 tapping a half hour moves the start there, keeping the hold's length
 // AC19 a busy contractor still opens his day; a Not ready one does not
@@ -66,7 +66,7 @@ async function putBillingAddress(page: Page, reference: string): Promise<void> {
   expect(res.status()).toBe(200);
 }
 
-const MONDAY = "2026-12-07";
+const MONDAY = "2027-03-08"; // inside Bob's licence (30 Jun 2027)
 
 async function expectNoSidewaysScroll(page: Page) {
   const { scrollWidth, clientWidth } = await page.evaluate(() => ({
@@ -146,7 +146,7 @@ test("AC6, AC17, AC18, AC29: the dispatch flow", async ({ page, request }) => {
 
   // AC6: opens on the job's preferred date, the window's start, a 1-hour hold.
   await expect(page.getByLabel("Day", { exact: true })).toHaveValue(monday);
-  await expect(page.getByLabel("Start (AWST)")).toHaveValue("420"); // 7:00am, morning's start
+  await expect(page.getByLabel("Start (WA time)")).toHaveValue("420"); // 7:00am, morning's start
   await expect(page.getByLabel("Hold")).toHaveValue("60");
 
   // The price, for a Monday (normal).
@@ -160,7 +160,7 @@ test("AC6, AC17, AC18, AC29: the dispatch flow", async ({ page, request }) => {
 
   // AC18: tapping a half hour moves the start, the hold stays 1 hour.
   await page.getByRole("button", { name: "Start at 9:00am" }).click();
-  await expect(page.getByLabel("Start (AWST)")).toHaveValue("540"); // 9:00am
+  await expect(page.getByLabel("Start (WA time)")).toHaveValue("540"); // 9:00am
   await expect(page.getByLabel("Hold")).toHaveValue("60");
 
   const goButton = page.getByRole("button", { name: /Dispatch to Bob/ });
@@ -193,7 +193,7 @@ test("AC19: a busy contractor still opens his day; a Not ready one does not", as
   await putBillingAddress(page, second);
   await page.goto(`/ops/jobs/${second}/dispatch`);
   await expect(page.getByRole("heading", { name: `Dispatch ${second}` })).toBeVisible();
-  await expect(page.getByLabel("Start (AWST)")).toHaveValue("420");
+  await expect(page.getByLabel("Start (WA time)")).toHaveValue("420");
 
   const bobBusyRow = page.getByRole("button", { name: /Bob Reilly/ });
   await expect(bobBusyRow.getByText(/Busy/)).toBeVisible({ timeout: 10_000 });
@@ -244,7 +244,7 @@ test.describe(() => {
     await expectNoSidewaysScroll(page);
     await expectTapTargets(page);
     await expectReachable(page, page.getByLabel("Day", { exact: true }));
-    await expectReachable(page, page.getByLabel("Start (AWST)"));
+    await expectReachable(page, page.getByLabel("Start (WA time)"));
     await expectReachable(page, page.getByLabel("Hold"));
     const bobRow = page.getByRole("button", { name: /Bob Reilly/ });
     await expectReachable(page, bobRow);
@@ -255,4 +255,113 @@ test.describe(() => {
     await expectReachable(page, page.getByLabel(/Emergency/));
     await expectReachable(page, page.getByRole("button", { name: /Dispatch to Bob/ }));
   });
+});
+
+// Feature 1020 -- the hours and holidays on the dispatch page
+test("1020 AC3, AC6: start times and the day view stay inside the opening hours; a refusal shows in the page's Banner", async ({ page, request }) => {
+  await page.goto("/ops/jobs");
+  await login(page, "mike@idelta.com.au");
+  const day = await pickFreeWeekday(page);
+  const reference = await postEnquiry(request, "ac1020", "Plumbing", FREMANTLE, day);
+  await putBillingAddress(page, reference);
+  await page.goto(`/ops/jobs/${reference}/dispatch`);
+  await expect(page.getByRole("heading", { name: `Dispatch ${reference}` })).toBeVisible();
+
+  // AC3: the seeded hours are 7:00am to 7:00pm -- the Start list opens at 7:00am and the last one that
+  // still fits a one-hour job is 6:00pm; nothing earlier or later is offered.
+  const options = await page.locator("#dispatch-start option").allTextContents();
+  expect(options[0]).toBe("7:00am");
+  expect(options[options.length - 1]).toBe("6:00pm");
+  await page.getByRole("button", { name: /Bob Reilly/ }).click();
+  await expect(page.getByRole("button", { name: "Start at 7:00am" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start at 6:30pm" })).toBeVisible();
+  // A one-hour job cannot start in the last half hour: that row is greyed and cannot be tapped.
+  await expect(page.getByRole("button", { name: "Start at 6:30pm" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Start at 6:00pm" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Start at 6:00am" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Start at 7:00pm" })).toHaveCount(0);
+
+  // AC6: the server's refusal for a holiday shows in the dispatch error Banner (the reply faked).
+  await page.route(new RegExp(`/api/jobs/${reference}/dispatch$`), (route) =>
+    route.request().method() === "POST"
+      ? route.fulfill({ status: 400, json: { error: "Closed for Christmas Day. Pick another day.", field: "startMinutes" } })
+      : route.continue(),
+  );
+  await page.getByRole("button", { name: /Dispatch to Bob/ }).click();
+  await expect(page.getByText("Closed for Christmas Day. Pick another day.")).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/ops/jobs/${reference}/dispatch$`));
+
+  // 1020: a holiday on the day locks it before anything is picked (the holiday read faked for this day).
+  await page.route(/\/api\/public-holidays\?state=WA/, (route) =>
+    route.fulfill({ json: { holidays: [{ date: day, name: "Test Day" }] } }),
+  );
+  await page.reload();
+  await expect(page.getByText(/^Closed on .* for Test Day\. Pick another day\.$/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /Bob Reilly/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Dispatch", exact: true })).toBeDisabled();
+});
+
+// Feature 2004 -- Availability on the dispatch page
+//
+// AC12 a day with nothing free greys the contractor's row (no tag); the server refuses it too
+// AC13 "Change availability" shows when that is the only problem; it opens a one-day pop-up; saved, the slot can be dispatched
+//      (when Bob has a free half hour that day the job box simply starts there)
+// AC14 time switched off just before dispatch is refused and the list refreshes
+test("2004 AC12, AC13: a day with nothing free greys the row, Change availability opens one day and Save frees the slot", async ({ page, request }) => {
+  await page.goto("/ops/jobs");
+  await login(page, "mike@idelta.com.au");
+  const day = await pickFreeWeekday(page);
+  const reference = await postEnquiry(request, "av13", "Plumbing", FREMANTLE, day);
+  await putBillingAddress(page, reference);
+  const off = await page.request.put(`${apiUrl}/api/contractors/CON-014/availability`, {
+    data: {
+      changes: Array.from({ length: 24 }, (_, i) => ({
+        date: day,
+        time: `${String(7 + Math.floor(i / 2)).padStart(2, "0")}:${i % 2 === 0 ? "00" : "30"}`,
+        available: false,
+      })),
+    },
+  });
+  expect(off.status()).toBe(200);
+
+  await page.goto(`/ops/jobs/${reference}/dispatch`);
+  const bobRow = page.getByRole("button", { name: /Bob Reilly/ });
+  await expect(bobRow).toBeVisible();
+  await bobRow.click();
+  await expect(page.getByRole("button", { name: "Dispatch", exact: true })).toBeDisabled();
+
+  await page.getByRole("button", { name: "Change availability" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: /Change Bob's availability/ })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: /Previous week|Next week|Copy to/ })).toHaveCount(0); // one day: no arrows, no copy
+  await dialog.getByRole("button", { name: /7:00am not available$/ }).click();
+  await dialog.getByRole("button", { name: /7:30am not available$/ }).click();
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  // Bob stays picked; with the list refreshed he can be dispatched.
+  const go = page.getByRole("button", { name: /Dispatch to Bob/ });
+  await expect(go).toBeEnabled({ timeout: 10_000 });
+  await go.click();
+  await expect(page).toHaveURL(new RegExp(`/ops/jobs/${reference}$`));
+});
+
+test("2004 AC14: time switched off just before dispatch is refused, and the list refreshes", async ({ page, request }) => {
+  await page.goto("/ops/jobs");
+  await login(page, "mike@idelta.com.au");
+  const day = await pickFreeWeekday(page);
+  const reference = await postEnquiry(request, "av14", "Plumbing", FREMANTLE, day);
+  await putBillingAddress(page, reference);
+  await page.goto(`/ops/jobs/${reference}/dispatch`);
+  await page.getByRole("button", { name: /Bob Reilly/ }).click();
+  const go = page.getByRole("button", { name: /Dispatch to Bob/ });
+  await expect(go).toBeEnabled({ timeout: 10_000 });
+  // Bob switches the hour off after Mike's page loaded.
+  const off = await page.request.put(`${apiUrl}/api/contractors/CON-014/availability`, {
+    data: { changes: [{ date: day, time: "07:00", available: false }] },
+  });
+  expect(off.status()).toBe(200);
+  await go.click();
+  await expect(page.getByText(/Bob has just switched that time off\. Nothing was sent\./)).toBeVisible();
+  // the day is read again and the job box moves to Bob's next free half hour (7:30am)
+  await expect(page.getByLabel("Start (WA time)")).toHaveValue("450", { timeout: 10_000 });
 });

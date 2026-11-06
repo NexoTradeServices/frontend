@@ -30,6 +30,7 @@ import { TradeIcon } from "./trade-icon";
 import { PriceBox } from "./price-box";
 import { AdditionalQuestions } from "./additional-questions";
 import { MAX_PHOTOS, PHOTO_UNAVAILABLE, useEnquiryPhotos } from "./use-enquiry-photos";
+import { holidayWords, stateOfPick, usePublicHolidays, useStateToday } from "./holidays";
 import { formatDayName, formatFriendlyDate, isWeekendDate, todayYmd } from "./money";
 import type { FormDataDto, PreferredWindow } from "./types";
 
@@ -66,13 +67,22 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
   const [platformSuburb, setPlatformSuburb] = useState<PlatformSuburb | null>(null);
   const [locationError, setLocationError] = useState<string>();
   /** Feature 3002: what the coverage check said about one pick. Never blocks Continue. */
-  const [coverageAnswer, setCoverageAnswer] = useState<{ query: string; outOfReach: boolean } | null>(null);
+  const [coverageAnswer, setCoverageAnswer] = useState<{ query: string; outOfReach: boolean; notOpen: boolean } | null>(null);
   const [trade, setTrade] = useState<string | null>(null);
   const [tradeError, setTradeError] = useState<string>();
   /** One typed answer per trade question, keyed by the question's own label. Optional -- left blank is fine. */
   const [questionAnswers, setQuestionAnswers] = useState<Record<string, string>>({});
-  const [preferredDate, setPreferredDate] = useState(todayYmd());
+  // Feature 1022: today is the SUBURB'S state's today (at 10pm in Perth a Sydney suburb is already tomorrow). Until the
+  // state is known the device's day stands in; the date the person typed always wins over the default.
+  const stateToday = useStateToday(stateOfPick(location, platformSuburb));
+  const today = stateToday ?? todayYmd();
+  const [pickedDate, setPreferredDate] = useState<string | null>(null);
+  const preferredDate = pickedDate ?? today;
   const [preferredWindow, setPreferredWindow] = useState<PreferredWindow>("morning");
+  // Feature 1020: a public holiday of the suburb's state is shown as the date's error and stops Next.
+  const holidays = usePublicHolidays(stateOfPick(location, platformSuburb));
+  const holidayName = holidays[preferredDate];
+  const holidayMessage = holidayName === undefined ? undefined : holidayWords(preferredDate, holidayName);
   const [description, setDescription] = useState("");
   const [descriptionError, setDescriptionError] = useState<string>();
   const [name, setName] = useState("");
@@ -100,7 +110,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
   // answer is kept with the pick it belongs to, so a stale one never shows for a newer pick.
   const coverageQuery =
     location !== null
-      ? new URLSearchParams({ postcode: location.postcode, lat: String(location.lat), lng: String(location.lng) }).toString()
+      ? new URLSearchParams({ postcode: location.postcode, lat: String(location.lat), lng: String(location.lng), state: location.state }).toString()
       : platformSuburb !== null
         ? new URLSearchParams({ suburbId: platformSuburb.suburbId }).toString()
         : null;
@@ -110,7 +120,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
     fetch(`${apiUrl}/api/enquiries/coverage?${coverageQuery}`, { signal: controller.signal })
       .then((res) => (res.ok ? (res.json() as Promise<{ tier?: string }>) : null))
       .then((body) => {
-        if (!controller.signal.aborted) setCoverageAnswer({ query: coverageQuery, outOfReach: body?.tier === "out_of_reach" });
+        if (!controller.signal.aborted) setCoverageAnswer({ query: coverageQuery, outOfReach: body?.tier === "out_of_reach", notOpen: body?.tier === "state_not_open" });
       })
       .catch(() => undefined);
     return () => {
@@ -118,6 +128,9 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
     };
   }, [coverageQuery]);
   const outOfReach = coverageQuery !== null && coverageAnswer?.query === coverageQuery && coverageAnswer.outOfReach;
+  // Feature 1021: a closed state stops the form at the suburb, in place; no further step opens.
+  const stateNotOpen = coverageQuery !== null && coverageAnswer?.query === coverageQuery && coverageAnswer.notOpen;
+  const closedStateName = stateOfPick(location, platformSuburb) ?? "that state";
 
   // Feature 3003: learn whether photo upload is switched on the first time the
   // notes step shows.
@@ -141,6 +154,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
         setLocationError("Pick a suburb from the list before continuing.");
         return false;
       }
+      if (stateNotOpen) return false;
       return true;
     }
     if (step === "trade") {
@@ -150,6 +164,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
       }
       return true;
     }
+    if (step === "schedule") return holidayMessage === undefined;
     if (step === "notes") {
       // The trade's own questions are optional (owner, 09/09/26) -- only
       // the general description is required on this step.
@@ -283,7 +298,10 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
 
           {step === "suburb" ? (
             <>
-              {outOfReach ? (
+              {stateNotOpen ? (
+                <Banner kind="error">Sorry, we don&apos;t currently operate or service in {closedStateName}.</Banner>
+              ) : null}
+              {outOfReach && !stateNotOpen ? (
                 <Banner kind="warning">
                   We don&apos;t currently service your area, but you can still submit your details. We&apos;ll do our
                   best to find a local service provider, subject to availability.
@@ -349,11 +367,14 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
                 label="Date"
                 required
                 type="date"
-                min={todayYmd()}
+                min={today}
                 value={preferredDate}
                 onChange={(e) => setPreferredDate(e.target.value)}
-                helper="Defaults to today -- move it later if that suits you better."
+                helper={holidayMessage === undefined ? "Defaults to today -- move it later if that suits you better." : undefined}
               />
+              {holidayMessage !== undefined ? (
+                <Banner kind="warning">{holidayMessage}</Banner>
+              ) : (
               <div className="mb-3.5">
                 <span className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']">
                   Time of day
@@ -381,6 +402,7 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
                   ))}
                 </div>
               </div>
+              )}
             </>
           ) : null}
 
@@ -549,7 +571,8 @@ export function RequestAJobForm({ formData }: { formData: FormDataDto }) {
               <button
                 type="button"
                 onClick={handleContinue}
-                className="min-h-11 rounded-button bg-brand-accent px-5 py-2.5 text-sm font-bold text-on-accent"
+                disabled={stateNotOpen || (step === "schedule" && holidayMessage !== undefined)}
+                className="min-h-11 rounded-button bg-brand-accent px-5 py-2.5 text-sm font-bold text-on-accent disabled:cursor-not-allowed disabled:bg-hairline disabled:text-muted-text"
               >
                 Continue
               </button>

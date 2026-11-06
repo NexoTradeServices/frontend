@@ -27,7 +27,7 @@ async function makeGuest(request: APIRequestContext, tag: string): Promise<strin
       location: { suburb: "Fremantle", state: "WA", country: "AU", postcode: "6160", lat: -32.0569, lng: 115.7439, placeId: `e2e-3004-${tag}` },
       trade: "Plumbing",
       selectedOptions: [],
-      preferredDate: "2027-03-01",
+      preferredDate: "2027-03-02",
       preferredWindow: "morning",
       description: "An e2e throwaway job for feature 3004.",
       marketingEmail: false,

@@ -28,8 +28,10 @@ export default async function DispatchPage({
   const { ref } = await params;
 
   const cookieStore = await cookies();
-  const reschedule = (await searchParams).mode === "reschedule";
-  const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(ref)}/dispatch${reschedule ? "?mode=reschedule" : ""}`, {
+  const mode = (await searchParams).mode;
+  const returnVisit = mode === "return";
+  const reschedule = mode === "reschedule" || returnVisit;
+  const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(ref)}/dispatch${reschedule ? `?mode=${returnVisit ? "return" : "reschedule"}` : ""}`, {
     headers: { cookie: cookieStore.toString() },
     cache: "no-store",
   });
@@ -52,8 +54,8 @@ export default async function DispatchPage({
     return (
       <Container width="wide">
         <PageHeader
-          title={`Reschedule ${ref}`}
-          subtitle="This job has no booking to move."
+          title={`${returnVisit ? "Return visit for" : "Reschedule"} ${ref}`}
+          subtitle={returnVisit ? "This job is not waiting for a return visit." : "This job has no booking to move."}
           breadcrumb={jobCrumb(ref)}
         />
         <div className="rounded-card border border-hairline bg-surface p-5 text-sm text-secondary-text">
@@ -67,15 +69,18 @@ export default async function DispatchPage({
   if (res.status !== 200) return <LoadFailed />;
   const facts = (await res.json()) as DispatchFacts;
   const isReschedule = facts.mode === "reschedule" && facts.contractor !== undefined;
+  const isReturn = facts.mode === "return" && facts.contractor !== undefined;
 
   return (
     <Container width="wide">
       <PageHeader
-        title={`${isReschedule ? "Reschedule" : "Dispatch"} ${facts.reference}`}
+        title={`${isReschedule ? "Reschedule" : isReturn ? "Return visit for" : "Dispatch"} ${facts.reference}`}
         subtitle={
           isReschedule
             ? `Pick ${facts.contractor?.firstName ?? ""}'s new time. ${facts.contractor?.firstName ?? ""} is asked to accept it again.`
-            : `${facts.trade} - ${facts.suburb} - ${facts.customerName}`
+            : isReturn
+              ? `Pick ${facts.contractor?.firstName ?? ""}'s return time. ${facts.customerName.split(" ")[0] ?? ""} is told by email and text.`
+              : `${facts.trade} - ${facts.suburb} - ${facts.customerName}`
         }
         tags={<StatusTag status={facts.status as JobStatus} />}
         breadcrumb={jobCrumb(facts.reference)}

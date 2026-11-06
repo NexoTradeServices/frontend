@@ -9,9 +9,10 @@ import type { PortalNavItem } from "./ops-nav";
 
 export const CONTRACTOR_NAV_ITEMS: readonly PortalNavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/contractor", built: true },
-  { key: "calendar", label: "Calendar", href: "/contractor/calendar", built: false },
+  { key: "calendar", label: "Calendar", href: "/contractor/calendar", built: true },
+  { key: "availability", label: "Availability", href: "/contractor/availability", built: true },
   { key: "settlements", label: "Payouts", href: "/contractor/payouts", built: true },
   { key: "rates", label: "Rates", href: "/contractor/rates", built: true },
   { key: "service-area", label: "Service area", href: "/contractor/service-area", built: true },
-  { key: "my-details", label: "My details", href: "/contractor/details", built: false },
+  { key: "my-details", label: "My details", href: "/contractor/details", built: true },
 ] as const;

@@ -17,6 +17,8 @@ export interface ContractorSpecialtyDto {
 
 export interface ContractorDto {
   code: string;
+  /** Feature 1021: the state the contractor works in; office-held */
+  operatingState: string;
   name: string;
   email: string;
   phone: string;

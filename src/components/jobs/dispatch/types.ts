@@ -12,8 +12,13 @@ export interface DispatchFacts {
   /** Feature 4006: the job's real status, for the page's tag. */
   status: string;
   defaults: { date: string; startMinutes: number; holdMinutes: number };
+  /** Feature 1022: "NSW time" - the label after every time the page shows */
+  stateLabel: string;
+  /** Feature 1020: the business hours, "HH:MM" -- the page offers start times inside them and its day view runs between them. */
+  openingTime: string;
+  closingTime: string;
   /** Feature 4006: "reschedule" fixes the contractor who holds the booking; absent at dispatch. */
-  mode?: "reschedule";
+  mode?: "reschedule" | "return";
   contractor?: { code: string; name: string; firstName: string };
 }
 
@@ -32,6 +37,12 @@ export interface CandidateRow {
   distanceKm: number | null;
   pay: { calloutRate: number; standardRate: number };
   rating: Rating | null;
+  /** Feature 2004: a half hour of the hold is switched off in his Availability */
+  notAvailable: boolean;
+  /** Feature 2004: Not available is the only problem - "Change availability" is offered */
+  linkable: boolean;
+  /** Feature 2004: he has never saved his Availability */
+  availabilityNotSet: boolean;
 }
 
 export type ServiceLevel = "normal" | "weekend" | "emergency";

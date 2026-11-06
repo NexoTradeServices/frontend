@@ -184,6 +184,24 @@ async function restoreSeededSettings(page: Page): Promise<void> {
     await expect(page.getByText("Saved.")).toBeVisible();
   }
 
+  // Feature 1020: the Opening hours card's test moves the opening time.
+  if ((await page.getByLabel("Opens").inputValue()) !== "07:00" || (await page.getByLabel("Closes").inputValue()) !== "19:00") {
+    await page.getByLabel("Opens").selectOption("07:00");
+    await page.getByLabel("Closes").selectOption("19:00");
+    await page.getByRole("button", { name: "Save settings" }).click();
+    await expect(page.getByText("Saved.")).toBeVisible();
+  }
+
+  // Feature 1021: the Operating states card's test unticks NSW and tries VIC; the seed has WA and NSW open.
+  const nsw = page.getByLabel("New South Wales (NSW)");
+  const vic = page.getByLabel("Victoria (VIC)");
+  if (!(await nsw.isChecked()) || (await vic.isChecked())) {
+    await nsw.check();
+    await vic.uncheck();
+    await page.getByRole("button", { name: "Save settings" }).click();
+    await expect(page.getByText("Saved.")).toBeVisible();
+  }
+
   // Feature 2006: the Legal identity card's test writes both fields.
   if ((await page.getByLabel("Legal entity name").inputValue()) !== "Trade Services") {
     await page.getByLabel("Legal entity name").fill("Trade Services");
@@ -402,5 +420,167 @@ test.describe(() => {
     const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
     expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
     await logout(page);
+  });
+});
+
+// Feature 1020 -- opening hours and public holidays on Settings
+//
+// AC1  the owner changes the opening hours and they hold after a reload; closing at or before opening is the field's own error
+// AC5  a holiday is added for a state and year and removed again; a second one on the same date is refused with the words
+// AC8  the warning Banner for a booked day (the server's count faked: the real count is proven in the backend)
+// AC9  Remove all shows for a finished year only, behind a confirm
+test.describe("1020 -- opening hours", () => {
+  test.afterEach(async ({ page }) => {
+    await withPlatformSettingsLock(() => restoreSeededSettings(page));
+  });
+
+  test("AC1: 8:00am to 5:30pm saves and holds after a reload; closing at the opening time is refused beside the field", async ({ page }) => {
+    await withPlatformSettingsLock(async () => {
+      await ensureLoggedInAs(page, "/ops/settings", "owner@idelta.com.au");
+      await expect(page.getByRole("heading", { name: "Opening hours" })).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText("The same every day. No job is booked outside these times.")).toBeVisible();
+      await expect(page.getByText(/New hours start as Not available for existing contractors/)).toBeVisible();
+
+      await page.getByLabel("Opens").selectOption("08:00");
+      await page.getByLabel("Closes").selectOption("08:00");
+      await page.getByRole("button", { name: "Save settings" }).click();
+      await expect(page.getByText("Closing time must be after opening time.")).toBeVisible();
+
+      await page.getByLabel("Closes").selectOption("17:30");
+      await page.getByRole("button", { name: "Save settings" }).click();
+      await expect(page.getByText("Saved.")).toBeVisible();
+      await page.reload();
+      await expect(page.getByLabel("Opens")).toHaveValue("08:00");
+      await expect(page.getByLabel("Closes")).toHaveValue("17:30");
+    });
+  });
+});
+
+test("1020: Settings carries a Manage holidays link to the Public holidays page, which links back", async ({ page }) => {
+  await ensureLoggedInAs(page, "/ops/settings", "owner@idelta.com.au");
+  await page.getByRole("link", { name: "Manage holidays" }).click();
+  await expect(page).toHaveURL(/\/ops\/settings\/holidays$/);
+  await expect(page.getByRole("heading", { name: "Public holidays", level: 1 })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("link", { name: "< Settings" }).click();
+  await expect(page).toHaveURL(/\/ops\/settings$/);
+});
+
+test.describe("1020 -- public holidays", () => {
+  test.beforeEach(async ({ page }) => {
+    await ensureLoggedInAs(page, "/ops/settings/holidays", "owner@idelta.com.au");
+    await expect(page.getByRole("heading", { name: "Public holidays", level: 1 })).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("AC5: add a holiday for NSW 2028, see it listed, a second on the same date is refused, remove it", async ({ page }) => {
+    await page.getByLabel("State", { exact: true }).selectOption("NSW");
+    const thisYear = new Date().getFullYear();
+    for (let year = thisYear; year < 2028; year += 1) await page.getByRole("button", { name: "Next year" }).click();
+    await expect(page.getByText("No holidays entered for NSW 2028. Add them so jobs can't be booked on those days.").first()).toBeVisible();
+
+    // The date box follows the year on show: another year is refused beside the box, nothing is added.
+    await page.getByLabel("Date", { exact: true }).fill("2027-01-26");
+    await page.getByLabel("Holiday name").fill("Wrong year");
+    await page.getByRole("button", { name: "Add holiday" }).click();
+    await expect(page.getByText("Pick a date in 2028.")).toBeVisible();
+    await page.getByLabel("Holiday name").fill("");
+
+    await page.getByLabel("Date", { exact: true }).fill("2028-01-26");
+    await page.getByLabel("Holiday name").fill("Australia Day");
+    await page.getByRole("button", { name: "Add holiday" }).click();
+    await expect(page.getByText("Added Australia Day.")).toBeVisible();
+    await expect(page.getByRole("list", { name: "NSW 2028 holidays" }).getByText("Australia Day")).toBeVisible();
+    await expect(page.getByText("NSW 2028 has fewer than 7 holidays. Check the list is complete.")).toBeVisible();
+
+    await page.getByLabel("Date", { exact: true }).fill("2028-01-26");
+    await page.getByLabel("Holiday name").fill("Again");
+    await page.getByRole("button", { name: "Add holiday" }).click();
+    await expect(page.getByText("NSW already has a holiday on that date.")).toBeVisible();
+
+    await page.getByRole("button", { name: /^Remove Australia Day/ }).click();
+    await expect(page.getByText("Removed Australia Day.")).toBeVisible();
+    await expect(page.getByRole("list", { name: "NSW 2028 holidays" })).toHaveCount(0);
+  });
+
+  test("AC8: when the server reports a booked job that day, a warning Banner says so", async ({ page }) => {
+    await page.route(/\/api\/holidays$/, (route) =>
+      route.request().method() === "POST"
+        ? route.fulfill({ status: 201, json: { holiday: { id: "fake", state: "NSW", date: "2028-03-01", name: "Test day" }, bookedJobs: 1 } })
+        : route.continue(),
+    );
+    await page.getByLabel("State", { exact: true }).selectOption("NSW");
+    await page.getByLabel("Date", { exact: true }).fill(`${String(new Date().getFullYear())}-03-01`);
+    await page.getByLabel("Holiday name").fill("Test day");
+    await page.getByRole("button", { name: "Add holiday" }).click();
+    await expect(page.getByText("1 job is already booked that day")).toBeVisible();
+  });
+
+  test("AC9: a past year has no add form, shows Remove all, asks first, and empties the list (the rows are faked: a past year cannot be added to)", async ({ page }) => {
+    const finished = new Date().getFullYear() - 1;
+    let rows = [{ id: "fake-1", state: "TAS", date: `${String(finished)}-01-01`, name: "New Year's Day" }];
+    await page.route(/\/api\/holidays\?state=TAS&year=\d+$/, (route) => {
+      if (route.request().method() === "DELETE") {
+        rows = [];
+        return route.fulfill({ status: 200, json: { removed: 1 } });
+      }
+      return route.fulfill({ status: 200, json: { holidays: rows } });
+    });
+    await page.getByLabel("State", { exact: true }).selectOption("TAS");
+    await expect(page.getByRole("button", { name: /^Remove all TAS/ })).toHaveCount(0); // this year: no Remove all
+    await expect(page.getByRole("button", { name: "Add holiday" })).toBeVisible();
+    await page.getByRole("button", { name: "Previous year" }).click();
+    await expect(page.getByText("Past years can't be added to.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add holiday" })).toHaveCount(0);
+    await page.getByRole("button", { name: `Remove all TAS ${String(finished)} holidays` }).click();
+    await expect(page.getByRole("heading", { name: `Remove all TAS ${String(finished)} holidays?` })).toBeVisible();
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await expect(page.getByRole("list", { name: `TAS ${String(finished)} holidays` })).toBeVisible();
+    await page.getByRole("button", { name: `Remove all TAS ${String(finished)} holidays` }).click();
+    await page.getByRole("button", { name: "Remove all", exact: true }).click();
+    await expect(page.getByText(`Removed all TAS ${String(finished)} holidays.`)).toBeVisible();
+    await expect(page.getByRole("list", { name: `TAS ${String(finished)} holidays` })).toHaveCount(0);
+  });
+});
+
+// Feature 1021 -- operating states on Settings
+//
+// AC1  the owner ticks and unticks states and it holds after a reload, with who and when
+// AC2  ticking a state with no holidays this year is refused beside the card, with a link to that state's holidays
+test.describe("1021 -- operating states", () => {
+  test.afterEach(async ({ page }) => {
+    await withPlatformSettingsLock(() => restoreSeededSettings(page));
+  });
+
+  test("AC1, AC2: WA and NSW are ticked; VIC is refused with a link to its holidays; unticking NSW holds after a reload", async ({ page }) => {
+    await withPlatformSettingsLock(async () => {
+      await ensureLoggedInAs(page, "/ops/settings", "owner@idelta.com.au");
+      await expect(page.getByRole("heading", { name: "Operating states" })).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByLabel("Western Australia (WA)")).toBeChecked();
+      await expect(page.getByLabel("New South Wales (NSW)")).toBeChecked();
+      await expect(page.getByLabel("Victoria (VIC)")).not.toBeChecked();
+
+      // AC2: VIC has no holidays this year - the whole Save is refused, the link goes to its holidays.
+      await page.getByLabel("Victoria (VIC)").check();
+      await page.getByRole("button", { name: "Save settings" }).click();
+      await expect(page.getByText("Can't open VIC yet. Add its public holidays first.")).toBeVisible();
+      await page.getByRole("link", { name: "Enter VIC holidays" }).click();
+      await expect(page).toHaveURL(/\/ops\/settings\/holidays\?holidayState=VIC$/);
+      await expect(page.getByLabel("State", { exact: true })).toHaveValue("VIC");
+
+      // AC1: back on Settings (the unsaved VIC tick is gone), untick NSW, save, reload - it holds and says who and when.
+      await page.goto("/ops/settings");
+      await expect(page.getByLabel("Victoria (VIC)")).not.toBeChecked();
+      await page.getByLabel("New South Wales (NSW)").uncheck();
+      await page.getByRole("button", { name: "Save settings" }).click();
+      await expect(page.getByText("Saved.")).toBeVisible();
+      await page.reload();
+      await expect(page.getByLabel("New South Wales (NSW)")).not.toBeChecked();
+      await expect(page.getByLabel("Western Australia (WA)")).toBeChecked();
+      await expect(page.getByText(/Last changed .* by The owner\./)).toBeVisible();
+
+      // Put NSW back: the seed has it open, and the Sydney job test (1022) needs Liam's state open.
+      await page.getByLabel("New South Wales (NSW)").check();
+      await page.getByRole("button", { name: "Save settings" }).click();
+      await expect(page.getByText("Saved.")).toBeVisible();
+    });
   });
 });

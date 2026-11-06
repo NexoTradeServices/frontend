@@ -112,6 +112,8 @@ export function TimeEntryRows({
   errors = {},
   noteLabel = "Visit note",
   showNow = true,
+  canAdd = true,
+  lockedCount = 0,
   onChange,
 }: {
   rows: TimeEntryRow[];
@@ -124,6 +126,10 @@ export function TimeEntryRows({
   noteLabel?: string;
   /** Feature 6007: false after the fact (Correct & reissue) -- Finish has no "Now" button. */
   showNow?: boolean;
+  /** Feature 5002: false on Bob's screen until a return visit is booked -- no "+ Add a visit" link. */
+  canAdd?: boolean;
+  /** Feature 5002: the first rows are earlier visits -- shown locked (their visit is over), the rest stay editable. */
+  lockedCount?: number;
   onChange?: (next: TimeEntryRow[]) => void;
 }) {
   if (mode !== "edit") {
@@ -169,6 +175,23 @@ export function TimeEntryRows({
       {rows.map((row, index) => {
         const id = `${idPrefix}-${String(index)}`;
         const at = (field: string): string | undefined => errors[`${String(index)}.${field}`];
+        if (index < lockedCount) {
+          return (
+            <div key={row.key} className={index > 0 ? "mt-3.5 border-t border-hairline pt-3.5" : undefined} data-testid="time-entry-row-locked">
+              <div className={rowGrid}>
+                <LockedBox label="Date" value={formatVisitDate(row.date)} />
+                <LockedBox label="Start" value={formatClock(row.start)} />
+                <LockedBox label="Finish" value={formatClock(row.end)} />
+                <div className="md:col-span-3">
+                  <LockedBox label={noteLabel} value={row.note === "" ? "-" : row.note} />
+                </div>
+              </div>
+              {index === lockedCount - 1 ? (
+                <p className="mt-[5px] text-xs text-muted-text">That visit is over. Ask the office to change it.</p>
+              ) : null}
+            </div>
+          );
+        }
         return (
           <div key={row.key} className={index > 0 ? "mt-3.5 border-t border-hairline pt-3.5" : undefined} data-testid="time-entry-row">
             <div className={rowGrid}>
@@ -229,6 +252,7 @@ export function TimeEntryRows({
         );
       })}
       {errors["rows"] ? <p className="mt-[5px] text-xs text-brand-destructive">{errors["rows"]}</p> : null}
+      {canAdd ? (
       <button
         type="button"
         onClick={() => onChange?.([...rows, newEntryRow(zone)])}
@@ -236,6 +260,7 @@ export function TimeEntryRows({
       >
         + Add a visit
       </button>
+      ) : null}
     </div>
   );
 }

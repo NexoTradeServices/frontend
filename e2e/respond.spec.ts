@@ -60,8 +60,8 @@ test("AC2, AC26: the page leads with when, where and who to ask for; Decline sho
   await expect(title).toHaveCSS("font-weight", "800");
   await expect(page.getByText("New job for you, Bob")).toBeVisible();
   await expect(page.getByText("When", { exact: true })).toBeVisible();
-  // 9001 AC3: the slot is written out, "Thu 15 Oct, 8:00am AWST" -- never a date in numbers.
-  await expect(page.getByText(/[A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}( \d{4})?, \d{1,2}:\d\d(am|pm) AWST/).first()).toBeVisible();
+  // 9001 AC3: the slot is written out, "Thu 15 Oct, 8:00am" -- never a date in numbers.
+  await expect(page.getByText(/[A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}( \d{4})?, \d{1,2}:\d\d(am|pm)/).first()).toBeVisible();
   await expect(page.getByText("14 Marine Terrace, Fremantle")).toBeVisible();
   // No site contact on this job: the customer's name is who to ask for.
   await expect(page.getByText("Site contact", { exact: true })).toBeVisible();

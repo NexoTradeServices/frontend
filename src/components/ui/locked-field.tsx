@@ -8,7 +8,7 @@
 // price shown is the price billed").
 export function LockedField({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
-    <div className="mb-3.5">
+    <div className="mb-3.5" data-testid="locked-field">
       <label className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase">
         {label}
       </label>

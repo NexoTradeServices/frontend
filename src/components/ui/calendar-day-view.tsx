@@ -22,8 +22,6 @@ export interface DayBlock {
   kind: "booked" | "hold" | "other";
 }
 
-const DAY_START = 360; // 6:00am
-const DAY_END = 1290; // 9:30pm
 const ROW_HEIGHT = 44; // px -- one half-hour row, the tap-target floor
 
 export function timeLabelFor(minutes: number): string {
@@ -34,43 +32,75 @@ export function timeLabelFor(minutes: number): string {
   return `${String(h12)}:${String(m).padStart(2, "0")}${period}`;
 }
 
-function topOf(minutes: number): number {
-  return ((minutes - DAY_START) / 30) * ROW_HEIGHT;
+function topOf(minutes: number, dayStart: number): number {
+  return ((minutes - dayStart) / 30) * ROW_HEIGHT;
 }
 
 export function CalendarDayView({
   dayLabel,
   blocks,
+  notAvailable = [],
   proposedStart,
   proposedEnd,
   onPickHalfHour,
   onStepDay,
+  openMinutes,
+  closeMinutes,
+  lastStartMinutes,
+  zoneLabel,
   loading = false,
+  allowNotAvailable = false,
 }: {
   /** e.g. "Bob's Mon 14 Sep" -- the caller composes it, this component only draws the grid. */
   dayLabel: string;
   blocks: DayBlock[];
+  /** Feature 2004: runs the contractor has switched off (minutes from midnight); drawn grey behind the blocks. */
+  notAvailable?: { startMinutes: number; endMinutes: number }[];
   proposedStart: number;
   proposedEnd: number;
   onPickHalfHour: (minutes: number) => void;
   onStepDay: (delta: -1 | 1) => void;
+  /** The rows run from the opening time to the closing time read from settings (Calendar & Scheduling / Opening hours), never a fixed range. */
+  openMinutes: number;
+  closeMinutes: number;
+  /** The latest half hour a start can be tapped at (closing time minus the hold); later rows are greyed and cannot be tapped. */
+  lastStartMinutes?: number;
+  /** e.g. "NSW time": the state's clock the grid is drawn in, shown on the job's own block so the office sees which clock it is. */
+  zoneLabel?: string;
   loading?: boolean;
+  /** Feature 5002: the contractor's own picker may still tap time they switched off (booking it switches it on). */
+  allowNotAvailable?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollTop = Math.max(0, topOf(proposedStart) - ROW_HEIGHT * 2);
+    el.scrollTop = Math.max(0, topOf(proposedStart, openMinutes) - ROW_HEIGHT * 2);
     // Opens at the slot in hand when the day changes -- not re-jumped on
     // every half-hour tap within the same day (the person is scrolled where
     // they are working).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dayLabel]);
 
+  // A start is closed when the hold from there would run into a job (booked, in progress, to answer, a hold) or a switched-off time.
+  const holdLength = proposedEnd - proposedStart;
+  const takenStart = (from: number) =>
+    blocks.some((block) => block.startMinutes < from + holdLength && block.endMinutes > from) ||
+    (!allowNotAvailable && notAvailable.some((run) => run.startMinutes < from + holdLength && run.endMinutes > from));
   const clashes = blocks.some((block) => block.startMinutes < proposedEnd && block.endMinutes > proposedStart);
+  // Feature 5002: on the contractor's own picker, time he picks over turns Available in the picture (booking makes it so);
+  // everywhere else the grey stays under the proposal.
+  const shownOff = allowNotAvailable
+    ? notAvailable.flatMap((run) => {
+        const pieces: { startMinutes: number; endMinutes: number }[] = [];
+        if (run.startMinutes < proposedStart) pieces.push({ startMinutes: run.startMinutes, endMinutes: Math.min(run.endMinutes, proposedStart) });
+        if (run.endMinutes > proposedEnd) pieces.push({ startMinutes: Math.max(run.startMinutes, proposedEnd), endMinutes: run.endMinutes });
+        return run.endMinutes <= proposedStart || run.startMinutes >= proposedEnd ? [run] : pieces;
+      })
+    : notAvailable;
   const rows: number[] = [];
-  for (let m = DAY_START; m < DAY_END; m += 30) rows.push(m);
+  for (let m = openMinutes; m < closeMinutes; m += 30) rows.push(m);
 
   return (
     <div className="mt-2 rounded-card border border-hairline bg-surface p-3">
@@ -115,8 +145,9 @@ export function CalendarDayView({
                 <button
                   type="button"
                   onClick={() => onPickHalfHour(minutes)}
+                  disabled={(lastStartMinutes !== undefined && minutes > lastStartMinutes) || (takenStart(minutes) && minutes !== proposedStart)}
                   aria-label={`Start at ${timeLabelFor(minutes)}`}
-                  className={`h-11 border-t px-2 text-left hover:bg-secondary ${
+                  className={`h-11 border-t px-2 text-left enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:bg-ground ${
                     half ? "border-dashed border-hairline" : "border-hairline"
                   }`}
                 />
@@ -124,10 +155,25 @@ export function CalendarDayView({
             );
           })}
           <div className="pointer-events-none absolute inset-y-0 left-[58px] right-0">
+            {shownOff.map((run, index) => {
+              const start = Math.max(run.startMinutes, openMinutes);
+              const end = Math.min(run.endMinutes, closeMinutes);
+              if (end <= start) return null;
+              return (
+                <div
+                  key={`off-${String(run.startMinutes)}-${String(index)}`}
+                  data-testid="not-available-run"
+                  style={{ top: `${String(topOf(start, openMinutes))}px`, height: `${String(topOf(end, openMinutes) - topOf(start, openMinutes))}px` }}
+                  className="absolute inset-x-0 bg-not-available/80 px-2 pt-1 text-field-label font-semibold text-secondary-text"
+                >
+                  Not available
+                </div>
+              );
+            })}
             {blocks.map((block, index) => (
               <div
                 key={`${String(block.startMinutes)}-${String(index)}`}
-                style={{ top: `${String(topOf(block.startMinutes) + 2)}px`, height: `${String(topOf(block.endMinutes) - topOf(block.startMinutes) - 4)}px` }}
+                style={{ top: `${String(topOf(block.startMinutes, openMinutes) + 2)}px`, height: `${String(topOf(block.endMinutes, openMinutes) - topOf(block.startMinutes, openMinutes) - 4)}px` }}
                 className={`absolute inset-x-1.5 overflow-hidden rounded-small-box border px-2 py-1 text-xs ${
                   block.kind === "hold"
                     ? "border-dashed border-status-assigned bg-status-assigned-bg text-status-assigned"
@@ -139,13 +185,14 @@ export function CalendarDayView({
               </div>
             ))}
             <div
-              style={{ top: `${String(topOf(proposedStart) + 2)}px`, height: `${String(Math.max(topOf(proposedEnd) - topOf(proposedStart) - 4, ROW_HEIGHT - 4))}px` }}
+              style={{ top: `${String(topOf(proposedStart, openMinutes) + 2)}px`, height: `${String(Math.max(topOf(proposedEnd, openMinutes) - topOf(proposedStart, openMinutes) - 4, ROW_HEIGHT - 4))}px` }}
               className={`absolute inset-x-6 overflow-hidden rounded-small-box border-2 border-dashed px-2 py-1 text-xs font-semibold ${
                 clashes ? "border-brand-destructive bg-error-bg text-brand-destructive" : "border-brand-accent bg-brand-accent/10 text-ink"
               }`}
             >
               <b className="tabular-nums">
                 {timeLabelFor(proposedStart)}-{timeLabelFor(proposedEnd)}
+                {zoneLabel ? ` ${zoneLabel}` : ""}
               </b>{" "}
               This job{clashes ? " - clashes" : ""}
             </div>

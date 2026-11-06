@@ -11,18 +11,20 @@
 // then the job. All of the addresses are optional; the suburb fills itself from the address picked.
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Field } from "@/components/auth/field";
 import { Banner } from "@/components/auth/banner";
 import { PrimaryButton } from "@/components/auth/buttons";
 import { SelectField } from "@/components/ui/select-field";
 import { PlacesField, fullAddress, type PickedAddress, type PlatformSuburb } from "@/components/ui/places-field";
+import { Toast, useToast } from "@/components/ui/toast";
 import { LockedField } from "@/components/ui/locked-field";
 import { AdditionalQuestions } from "@/components/request-a-job/additional-questions";
 import { PriceBox } from "@/components/request-a-job/price-box";
 import { WINDOWS } from "@/components/request-a-job/request-a-job-form";
-import { isWeekendDate, todayYmd } from "@/components/request-a-job/money";
+import { isWeekendDate } from "@/components/request-a-job/money";
+import { holidayWords, stateOfPick, useStateClosed, usePublicHolidays, useStateToday } from "@/components/request-a-job/holidays";
 import type { FormDataDto, PreferredWindow } from "@/components/request-a-job/types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -46,7 +48,7 @@ type FieldKey =
   | "siteContactEmail";
 type Errors = Partial<Record<FieldKey, string>>;
 
-export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
+export function PhoneIntakeForm({ formData, businessToday }: { formData: FormDataDto; businessToday: string }) {
   const router = useRouter();
   const { serviceTypes } = formData;
 
@@ -55,7 +57,7 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
   const [trade, setTrade] = useState("");
   const [description, setDescription] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [preferredDate, setPreferredDate] = useState(todayYmd());
+  const [pickedDate, setPreferredDate] = useState<string | null>(null);
   const [preferredWindow, setPreferredWindow] = useState<PreferredWindow | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -78,7 +80,24 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
   const isBusiness = businessName.trim() !== "";
 
   const selectedType = useMemo(() => serviceTypes.find((t) => t.trade === trade) ?? null, [serviceTypes, trade]);
+  // Feature 1022: today is the job's state's today once the suburb is picked; until then the business clock's, from the page.
+  const stateToday = useStateToday(stateOfPick(effectiveSite ?? location, platformSuburb));
+  const today = stateToday ?? businessToday;
+  const preferredDate = pickedDate ?? today;
   const weekend = isWeekendDate(preferredDate);
+  // Feature 1020: a public holiday of the job's state is shown as the date's error and stops Save.
+  const holidays = usePublicHolidays(stateOfPick(effectiveSite ?? location, platformSuburb));
+  // Feature 1021: a closed state is said as soon as the place is picked, and Create job is held back.
+  const stateClosed = useStateClosed(effectiveSite ?? location, platformSuburb);
+  const closedStateName = stateOfPick(effectiveSite ?? location, platformSuburb);
+  const closedMessage = stateClosed && closedStateName !== null ? `${closedStateName} is not an operating state.` : undefined;
+  // The message is also a toast, so Mike notices it even when the suburb box is off screen.
+  const [toastMessage, showToast] = useToast();
+  useEffect(() => {
+    if (closedMessage !== undefined) showToast(closedMessage);
+  }, [closedMessage, showToast]);
+  const holidayName = holidays[preferredDate];
+  const holidayMessage = holidayName === undefined ? undefined : holidayWords(preferredDate, holidayName);
   const multiplier = selectedType
     ? weekend
       ? selectedType.serviceLevelMultipliers.weekend
@@ -96,6 +115,7 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
     if (trade === "") next.trade = "Pick a trade.";
     if (description.trim() === "") next.description = "Tell us what's happening.";
     if (preferredDate === "") next.preferredDate = "Pick a date.";
+    else if (holidayMessage !== undefined) next.preferredDate = holidayMessage;
     if (preferredWindow === null) next.preferredWindow = "Pick a time of day.";
     if (name.trim() === "") next.name = "Enter the customer's name.";
     if (!EMAIL_PATTERN.test(email.trim())) next.email = "Enter the customer's email address.";
@@ -396,6 +416,11 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
             }}
           />
         )}
+        {closedMessage !== undefined ? (
+          <div className="mt-2">
+            <Banner kind="error">{closedMessage}</Banner>
+          </div>
+        ) : null}
 
         <SelectField
           id="trade"
@@ -451,7 +476,7 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
             label="Date"
             required
             type="date"
-            min={todayYmd()}
+            min={today}
             value={preferredDate}
             onChange={(event) => {
               setPreferredDate(event.target.value);
@@ -459,6 +484,9 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
             }}
             error={errors.preferredDate}
           />
+          {holidayMessage !== undefined ? (
+            <Banner kind="warning">{holidayMessage}</Banner>
+          ) : (
           <fieldset className="mb-3.5">
             <legend className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']">
               Time of day
@@ -492,6 +520,7 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
               <p className="mt-[5px] text-xs text-brand-destructive">{errors.preferredWindow}</p>
             ) : null}
           </fieldset>
+          )}
         </div>
       </div>
 
@@ -506,9 +535,16 @@ export function PhoneIntakeForm({ formData }: { formData: FormDataDto }) {
         </div>
       ) : null}
 
-      <PrimaryButton size="compact" loading={submitting} loadingLabel="Creating...">
+      <PrimaryButton
+        size="compact"
+        loading={submitting}
+        loadingLabel="Creating..."
+        disabled={holidayMessage !== undefined || closedMessage !== undefined}
+        className="disabled:cursor-not-allowed disabled:bg-hairline disabled:text-muted-text"
+      >
         Create job
       </PrimaryButton>
+      <Toast message={toastMessage} />
     </form>
   );
 }
