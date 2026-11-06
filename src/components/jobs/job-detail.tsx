@@ -895,6 +895,53 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
   );
 }
 
+/**
+ * Feature 5002: where the office looks for a return visit. While the job waits (on hold) it is the one card that
+ * asks for the office, in the Needs attention colours, with the Reason, Bob's note and the Primary that books it;
+ * once booked it stays as the record of why the job came back.
+ */
+function ReturnVisitCard({ job }: { job: JobDetail }) {
+  const visit = job.returnVisit;
+  if (visit === null) return null;
+  const waiting = job.status === "on_hold";
+  return (
+    <section
+      data-testid="return-visit-facts"
+      className={`rounded-card border p-5 ${waiting ? "border-brand-warning/30 bg-warning-bg" : "border-hairline bg-surface"}`}
+    >
+      <h2 className="font-heading text-base font-extrabold text-ink">
+        Return visit
+        <span className="ml-2 align-middle">
+          <Tag tone={waiting ? "warning" : "neutral"}>{waiting ? "Needs booking" : "Booked"}</Tag>
+        </span>
+      </h2>
+      <div className="mt-3.5 grid gap-3">
+        <Fact label="Status">{job.contractor?.standing ?? (waiting ? "On hold - no return date yet" : "")}</Fact>
+        <Fact label="Reason">
+          {visit.reasonLabel}
+          {visit.otherText ? <span className="font-normal text-secondary-text"> - {visit.otherText}</span> : null}
+        </Fact>
+        {visit.officeNote ? (
+          <Fact label="Note for the office">
+            <p className="max-w-[62ch] font-normal whitespace-pre-wrap">{visit.officeNote}</p>
+          </Fact>
+        ) : null}
+        <Fact label="Asked for by">
+          {visit.byName} <span className="font-normal text-muted-text">- {visit.atLabel}</span>
+        </Fact>
+      </div>
+      {job.actions.bookReturn ? (
+        <PrimaryLink
+          href={`/ops/jobs/${encodeURIComponent(job.reference)}/dispatch?mode=return`}
+          className="mt-3.5 md:inline-block md:min-h-11 md:w-auto md:px-[18px] md:py-2.5"
+        >
+          Book return visit
+        </PrimaryLink>
+      ) : null}
+    </section>
+  );
+}
+
 function ContractorCard({
   job,
   onChanged,
@@ -943,27 +990,6 @@ function ContractorCard({
       ) : (
         <p className="text-small text-muted-text">Not dispatched yet.</p>
       )}
-      {job.returnVisit ? (
-        <div className="mt-3.5 grid gap-3 border-t border-hairline pt-3.5" data-testid="return-visit-facts">
-          <Fact label="Reason">
-            {job.returnVisit.reasonLabel}
-            {job.returnVisit.otherText ? <span className="font-normal text-secondary-text"> - {job.returnVisit.otherText}</span> : null}
-          </Fact>
-          {job.returnVisit.officeNote ? (
-            <Fact label="Note for the office">
-              <p className="max-w-[62ch] font-normal whitespace-pre-wrap">{job.returnVisit.officeNote}</p>
-            </Fact>
-          ) : null}
-        </div>
-      ) : null}
-      {job.actions.bookReturn ? (
-        <PrimaryLink
-          href={`/ops/jobs/${encodeURIComponent(job.reference)}/dispatch?mode=return`}
-          className="mt-3 md:inline-block md:min-h-11 md:w-auto md:px-[18px] md:py-2.5"
-        >
-          Book return visit
-        </PrimaryLink>
-      ) : null}
       <EarlierBookings bookings={job.earlierBookings} />
       <JobActions job={job} onChanged={onChanged} />
     </Card>
@@ -2652,7 +2678,8 @@ export function JobDetailView({ initial }: { initial: JobDetail }) {
             actual dependency (no address, no dispatch). Desktop's two-column
             arrangement (Request+Contractor+Messages+Notes left, Rating+Customer+Addresses
             right) rides the explicit xl: column/row placement. */}
-        <div className="order-1 min-w-0 xl:order-none xl:col-start-1 xl:row-start-1">
+        <div className="order-1 grid min-w-0 gap-4 xl:order-none xl:col-start-1 xl:row-start-1">
+          <ReturnVisitCard job={job} />
           <RequestCard
             job={job}
             editing={editing}
