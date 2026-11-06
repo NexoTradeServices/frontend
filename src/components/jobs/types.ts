@@ -212,7 +212,7 @@ export interface JobDetail {
   /** Feature 4003: every booking on the job but the one in play, newest first. */
   earlierBookings: EarlierBooking[];
   /** Feature 4006: which of Reschedule, Reassign and Cancel job the page offers. */
-  actions: { reschedule: boolean; takeOff: boolean; cancel: boolean };
+  actions: { reschedule: boolean; takeOff: boolean; cancel: boolean; hold: boolean; bookReturn: boolean };
   /** Feature 6004: the root original's reference when this job is a callback, else null. */
   callbackOn: string | null;
   /** Feature 6004: this job's callbacks, oldest first. */
@@ -221,6 +221,8 @@ export interface JobDetail {
   canRaiseCallback: boolean;
   /** Feature 6004: Mark no-show is offered on a scheduled or in-progress job. */
   canMarkNoShow: boolean;
+  /** Feature 5002: why the job is on hold or has a return visit; null when it never had one. */
+  returnVisit: { reasonLabel: string; otherText: string | null; officeNote: string | null; byName: string; atLabel: string } | null;
   /** Feature 4006: set once the job is cancelled. */
   cancelled: { reasonLabel: string; note: string | null; byName: string; atLabel: string } | null;
   /** Feature 4002, AC29: the level and its price, once the job is dispatched. */

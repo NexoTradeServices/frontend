@@ -18,7 +18,7 @@ export interface DispatchFacts {
   openingTime: string;
   closingTime: string;
   /** Feature 4006: "reschedule" fixes the contractor who holds the booking; absent at dispatch. */
-  mode?: "reschedule";
+  mode?: "reschedule" | "return";
   contractor?: { code: string; name: string; firstName: string };
 }
 

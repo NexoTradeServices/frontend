@@ -1,0 +1,199 @@
+// The Return visit card -- Feature 5002, Organisms / Calendar and charts (Return visit card) with the Calendar day.
+//
+// Bob's "Book a return visit": a required Reason (Part on order, More time needed, Other with its words), then either
+// Pick a time (a date, how long, and a tap on his own day) or Not yet (with an optional note for the office). The card
+// only collects the answers; the bottom bar's Confirm return visit / Put on hold sends them with the screen's times,
+// notes and parts. Time he has switched off is still tappable -- booking it switches it on, and the card says so.
+"use client";
+
+import { useEffect, useState } from "react";
+import { Banner } from "@/components/auth/banner";
+import { Field } from "@/components/auth/field";
+import { SelectField } from "@/components/ui/select-field";
+import { CalendarDayView, timeLabelFor, type DayBlock } from "@/components/ui/calendar-day-view";
+import { formatDateWithDay } from "@/lib/date-format";
+
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+
+export type ReturnReasonValue = "" | "part_on_order" | "more_time_needed" | "other";
+
+export interface ReturnDraft {
+  reason: ReturnReasonValue;
+  otherText: string;
+  choice: "" | "pick" | "notyet";
+  officeNote: string;
+  date: string;
+  startMinutes: number;
+  /** true once he has tapped a half hour: the default start is only where the picture begins. */
+  startPicked: boolean;
+  holdMinutes: number;
+}
+
+interface DayData {
+  blocks: DayBlock[];
+  notAvailable: { startMinutes: number; endMinutes: number }[];
+  closed: string | null;
+  openingTime: string;
+  closingTime: string;
+}
+
+const minutesOfClock = (clock: string): number => Number(clock.slice(0, 2)) * 60 + Number(clock.slice(3, 5));
+const holdOptions = Array.from({ length: 15 }, (_, i) => {
+  const minutes = 60 + i * 30;
+  const hours = Math.floor(minutes / 60);
+  const label = `${String(hours)}${minutes % 60 === 0 ? "" : ".5"} hour${minutes === 60 ? "" : "s"}`;
+  return { value: String(minutes), label };
+});
+
+/** A date as YYYY-MM-DD in the job's zone, `plus` days from today. */
+export function dayInZone(zone: string, plus: number): string {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: zone }).format(new Date());
+  return new Date(Date.parse(`${today}T00:00:00Z`) + plus * 86_400_000).toISOString().slice(0, 10);
+}
+
+export function emptyDraft(zone: string): ReturnDraft {
+  return { reason: "", otherText: "", choice: "", officeNote: "", date: dayInZone(zone, 1), startMinutes: 480, startPicked: false, holdMinutes: 60 };
+}
+
+/** Are the required answers in? (The bottom bar's Primary is greyed until they are.) */
+export function draftReady(draft: ReturnDraft, day: { closed: string | null } | null): boolean {
+  if (draft.reason === "" || (draft.reason === "other" && draft.otherText.trim() === "") || draft.choice === "") return false;
+  if (draft.choice === "notyet") return true;
+  return draft.startPicked && draft.date !== "" && (day === null || day.closed === null);
+}
+
+export function ReturnVisitCard({
+  reference,
+  zone,
+  draft,
+  onChange,
+  error,
+  onDay,
+}: {
+  reference: string;
+  zone: string;
+  draft: ReturnDraft;
+  onChange: (next: ReturnDraft) => void;
+  /** The server's refusal, shown above the day. */
+  error?: string;
+  /** Tells the screen what the day says (a holiday), so it can grey the Primary. */
+  onDay?: (day: { closed: string | null } | null) => void;
+}) {
+  const [day, setDay] = useState<DayData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const set = (changes: Partial<ReturnDraft>) => onChange({ ...draft, ...changes });
+
+  useEffect(() => {
+    if (draft.choice !== "pick" || draft.date === "") return;
+    let live = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the day is read from the server when the date changes
+    setLoading(true);
+    void fetch(`${apiUrl}/api/contractor/jobs/${encodeURIComponent(reference)}/day?date=${draft.date}`, { credentials: "include" })
+      .then((res) => (res.ok ? (res.json() as Promise<DayData>) : null))
+      .then((body) => {
+        if (!live) return;
+        setDay(body);
+        onDay?.(body);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (live) setLoading(false);
+      });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reference, draft.choice, draft.date]);
+
+  const open = day === null ? 420 : minutesOfClock(day.openingTime);
+  const close = day === null ? 1140 : minutesOfClock(day.closingTime);
+  const end = draft.startMinutes + draft.holdMinutes;
+  const overlapsOff = day !== null && day.notAvailable.some((run) => run.startMinutes < end && run.endMinutes > draft.startMinutes && run.startMinutes < close && run.endMinutes > open);
+
+  function stepDay(delta: -1 | 1) {
+    set({ date: new Date(Date.parse(`${draft.date}T00:00:00Z`) + delta * 86_400_000).toISOString().slice(0, 10), startPicked: false });
+  }
+
+  return (
+    <div className="rounded-card border border-hairline bg-surface p-4 sm:p-5" data-testid="return-visit-card">
+      <h3 className="mb-3.5 font-heading text-base font-extrabold text-ink">Return visit</h3>
+      <SelectField
+        label="Reason"
+        id="rv-reason"
+        required
+        value={draft.reason}
+        onChange={(e) => set({ reason: e.target.value as ReturnReasonValue })}
+        options={[
+          { value: "", label: "Pick a reason" },
+          { value: "part_on_order", label: "Part on order" },
+          { value: "more_time_needed", label: "More time needed" },
+          { value: "other", label: "Other" },
+        ]}
+      />
+      {draft.reason === "other" ? (
+        <Field label="What is it?" id="rv-other" required value={draft.otherText} onChange={(e) => set({ otherText: e.target.value })} />
+      ) : null}
+      <SelectField
+        label="Return date"
+        id="rv-choice"
+        required
+        value={draft.choice}
+        onChange={(e) => set({ choice: e.target.value as ReturnDraft["choice"] })}
+        options={[
+          { value: "", label: "Pick one" },
+          { value: "pick", label: "Pick a time" },
+          { value: "notyet", label: "Not yet" },
+        ]}
+      />
+      {draft.choice === "notyet" ? (
+        <div className="mb-3.5">
+          <label htmlFor="rv-note" className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase">
+            Note for the office
+          </label>
+          <textarea
+            id="rv-note"
+            rows={3}
+            value={draft.officeNote}
+            onChange={(e) => set({ officeNote: e.target.value })}
+            className="w-full rounded-button border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
+          />
+          <p className="mt-[5px] text-xs text-muted-text">The office will book the return and tell the customer.</p>
+        </div>
+      ) : null}
+      {draft.choice === "pick" ? (
+        <>
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <Field label="Day" id="rv-date" type="date" value={draft.date} onChange={(e) => set({ date: e.target.value, startPicked: false })} />
+            <SelectField label="How long?" id="rv-hold" value={String(draft.holdMinutes)} onChange={(e) => set({ holdMinutes: Number(e.target.value) })} options={holdOptions} />
+          </div>
+          {error ? <Banner kind="error">{error}</Banner> : null}
+          {day?.closed ? (
+            <Banner kind="error">
+              We&apos;re closed on {formatDateWithDay(draft.date, zone)} for {day.closed}. Pick another date.
+            </Banner>
+          ) : null}
+          {overlapsOff && !day?.closed ? <Banner kind="warning">You marked this time Not available. Booking will make it available.</Banner> : null}
+          <CalendarDayView
+            dayLabel={`Your ${formatDateWithDay(draft.date, zone)}`}
+            blocks={day?.blocks ?? []}
+            notAvailable={day?.notAvailable ?? []}
+            allowNotAvailable
+            proposedStart={draft.startMinutes}
+            proposedEnd={end}
+            onPickHalfHour={(minutes) => set({ startMinutes: minutes, startPicked: true })}
+            onStepDay={stepDay}
+            openMinutes={open}
+            closeMinutes={close}
+            lastStartMinutes={close - draft.holdMinutes}
+            loading={loading}
+          />
+          <p className="mt-2 text-small text-secondary-text">
+            {draft.startPicked ? `Return visit: ${timeLabelFor(draft.startMinutes)} to ${timeLabelFor(end)}.` : "Tap a half hour for the start."}
+          </p>
+        </>
+      ) : error ? (
+        <Banner kind="error">{error}</Banner>
+      ) : null}
+    </div>
+  );
+}

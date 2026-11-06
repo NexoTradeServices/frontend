@@ -33,6 +33,8 @@ import { billedHoursOf, formatHours } from "@/lib/billed-hours";
 import { centsToDollarsText, dollarsTextToCents } from "@/lib/visit-format";
 import { formatDollars } from "@/components/request-a-job/money";
 import { OnMyWayButton, OnMyWaySent, ON_MY_WAY_FAILED, postOnMyWay } from "@/components/contractor-dashboard/on-my-way";
+import { Banner } from "@/components/auth/banner";
+import { ReturnVisitCard, draftReady, emptyDraft, type ReturnDraft } from "./return-visit-card";
 import type { ApiError, ContractorJobDto, PaymentDto } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -342,8 +344,16 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
   const [toastMessage, showToast] = useToast();
   const paymentRef = useRef<HTMLDivElement>(null);
   const [scrollToPayment, setScrollToPayment] = useState(false);
+  // Feature 5002: the Return visit card (opened by Book a return visit) and what the last booking said.
+  const [returning, setReturning] = useState(false);
+  const [draft, setDraft] = useState<ReturnDraft>(() => emptyDraft(initial.timezone));
+  const [dayState, setDayState] = useState<{ closed: string | null } | null>(null);
+  const [returnError, setReturnError] = useState<string | undefined>();
+  const [bookedLabel, setBookedLabel] = useState<string | null>(null);
+  const returnRef = useRef<HTMLDivElement>(null);
 
   const frozen = job.frozen;
+  const onHold = job.jobStatus === "on_hold";
   const isCallback = job.callbackOn !== null;
   const changed = snapshotOf(rows, notes, parts, pick) !== saved;
   const uploading = parts.some((part) => part.uploading);
@@ -502,6 +512,65 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
     }
   }
 
+  /** Book a return visit: nothing is saved. A time for today first, then the card opens and the page scrolls to it. */
+  function openReturn() {
+    setBanner(undefined);
+    setReturnError(undefined);
+    setBookedLabel(null);
+    const problems = check(false);
+    const today = emptyDraft(job.timezone).date; // tomorrow in the job's zone; today is one day before
+    const todayText = new Date(Date.parse(`${today}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+    if (!rows.some((row) => !isBlankRow(row) && row.date === todayText)) problems["rows"] = "Enter today's time on site first.";
+    setErrors(problems);
+    if (Object.keys(problems).length > 0) return;
+    setReturning(true);
+    setTimeout(() => returnRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
+
+  /** Confirm return visit / Put on hold: the screen's times, notes and parts go with the booking, in one go. */
+  async function sendReturn() {
+    setBanner(undefined);
+    setReturnError(undefined);
+    const problems = check(false);
+    setErrors(problems);
+    if (Object.keys(problems).length > 0) return;
+    const { body, entryAt, partAt } = buildRequest();
+    setBusy("save");
+    try {
+      const res = await fetch(`${apiUrl}/api/contractor/jobs/${encodeURIComponent(job.reference)}/return-visit`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...body,
+          reason: draft.reason,
+          otherText: draft.reason === "other" ? draft.otherText : undefined,
+          ...(draft.choice === "notyet"
+            ? { notYet: true, officeNote: draft.officeNote }
+            : { slot: { date: draft.date, startMinutes: draft.startMinutes, holdMinutes: draft.holdMinutes } }),
+        }),
+      });
+      const payload = (await res.json()) as ContractorJobDto & ApiError & { returnBooked?: { label: string } | null };
+      if (!res.ok) {
+        if (payload.field === "startMinutes" || payload.field === "slot" || payload.field === "date" || payload.field === "holdMinutes" || payload.field === "status") setReturnError(payload.error);
+        else if (payload.field === "reason" || payload.field === "otherText") setReturnError(payload.error);
+        else place(payload, entryAt, partAt);
+        return;
+      }
+      adopt(payload);
+      setReturning(false);
+      setDraft(emptyDraft(job.timezone));
+      setDayState(null);
+      if (payload.returnBooked) setBookedLabel(payload.returnBooked.label);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      router.refresh();
+    } catch {
+      setBanner("Save failed - check your connection and try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function onSite() {
     setBanner(undefined);
     setBusy("onsite");
@@ -598,6 +667,20 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
           <p role="alert" className="col-span-full rounded-button border border-error-border bg-error-bg px-3 py-2.5 text-small text-brand-destructive">
             {banner}
           </p>
+        ) : null}
+        {bookedLabel !== null ? (
+          <div className="col-span-full" data-testid="return-booked">
+            <Banner kind="success">
+              Return visit booked for {bookedLabel}. {firstNameOf(job.customerName)} has been told by email and text.
+            </Banner>
+          </div>
+        ) : null}
+        {onHold ? (
+          <div className="col-span-full" data-testid="on-hold-banner">
+            <Banner kind="warning">
+              <b>On hold.</b> The office will book the return visit and tell {firstNameOf(job.customerName)}. You can still save your notes.
+            </Banner>
+          </div>
         ) : null}
 
         <div className="order-1 flex min-w-0 flex-col gap-4 xl:col-start-2 xl:row-start-1 xl:row-span-3">
@@ -871,6 +954,21 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               </button>
             ) : null}
           </Card>
+          {returning ? (
+            <div ref={returnRef} className="scroll-mt-4">
+              <ReturnVisitCard
+                reference={job.reference}
+                zone={job.timezone}
+                draft={draft}
+                onChange={(next) => {
+                  setReturnError(undefined);
+                  setDraft(next);
+                }}
+                error={returnError}
+                onDay={setDayState}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -882,29 +980,69 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                 Not saved yet
               </span>
             ) : null}
-            <button
-              type="button"
-              onClick={() => void send(false)}
-              disabled={!changed || busy !== null || uploading}
-              className={`min-h-[52px] flex-1 rounded-button px-4 text-sm font-bold md:min-h-11 md:flex-none ${
-                changed ? "border border-hairline bg-surface text-ink" : "bg-hairline text-muted-text"
-              } disabled:cursor-not-allowed`}
-            >
-              {busy === "save" ? "Saving..." : "Save"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const problems = check(true);
-                setErrors(problems);
-                setBanner(undefined);
-                if (Object.keys(problems).length === 0) setConfirming(true);
-              }}
-              disabled={busy !== null || uploading}
-              className="min-h-[52px] flex-[2] rounded-button bg-brand-success px-4 text-sm font-bold text-on-accent disabled:opacity-50 md:min-h-11 md:flex-none"
-            >
-              Complete job
-            </button>
+            {returning ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReturning(false);
+                    setReturnError(undefined);
+                  }}
+                  disabled={busy !== null}
+                  className="min-h-[52px] flex-1 rounded-button border border-hairline bg-surface px-4 text-sm font-bold text-ink md:min-h-11 md:flex-none"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void sendReturn()}
+                  disabled={!draftReady(draft, dayState) || busy !== null || uploading}
+                  className={`min-h-[52px] flex-[2] rounded-button px-4 text-sm font-bold md:min-h-11 md:flex-none ${
+                    draftReady(draft, dayState) ? "bg-brand-accent text-on-accent" : "bg-hairline text-muted-text"
+                  } disabled:cursor-not-allowed`}
+                >
+                  {busy === "save" ? "Saving..." : draft.choice === "notyet" ? "Put on hold" : "Confirm return visit"}
+                </button>
+              </>
+            ) : (
+              <>
+                {job.canBookReturn ? (
+                  <button
+                    type="button"
+                    onClick={openReturn}
+                    disabled={busy !== null || uploading}
+                    className="min-h-[52px] w-full rounded-button border border-brand-accent bg-surface px-4 text-sm font-bold text-brand-accent disabled:opacity-50 md:min-h-11 md:w-auto"
+                  >
+                    Book a return visit
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void send(false)}
+                  disabled={!changed || busy !== null || uploading}
+                  className={`min-h-[52px] flex-1 rounded-button px-4 text-sm font-bold md:min-h-11 md:flex-none ${
+                    changed ? "border border-hairline bg-surface text-ink" : "bg-hairline text-muted-text"
+                  } disabled:cursor-not-allowed`}
+                >
+                  {busy === "save" ? "Saving..." : "Save"}
+                </button>
+                {onHold ? null : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const problems = check(true);
+                      setErrors(problems);
+                      setBanner(undefined);
+                      if (Object.keys(problems).length === 0) setConfirming(true);
+                    }}
+                    disabled={busy !== null || uploading}
+                    className="min-h-[52px] flex-[2] rounded-button bg-brand-success px-4 text-sm font-bold text-on-accent disabled:opacity-50 md:min-h-11 md:flex-none"
+                  >
+                    Complete job
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </div>
       ) : null}

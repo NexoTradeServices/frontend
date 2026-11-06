@@ -15,6 +15,8 @@
 // 6002 AC10 with the QR code open, the customer paying turns the card to "Paid - nothing more to
 //      collect." within seconds, without a reload; the QR button goes, the total stays
 //
+// 5002 (at the end of this file): Book a return visit, Not yet / Put on hold, Back
+//
 // AC1-AC3, AC5, AC8 and AC9 are proven in the backend (tests/contractor-job.test.ts,
 // tests/billed-hours.test.ts, tests/ops-jobs.test.ts); the browser proves what needs one.
 //
@@ -332,5 +334,93 @@ test.describe("Bob's job screen, on a phone", () => {
     await pickTime(page, "#entry-0-end", "11:05am");
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByText(`Saved ${job.reference}.`)).toBeVisible();
+  });
+});
+
+// Feature 5002 -- Book a return visit, on Bob's phone.
+//
+// AC1  the bottom bar offers Save, Book a return visit and Complete job
+// AC2  Book a return visit saves nothing: no time for today -> "Enter today's time on site first."; otherwise the card opens
+// AC3  the Primary stays greyed until the Reason and the return choice are in
+// AC4  Pick a time then Confirm return visit books it and shows the banner
+// AC5  Not yet then Put on hold: the On hold banner, Save only
+// AC6  Back closes the card with nothing booked and what was typed kept
+const todayPerth = (): string => new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Perth" }).format(new Date());
+
+test.describe("Bob's return visit, on a phone", () => {
+  test.use(MOBILE_VIEWPORT);
+
+  test("5002 AC1, AC2, AC3, AC6: the bar has three buttons; no time today is refused; the card opens, greys its Primary, and Back keeps what was typed", async ({
+    page,
+    browser,
+    request,
+  }) => {
+    const job = await acceptedJobForBob(browser, request, "rv1");
+    await openJobScreen(page, job);
+
+    for (const name of ["Save", "Book a return visit", "Complete job"]) await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+
+    // AC2: nothing typed yet -> the words, no card
+    await page.getByRole("button", { name: "Book a return visit" }).click();
+    await expect(page.getByText("Enter today's time on site first.")).toBeVisible();
+    await expect(page.getByTestId("return-visit-card")).toHaveCount(0);
+
+    // a time for today opens the card
+    await page.locator("#entry-0-date").fill(todayPerth());
+    await pickTime(page, "#entry-0-start", "9:00am");
+    await pickTime(page, "#entry-0-end", "10:00am");
+    await page.getByRole("button", { name: "Book a return visit" }).click();
+    await expect(page.getByTestId("return-visit-card")).toBeVisible();
+
+    // AC3: greyed until both answers are in
+    const confirm = page.getByRole("button", { name: "Confirm return visit" });
+    await expect(confirm).toBeDisabled();
+    await page.getByLabel("Reason").selectOption("part_on_order");
+    await expect(confirm).toBeDisabled();
+    await page.getByLabel("Return date").selectOption("pick");
+    await expect(confirm).toBeDisabled(); // a time still has to be tapped
+
+    // AC6: Back closes the card, nothing booked, the typed time stays
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await expect(page.getByTestId("return-visit-card")).toHaveCount(0);
+    await expect(page.locator("#entry-0-date")).toHaveValue(todayPerth());
+    const saved = await page.request.get(`${process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au"}/api/contractor/jobs/${job.reference}`);
+    expect(((await saved.json()) as { timeEntries: unknown[] }).timeEntries).toHaveLength(0); // nothing was saved by Back
+  });
+
+  test("5002 AC4: Pick a time then Confirm return visit books it, saves the visit and shows the banner", async ({ page, browser, request }) => {
+    const job = await acceptedJobForBob(browser, request, "rv2");
+    await openJobScreen(page, job);
+    await page.locator("#entry-0-date").fill(todayPerth());
+    await pickTime(page, "#entry-0-start", "9:00am");
+    await pickTime(page, "#entry-0-end", "10:00am");
+    await page.getByRole("button", { name: "Book a return visit" }).click();
+    await page.getByLabel("Reason").selectOption("more_time_needed");
+    await page.getByLabel("Return date").selectOption("pick");
+    await page.getByRole("button", { name: "Start at 1:00pm" }).click();
+    await page.getByRole("button", { name: "Confirm return visit" }).click();
+    await expect(page.getByTestId("return-booked")).toContainText(/Return visit booked for .* 1:00pm\. .* has been told by email and text\./);
+    await expect(page.getByTestId("return-visit-card")).toHaveCount(0);
+    // the visit he typed was saved with the booking
+    await page.reload();
+    await expect(page.locator("#entry-0-date")).toHaveValue(todayPerth());
+  });
+
+  test("5002 AC5: Not yet then Put on hold shows the On hold banner and leaves Save only", async ({ page, browser, request }) => {
+    const job = await acceptedJobForBob(browser, request, "rv3");
+    await openJobScreen(page, job);
+    await page.locator("#entry-0-date").fill(todayPerth());
+    await pickTime(page, "#entry-0-start", "9:00am");
+    await pickTime(page, "#entry-0-end", "10:00am");
+    await page.getByRole("button", { name: "Book a return visit" }).click();
+    await page.getByLabel("Reason").selectOption("other");
+    await page.getByLabel("What is it?").fill("Waiting on the owner's tiles");
+    await page.getByLabel("Return date").selectOption("notyet");
+    await page.getByLabel("Note for the office").fill("Owner says Friday.");
+    await page.getByRole("button", { name: "Put on hold" }).click();
+    await expect(page.getByTestId("on-hold-banner")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Book a return visit" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Complete job" })).toHaveCount(0);
   });
 });

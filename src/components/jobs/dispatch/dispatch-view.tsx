@@ -133,14 +133,16 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
   // job on a 5:30pm close starts at the last start that fits). A reschedule keeps the booked slot as is.
   const [startMinutes, setStartMinutes] = useState(() => {
     const wanted = initial.defaults.startMinutes;
-    if (initial.mode === "reschedule") return wanted;
+    if (initial.mode === "reschedule" || initial.mode === "return") return wanted;
     const allowed = startTimesWithin(minutesOfClock(initial.openingTime), minutesOfClock(initial.closingTime));
     if (allowed.length === 0 || allowed.includes(wanted)) return wanted;
     return allowed.reduce((best, m) => (Math.abs(m - wanted) < Math.abs(best - wanted) ? m : best), allowed[0] ?? wanted);
   });
   const [holdMinutes, setHoldMinutes] = useState(initial.defaults.holdMinutes);
   const [emergency, setEmergency] = useState(false);
-  const reschedule = initial.mode === "reschedule" && initial.contractor !== undefined;
+  // Feature 5002: a return visit is a reschedule-shaped page -- the contractor is fixed -- that books a second block.
+  const returning = initial.mode === "return" && initial.contractor !== undefined;
+  const reschedule = (initial.mode === "reschedule" || initial.mode === "return") && initial.contractor !== undefined;
   const fixedFirstName = initial.contractor?.firstName ?? "";
   const [pickedCode, setPickedCode] = useState<string | null>(reschedule ? (initial.contractor?.code ?? null) : null);
   const [candidates, setCandidates] = useState<CandidatesResponse | null>(null);
@@ -183,7 +185,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
         startMinutes: String(startMinutes),
         holdMinutes: String(holdMinutes),
         emergency: String(emergency),
-        ...(reschedule ? { mode: "reschedule" } : {}),
+        ...(reschedule ? { mode: returning ? "return" : "reschedule" } : {}),
       });
       fetch(`${apiUrl}/api/jobs/${encodeURIComponent(initial.reference)}/dispatch/candidates?${params.toString()}`, {
         credentials: "include",
@@ -203,7 +205,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [initial.reference, date, startMinutes, holdMinutes, emergency, reschedule, refreshTick]);
+  }, [initial.reference, date, startMinutes, holdMinutes, emergency, reschedule, returning, refreshTick]);
 
   useEffect(() => {
     let cancelled = false;
@@ -214,7 +216,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
         return;
       }
       setDayLoading(true);
-      const ignore = reschedule ? `&ignoreJob=${encodeURIComponent(initial.reference)}` : "";
+      const ignore = reschedule && !returning ? `&ignoreJob=${encodeURIComponent(initial.reference)}` : "";
       fetch(`${apiUrl}/api/contractors/${encodeURIComponent(pickedCode)}/day?date=${date}&job=${encodeURIComponent(initial.reference)}${ignore}`, { credentials: "include" })
         .then((res) => (res.ok ? (res.json() as Promise<{ blocks: DayBlock[]; notAvailable?: { startMinutes: number; endMinutes: number }[] }>) : null))
         .then((body) => {
@@ -237,7 +239,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [pickedCode, date, reschedule, initial.reference, refreshTick]);
+  }, [pickedCode, date, reschedule, returning, initial.reference, refreshTick]);
 
   const allRows = candidates ? [...candidates.serves, ...candidates.outside] : [];
   const pickedRow = allRows.find((row) => row.code === pickedCode) ?? null;
@@ -278,7 +280,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
     setDispatching(true);
     setDispatchError(undefined);
     try {
-      const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(initial.reference)}/${reschedule ? "reschedule" : "dispatch"}`, {
+      const res = await fetch(`${apiUrl}/api/jobs/${encodeURIComponent(initial.reference)}/${returning ? "return-visit" : reschedule ? "reschedule" : "dispatch"}`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -294,14 +296,14 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
         setDispatchError(
           res.status === 409 && payload.error?.startsWith("Not available at that time")
             ? `${pickedRow.name.split(" ")[0] ?? pickedRow.name} has just switched that time off. Nothing was sent. Pick a free time (the grey hours are off) or another contractor.`
-            : (payload.error ?? (reschedule ? "Reschedule failed." : "Dispatch failed.")),
+            : (payload.error ?? (returning ? "Booking the return visit failed." : reschedule ? "Reschedule failed." : "Dispatch failed.")),
         );
         setRefreshTick((tick) => tick + 1); // the list may have changed under Mike (a time switched off, a clash)
         return;
       }
       router.push(`/ops/jobs/${encodeURIComponent(initial.reference)}?toast=${encodeURIComponent(payload.toast ?? "")}`);
     } catch {
-      setDispatchError(`${reschedule ? "Reschedule" : "Dispatch"} failed - check your connection and try again.`);
+      setDispatchError(`${returning ? "Booking the return visit" : reschedule ? "Reschedule" : "Dispatch"} failed - check your connection and try again.`);
     } finally {
       setDispatching(false);
     }
@@ -380,6 +382,15 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
           <Card title={`${fixedFirstName}'s day`} aside={`${initial.trade} - ${shortDateOf(date)}, ${timeLabelFor(startMinutes)}-${timeLabelFor(startMinutes + holdMinutes)} ${initial.stateLabel}`}>
             {pickedRow && !pickedRow.pickable && pickedRow.why ? (
               <p className="mb-2.5 text-xs font-semibold text-brand-warning">{pickedRow.why}</p>
+            ) : null}
+            {returning && pickedRow?.linkable ? (
+              <button
+                type="button"
+                className="-mt-1.5 mb-2.5 min-h-11 py-2.5 text-small font-semibold text-secondary-text underline underline-offset-2"
+                onClick={() => setAvailabilityFor({ code: pickedRow.code, name: pickedRow.name })}
+              >
+                Change availability
+              </button>
             ) : null}
             {closedPanel ?? (
             <CalendarDayView
@@ -572,6 +583,8 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
             <span className="text-xs text-muted-text md:order-1">
               {holidayName !== undefined
                 ? ""
+                : canGo && returning
+                ? `${initial.customerName.split(" ")[0]} is told the new time by email and text.`
                 : canGo && reschedule
                 ? `${fixedFirstName} is sent one message with the new time to accept or decline. ${initial.customerName.split(" ")[0]} is told only when he accepts.`
                 : canGo
@@ -585,11 +598,11 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 type="button"
                 onClick={() => void dispatch()}
                 loading={dispatching}
-                loadingLabel={reschedule ? "Sending..." : "Dispatching..."}
+                loadingLabel={returning ? "Booking..." : reschedule ? "Sending..." : "Dispatching..."}
                 size="compact"
                 className="md:order-2"
               >
-                {reschedule ? "Send new time" : pickedRow ? `Dispatch to ${pickedRow.name.split(" ")[0] ?? pickedRow.name}` : "Dispatch"}
+                {returning ? "Confirm return visit" : reschedule ? "Send new time" : pickedRow ? `Dispatch to ${pickedRow.name.split(" ")[0] ?? pickedRow.name}` : "Dispatch"}
               </PrimaryButton>
             ) : (
               <button
@@ -597,7 +610,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                 disabled
                 className="min-h-[52px] w-full rounded-button border border-hairline bg-ground px-4 text-sm font-bold text-muted-text md:order-2 md:min-h-11 md:w-auto md:px-[18px]"
               >
-                {reschedule ? "Send new time" : "Dispatch"}
+                {returning ? "Confirm return visit" : reschedule ? "Send new time" : "Dispatch"}
               </button>
             )}
           </div>

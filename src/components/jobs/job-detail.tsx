@@ -427,37 +427,6 @@ const LEVEL_LABELS: Record<"normal" | "weekend" | "emergency", string> = {
   emergency: "Emergency",
 };
 
-/**
- * Feature 4003, Quick fixes: the job actions the platform has not built yet,
- * each shown only where it would work, outlined, greyed and disabled, naming
- * the feature that switches it on. Architect skill, Writing the plan, step 2a.
- * Feature 4006 took Reassign, Reschedule and Cancel out of
- * this list: they are real buttons (JobActions, below). Feature 6004 did the same for Mark no-show
- * and Raise callback. Feature 6007 did the same for Correct & reissue: a real link in the Invoice card.
- */
-const ACTION_PLACEHOLDERS: { label: string; feature: string; statuses: JobDetail["status"][] }[] = [
-  { label: "On hold", feature: "5002", statuses: ["scheduled", "in_progress"] },
-];
-
-function ActionPlaceholders({ job }: { job: JobDetail }) {
-  const shown = ACTION_PLACEHOLDERS.filter((action) => action.statuses.includes(job.status));
-  if (shown.length === 0) return null;
-  return (
-    <div className="mt-3.5 flex flex-wrap gap-2 border-t border-hairline pt-3" data-testid="action-placeholders">
-      {shown.map((action) => (
-        <button
-          key={action.label}
-          type="button"
-          disabled
-          className="min-h-11 rounded-button border border-hairline bg-transparent px-3.5 text-small font-bold text-muted-text"
-        >
-          {action.label} - coming in {action.feature}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 /** Feature 4003, plan decision 10: every booking on the job but the one in play, newest first. */
 function EarlierBookings({ bookings }: { bookings: EarlierBooking[] }) {
   if (bookings.length === 0) return null;
@@ -549,7 +518,10 @@ async function postAction(path: string, body: Record<string, unknown>): Promise<
 
 /** Feature 4006: Reschedule, Reassign and Cancel job, shown by the page's own `actions`. */
 function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobDetail, message: string) => void }) {
-  const [dialog, setDialog] = useState<"take-off" | "cancel" | "callback" | "no-show" | null>(null);
+  const [dialog, setDialog] = useState<"take-off" | "cancel" | "callback" | "no-show" | "hold" | null>(null);
+  const [holdReason, setHoldReason] = useState("");
+  const [holdOther, setHoldOther] = useState("");
+  const [holdError, setHoldError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [reason, setReason] = useState("");
@@ -561,9 +533,9 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
   const [charge, setCharge] = useState(true);
   const router = useRouter();
 
-  const { reschedule, takeOff, cancel } = job.actions;
+  const { reschedule, takeOff, cancel, hold } = job.actions;
   const { canRaiseCallback, canMarkNoShow } = job;
-  if (!reschedule && !takeOff && !cancel && !canRaiseCallback && !canMarkNoShow) return null;
+  if (!reschedule && !takeOff && !cancel && !canRaiseCallback && !canMarkNoShow && !hold) return null;
   const contractorFirst = job.contractor ? firstNameOf(job.contractor.name) : "the contractor";
 
   function close() {
@@ -576,6 +548,32 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
     setCallbackText("");
     setCallbackError(undefined);
     setCharge(true);
+    setHoldReason("");
+    setHoldOther("");
+    setHoldError(undefined);
+  }
+
+  async function confirmHold() {
+    setHoldError(undefined);
+    setError(undefined);
+    if (holdReason === "") {
+      setHoldError("Required.");
+      return;
+    }
+    if (holdReason === "other" && holdOther.trim() === "") {
+      setHoldError("Say what it is.");
+      return;
+    }
+    setBusy(true);
+    const result = await postAction(`/api/jobs/${encodeURIComponent(job.reference)}/hold`, { reason: holdReason, otherText: holdOther.trim() });
+    setBusy(false);
+    if (!result.ok) {
+      if (result.field === "reason" || result.field === "otherText") setHoldError(result.error);
+      else setError(result.error);
+      return;
+    }
+    close();
+    onChanged(result.job, result.toast);
   }
 
   async function confirmCallback() {
@@ -673,6 +671,11 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
             Reassign
           </button>
         ) : null}
+        {hold ? (
+          <button type="button" className={outlinedButton} onClick={() => setDialog("hold")}>
+            Put on hold
+          </button>
+        ) : null}
         {cancel ? (
           <button type="button" className={outlinedButton} onClick={() => setDialog("cancel")}>
             Cancel job
@@ -689,6 +692,64 @@ function JobActions({ job, onChanged }: { job: JobDetail; onChanged: (next: JobD
           </button>
         ) : null}
       </div>
+
+      <ConfirmDialog
+        open={dialog === "hold"}
+        title={`Put ${job.reference} on hold?`}
+        confirmLabel="Put on hold"
+        cancelLabel="Not now"
+        loading={busy}
+        loadingLabel="Putting on hold..."
+        onConfirm={() => void confirmHold()}
+        onCancel={close}
+        fields={
+          <>
+            <SelectField
+              id="hold-reason"
+              label="Reason"
+              required
+              value={holdReason}
+              error={holdReason === "other" ? undefined : holdError}
+              options={[
+                { value: "", label: "Pick a reason" },
+                { value: "part_on_order", label: "Part on order" },
+                { value: "more_time_needed", label: "More time needed" },
+                { value: "other", label: "Other" },
+              ]}
+              onChange={(event) => {
+                setHoldReason(event.target.value);
+                setHoldError(undefined);
+              }}
+            />
+            {holdReason === "other" ? (
+              <div className="mb-3.5">
+                <label
+                  htmlFor="hold-other"
+                  className="mb-[5px] block text-field-label font-bold tracking-[0.08em] text-muted-text uppercase after:ml-0.5 after:text-brand-destructive after:content-['*']"
+                >
+                  What is it?
+                </label>
+                <input
+                  id="hold-other"
+                  value={holdOther}
+                  maxLength={500}
+                  onChange={(event) => {
+                    setHoldOther(event.target.value);
+                    setHoldError(undefined);
+                  }}
+                  className={`min-h-[44px] w-full rounded-button border bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 ${
+                    holdError ? "border-brand-destructive" : "border-hairline"
+                  }`}
+                />
+                {holdError ? <p className="mt-[5px] text-xs text-brand-destructive">{holdError}</p> : null}
+              </div>
+            ) : null}
+            {error && dialog === "hold" ? <p className="mt-2 text-xs text-brand-destructive">{error}</p> : null}
+          </>
+        }
+      >
+        {job.status === "scheduled" ? `A booked time comes off, and ${firstNameOf(job.customer.name)} and the site contact are told by email and text.` : "The booked visit stays as it is until you book the return."}
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={dialog === "callback"}
@@ -882,9 +943,29 @@ function ContractorCard({
       ) : (
         <p className="text-small text-muted-text">Not dispatched yet.</p>
       )}
+      {job.returnVisit ? (
+        <div className="mt-3.5 grid gap-3 border-t border-hairline pt-3.5" data-testid="return-visit-facts">
+          <Fact label="Reason">
+            {job.returnVisit.reasonLabel}
+            {job.returnVisit.otherText ? <span className="font-normal text-secondary-text"> - {job.returnVisit.otherText}</span> : null}
+          </Fact>
+          {job.returnVisit.officeNote ? (
+            <Fact label="Note for the office">
+              <p className="max-w-[62ch] font-normal whitespace-pre-wrap">{job.returnVisit.officeNote}</p>
+            </Fact>
+          ) : null}
+        </div>
+      ) : null}
+      {job.actions.bookReturn ? (
+        <PrimaryLink
+          href={`/ops/jobs/${encodeURIComponent(job.reference)}/dispatch?mode=return`}
+          className="mt-3 md:inline-block md:min-h-11 md:w-auto md:px-[18px] md:py-2.5"
+        >
+          Book return visit
+        </PrimaryLink>
+      ) : null}
       <EarlierBookings bookings={job.earlierBookings} />
       <JobActions job={job} onChanged={onChanged} />
-      <ActionPlaceholders job={job} />
     </Card>
   );
 }
@@ -1005,6 +1086,13 @@ function TimeOnSiteCard({
         }}
       />
       {formError ? <p className="mb-2 text-xs text-brand-destructive">{formError}</p> : null}
+      {visit.completionNotes ? (
+        <div className="mt-3.5 border-t border-hairline pt-3.5" data-testid="work-summary">
+          <Fact label="Contractor work summary">
+            <p className="max-w-[62ch] font-normal whitespace-pre-wrap">{visit.completionNotes}</p>
+          </Fact>
+        </div>
+      ) : null}
       <div className="mt-3.5 flex flex-col gap-2 border-t border-hairline pt-3.5 md:flex-row md:items-center md:justify-end md:gap-3">
         {pending && !saving ? <span className="text-xs font-semibold text-brand-warning">Not saved yet</span> : null}
         <button

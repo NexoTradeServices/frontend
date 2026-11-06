@@ -67,6 +67,7 @@ import { expectFilterRowOnPhone, expectFilterRowWraps } from "./helpers/filter-r
 import { MOCKS_GOOGLE_PLACES, installMockGooglePlaces } from "./helpers/mock-google-places";
 import { installMockPhotoImages } from "./helpers/mock-cloudinary";
 import { reviewLinkFor, rateByLink } from "./helpers/reviews";
+import { BASE_URL, testRunStorageState } from "./helpers/test-run";
 import { MOBILE_VIEWPORT } from "../playwright.config";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
@@ -1052,4 +1053,63 @@ test("7001 AC7, AC8: Bouncing tag on a listed email; Change email refuses under 
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await expect(card.getByText(fresh)).toBeVisible();
   await expect(card.getByTestId("email-bouncing-tag")).toHaveCount(0);
+});
+
+// Feature 5002 -- Mike's side of a return visit.
+//
+// AC10 Put on hold with a Reason on a Scheduled job
+// AC11 on an On hold job: the Reason, the note, Book return visit through the picker -> Scheduled
+// AC12 the Contractor work summary shows before completion
+test("5002 AC10, AC11, AC12: Mike sees the work notes, puts the job on hold with a Reason, then books the return from the picker", async ({
+  page,
+  browser,
+  request,
+}) => {
+  const job = await dispatchThrowawayJob(page, request, "hold");
+  const accepted = await request.post(`${apiUrl}/api/respond/${job.token}/accept`);
+  expect(accepted.status()).toBe(200);
+
+  // Bob saves his notes, in a context of his own.
+  const bobContext = await browser.newContext({ baseURL: BASE_URL, storageState: testRunStorageState() });
+  try {
+    const bobPage = await bobContext.newPage();
+    await bobPage.goto("/contractor");
+    await login(bobPage, "bob@idelta.com.au");
+    await expect(bobPage.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+    const saved = await bobPage.request.put(`${apiUrl}/api/contractor/jobs/${job.reference}`, {
+      data: { timeEntries: [{ date: "2026-10-07", start: "08:07", end: "09:07", note: "" }], completionNotes: "Replaced the washer.", parts: [] },
+    });
+    expect(saved.status()).toBe(200);
+  } finally {
+    await bobContext.close();
+  }
+
+  await page.goto(`/ops/jobs/${job.reference}`);
+  await expect(page.getByRole("heading", { name: job.reference, exact: true })).toBeVisible({ timeout: 15_000 });
+  // AC12: the work summary before completion
+  await expect(page.getByTestId("work-summary")).toContainText("Replaced the washer.");
+  // the placeholder is gone
+  await expect(page.getByTestId("action-placeholders")).toHaveCount(0);
+
+  // AC10: Put on hold needs a Reason
+  await page.getByRole("button", { name: "Put on hold" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await dialog.getByRole("button", { name: "Put on hold" }).click();
+  await expect(dialog.getByText("Required.")).toBeVisible();
+  await dialog.getByLabel("Reason").selectOption("more_time_needed");
+  await dialog.getByRole("button", { name: "Put on hold" }).click();
+  await expect(page.getByText("On hold", { exact: true }).first()).toBeVisible({ timeout: 10_000 });
+
+  // AC11: the Reason as a fact, the Primary, the picker
+  await expect(page.getByTestId("return-visit-facts")).toContainText("More time needed");
+  await page.getByRole("link", { name: "Book return visit" }).click();
+  await expect(page).toHaveURL(new RegExp(`/ops/jobs/${job.reference}/dispatch\\?mode=return$`));
+  await page.getByLabel("Day", { exact: true }).fill("2027-05-18");
+  await page.getByLabel("Start (WA time)").selectOption({ label: "5:00pm" });
+  const confirmReturn = page.getByRole("button", { name: "Confirm return visit" });
+  await expect(confirmReturn).toBeEnabled({ timeout: 10_000 });
+  await confirmReturn.click();
+  await expect(page).toHaveURL(new RegExp(`/ops/jobs/${job.reference}(\\?|$)`));
+  await expect(page.getByText("Scheduled", { exact: true }).first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId("return-visit-facts")).toContainText("More time needed"); // the Reason stays
 });

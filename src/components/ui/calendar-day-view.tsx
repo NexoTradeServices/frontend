@@ -49,6 +49,7 @@ export function CalendarDayView({
   lastStartMinutes,
   zoneLabel,
   loading = false,
+  allowNotAvailable = false,
 }: {
   /** e.g. "Bob's Mon 14 Sep" -- the caller composes it, this component only draws the grid. */
   dayLabel: string;
@@ -67,6 +68,8 @@ export function CalendarDayView({
   /** e.g. "NSW time": the state's clock the grid is drawn in, shown on the job's own block so the office sees which clock it is. */
   zoneLabel?: string;
   loading?: boolean;
+  /** Feature 5002: the contractor's own picker may still tap time they switched off (booking it switches it on). */
+  allowNotAvailable?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -84,7 +87,7 @@ export function CalendarDayView({
   const holdLength = proposedEnd - proposedStart;
   const takenStart = (from: number) =>
     blocks.some((block) => block.startMinutes < from + holdLength && block.endMinutes > from) ||
-    notAvailable.some((run) => run.startMinutes < from + holdLength && run.endMinutes > from);
+    (!allowNotAvailable && notAvailable.some((run) => run.startMinutes < from + holdLength && run.endMinutes > from));
   const clashes = blocks.some((block) => block.startMinutes < proposedEnd && block.endMinutes > proposedStart);
   const rows: number[] = [];
   for (let m = openMinutes; m < closeMinutes; m += 30) rows.push(m);
