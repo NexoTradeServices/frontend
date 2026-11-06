@@ -20,7 +20,8 @@ export default async function ContractorDetailsPage() {
   return (
     <Container width="medium">
       <PageHeader title="My details" />
-      <ContractorDetails initial={details} />
+      {/* keyed by what is saved: when the office changes something, the form is rebuilt from it, never left on old values */}
+      <ContractorDetails key={JSON.stringify(details)} initial={details} />
     </Container>
   );
 }
