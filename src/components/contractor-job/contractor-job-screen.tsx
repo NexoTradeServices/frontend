@@ -798,6 +798,16 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                 setErrors({});
               }}
             />
+            {job.canBookReturn && !returning ? (
+              <button
+                type="button"
+                onClick={openReturn}
+                disabled={busy !== null || uploading}
+                className="mt-3.5 min-h-[52px] w-full rounded-button border border-brand-accent bg-surface px-4 text-sm font-bold text-brand-accent disabled:opacity-50 md:min-h-11 md:w-auto"
+              >
+                Book a return visit
+              </button>
+            ) : null}
           </Card>
         </div>
 
@@ -1006,16 +1016,6 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               </>
             ) : (
               <>
-                {job.canBookReturn ? (
-                  <button
-                    type="button"
-                    onClick={openReturn}
-                    disabled={busy !== null || uploading}
-                    className="min-h-[52px] w-full rounded-button border border-brand-accent bg-surface px-4 text-sm font-bold text-brand-accent disabled:opacity-50 md:min-h-11 md:w-auto"
-                  >
-                    Book a return visit
-                  </button>
-                ) : null}
                 <button
                   type="button"
                   onClick={() => void send(false)}

@@ -339,7 +339,7 @@ test.describe("Bob's job screen, on a phone", () => {
 
 // Feature 5002 -- Book a return visit, on Bob's phone.
 //
-// AC1  the bottom bar offers Save, Book a return visit and Complete job
+// AC1  Book a return visit sits under Time on site; the bottom bar offers Save and Complete job
 // AC2  Book a return visit saves nothing: no time for today -> "Enter today's time on site first."; otherwise the card opens
 // AC3  the Primary stays greyed until the Reason and the return choice are in
 // AC4  Pick a time then Confirm return visit books it and shows the banner
