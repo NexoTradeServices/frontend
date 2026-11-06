@@ -346,7 +346,7 @@ const todayPerth = (): string => new Intl.DateTimeFormat("en-CA", { timeZone: "A
 test.describe("Bob's return visit, on a phone", () => {
   test.use(MOBILE_VIEWPORT);
 
-  test("5002 AC1, AC2, AC3, AC6: Book a return visit sits under Time on site and the bar has Save and Complete job; no time today is refused; the card opens, greys its Primary, and Back keeps what was typed", async ({
+  test("5002 AC1, AC2, AC3, AC6: Book a return visit sits under Time on site and the bar has Save and Complete job; no time today is refused; the pop-up opens, greys its Primary, and Cancel keeps what was typed", async ({
     page,
     browser,
     request,
@@ -371,13 +371,13 @@ test.describe("Bob's return visit, on a phone", () => {
     // AC3: greyed until both answers are in
     const confirm = page.getByRole("button", { name: "Confirm return visit" });
     await expect(confirm).toBeDisabled();
-    await page.getByLabel("Reason").selectOption("part_on_order");
+    await page.getByRole("radio", { name: "Part on order" }).click();
     await expect(confirm).toBeDisabled();
-    await page.getByLabel("Return date").selectOption("pick");
-    await expect(confirm).toBeDisabled(); // a time still has to be tapped
+    await page.getByRole("radio", { name: "I know the time" }).click();
+    await expect(confirm).toBeEnabled(); // the day loads and the first free half hour is proposed
 
-    // AC6: Back closes the card, nothing booked, the typed time stays
-    await page.getByRole("button", { name: "Back", exact: true }).click();
+    // AC6: Cancel closes the pop-up, nothing booked, the typed time stays
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(page.getByTestId("return-visit-card")).toHaveCount(0);
     await expect(page.locator("#entry-0-date")).toHaveValue(todayPerth());
     const saved = await page.request.get(`${process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au"}/api/contractor/jobs/${job.reference}`);
@@ -391,15 +391,16 @@ test.describe("Bob's return visit, on a phone", () => {
     await pickTime(page, "#entry-0-start", "9:00am");
     await pickTime(page, "#entry-0-end", "10:00am");
     await page.getByRole("button", { name: "Book a return visit" }).click();
-    await page.getByLabel("Reason").selectOption("more_time_needed");
-    await page.getByLabel("Return date").selectOption("pick");
+    await page.getByRole("radio", { name: "More time needed" }).click();
+    await page.getByRole("radio", { name: "I know the time" }).click();
     await page.getByRole("button", { name: "Start at 1:00pm" }).click();
     await page.getByRole("button", { name: "Confirm return visit" }).click();
     await expect(page.getByTestId("return-booked")).toContainText(/Return visit booked for .* 1:00pm\. .* has been told by email and text\./);
     await expect(page.getByTestId("return-visit-card")).toHaveCount(0);
     // the visit he typed was saved with the booking, and the screen now waits for the next visit: no arrival, no boxes, no buttons
     await page.reload();
-    await expect(page.getByTestId("next-visit")).toContainText("I've arrived appears on the day.");
+    await expect(page.getByTestId("return-visit-summary")).toContainText("More time needed");
+    await expect(page.getByText("I've arrived appears on the day.")).toBeVisible();
     await expect(page.getByRole("button", { name: "I've arrived" })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Time on site" })).toBeVisible();
     await expect(page.locator("#entry-0-date")).toHaveCount(0);
@@ -414,9 +415,9 @@ test.describe("Bob's return visit, on a phone", () => {
     await pickTime(page, "#entry-0-start", "9:00am");
     await pickTime(page, "#entry-0-end", "10:00am");
     await page.getByRole("button", { name: "Book a return visit" }).click();
-    await page.getByLabel("Reason").selectOption("other");
+    await page.getByRole("radio", { name: "Other" }).click();
     await page.getByLabel("What is it?").fill("Waiting on the owner's tiles");
-    await page.getByLabel("Return date").selectOption("notyet");
+    await page.getByRole("radio", { name: "Not yet" }).click();
     await page.getByLabel("Note for the office").fill("Owner says Friday.");
     await page.getByRole("button", { name: "Put on hold" }).click();
     await expect(page.getByTestId("on-hold-banner")).toBeVisible();
