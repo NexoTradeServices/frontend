@@ -132,10 +132,10 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
               onPickingChange={setAddressPicking}
             />
           </div>
-          <hr className="mt-3 mb-5 border-hairline sm:col-span-2" />
+          <h4 className="mt-5 mb-3 font-heading text-sm font-extrabold text-ink sm:col-span-2">Emergency contact</h4>
           <Field label="Emergency contact name" id="d-ecName" placeholder="Jen Reilly" value={fields.emergencyContactName} onChange={(e) => set("emergencyContactName", e.target.value)} />
           <Field label="Emergency contact phone" id="d-ecPhone" placeholder="0400 000 000" value={fields.emergencyContactPhone} onChange={(e) => set("emergencyContactPhone", e.target.value)} />
-          <hr className="mt-3 mb-5 border-hairline sm:col-span-2" />
+          <h4 className="mt-5 mb-3 font-heading text-sm font-extrabold text-ink sm:col-span-2">Trade and insurance</h4>
           {office.specialties.map((s) => (
             <LockedField key={s.trade} label={s.trade} value={`Licence ${s.licenceNumber}, expires ${fmtDate(s.licenceExpiry)}`} />
           ))}
@@ -147,7 +147,7 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
                 : "Not set"
             }
           />
-          <hr className="mt-3 mb-5 border-hairline sm:col-span-2" />
+          <h4 className="mt-5 mb-3 font-heading text-sm font-extrabold text-ink sm:col-span-2">Bank details</h4>
           <LockedField label="BSB" value={office.payoutBsb ?? "Not set"} />
           <LockedField label="Account number" value={office.payoutAccountNo ?? "Not set"} />
           <LockedField label="Account name" value={office.payoutAccountName ?? "Not set"} />
