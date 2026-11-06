@@ -1,49 +1,65 @@
-// The dashboard's readiness panel -- Feature 2003, plan decision 2: the
-// server decides (key, copy, pen, route, blocking), the screen renders. Two
-// row shapes only, picked by whose pen the field is (Managing the
-// contractor record / "What the contractor sees on his dashboard"): his own
-// read as an instruction, linked when its page exists; Mike's state the
-// fact and send him to the office, never a link.
+// The dashboard's one Needs attention block -- Feature 2003's readiness panel, joined by 2004's Availability messages.
+//
+// The server decides what is missing (key, copy, pen, route, blocking), the screen renders. One block, one row per item,
+// 6px apart, nothing sliding: the new opening hours notice, Set your availability, then each readiness item. Two shapes
+// for a readiness item, picked by whose pen it is (Managing the contractor record / "What the contractor sees on his
+// dashboard"): his own read as an instruction, linked when its page exists; the office's state the fact and send him to
+// the office, never a link. The block is gone when nothing is left (the pattern is Components / Needs attention).
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import type { ReadinessItemDto } from "./types";
+import { HoursNoticeRow, SetAvailabilityRow, attentionRow, textButton } from "./availability-banners";
 
 function ReadinessRow({ item }: { item: ReadinessItemDto }) {
   return (
-    <li className="flex items-center justify-between gap-3 border-t border-hairline px-3.5 py-2.5">
-      <span className="text-sm font-semibold text-ink">{item.copy}</span>
+    <li className={attentionRow}>
+      <span className="font-semibold">{item.copy}</span>
       {item.pen === "own" && item.route ? (
-        <Link href={item.route} className="shrink-0 text-small font-bold text-brand-accent hover:underline">
+        <Link href={item.route} className={textButton}>
           Fix now
         </Link>
       ) : null}
-      {item.pen === "mikes" ? (
-        <span className="shrink-0 text-small font-semibold text-muted-text">Call the office</span>
-      ) : null}
+      {item.pen === "mikes" ? <span className="shrink-0 text-small font-semibold text-muted-text">Call the office</span> : null}
     </li>
   );
 }
 
-export function ReadinessPanel({ ready, missing }: { ready: boolean; missing: ReadinessItemDto[] }) {
-  // AC6: renders only while something is missing -- blocking or not.
-  if (missing.length === 0) return null;
+export function NeedsAttention({
+  ready,
+  missing,
+  setAvailability,
+  hoursNotice,
+}: {
+  ready: boolean;
+  missing: ReadinessItemDto[];
+  setAvailability: boolean;
+  hoursNotice: { openingTime: string; closingTime: string } | null;
+}) {
+  const [dismissed, setDismissed] = useState(false);
+  const showHours = hoursNotice !== null && !dismissed;
+  // Renders only while something needs attention -- blocking or not.
+  if (!showHours && !setAvailability && missing.length === 0) return null;
 
   return (
-    <div className="mb-4 overflow-hidden rounded-card border border-hairline">
-      {/* AC8: the tag sits over the panel only when something actually blocks
-          dispatch -- a contractor missing only his own address (non-blocking)
-          never sees it. */}
-      {!ready ? (
-        <div className="bg-warning-bg px-3.5 py-2.5">
-          <span className="inline-block rounded bg-surface px-2 py-0.5 text-field-label font-bold tracking-[0.04em] text-brand-warning uppercase">
+    <section className="mb-4" aria-label="Needs attention" data-testid="needs-attention">
+      <div className="mb-1.5 flex flex-wrap items-center gap-2">
+        <span className="text-field-label font-bold tracking-[0.08em] text-brand-warning uppercase">Needs attention</span>
+        {/* The tag only when something blocks dispatch -- a contractor missing only his own address never sees it. */}
+        {!ready ? (
+          <span className="inline-block rounded bg-warning-bg px-2 py-0.5 text-field-label font-bold tracking-[0.04em] text-brand-warning uppercase">
             Not ready to dispatch
           </span>
-        </div>
-      ) : null}
-      <ul className="m-0 list-none bg-surface p-0">
+        ) : null}
+      </div>
+      <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+        {showHours && hoursNotice !== null ? <HoursNoticeRow hoursNotice={hoursNotice} onSeen={() => setDismissed(true)} /> : null}
+        {setAvailability ? <SetAvailabilityRow /> : null}
         {missing.map((item) => (
           <ReadinessRow key={item.key} item={item} />
         ))}
       </ul>
-    </div>
+    </section>
   );
 }

@@ -1,30 +1,24 @@
-// The dashboard's Availability messages -- Feature 2004, Molecules / Messages to the person (Banner).
+// The dashboard's Availability rows -- Feature 2004, shown inside the one Needs attention block (readiness-panel.tsx).
 //
 // "Set your availability" until the first save (it blocks nothing), and the one-time notice when the business widened its
-// opening hours: the new half hours start as Not available until he switches them on. Each is a warning Banner with an
-// Outlined button; the notice's button says it has been seen and goes to Availability.
+// opening hours: the new half hours start as Not available until he switches them on. Each is a warning row with a Text
+// button on the right; the notice's button says it has been seen and goes to Availability.
 "use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Banner } from "@/components/auth/banner";
 import { timeLabelFor } from "@/components/ui/calendar-day-view";
 import { minutesOfClock } from "@/components/availability/types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
-const outlined =
-  "inline-flex min-h-11 items-center rounded-button border border-hairline bg-surface px-4 py-2 text-sm font-bold text-ink";
 
-export function AvailabilityBanners({
-  setAvailability,
-  hoursNotice,
-}: {
-  setAvailability: boolean;
-  hoursNotice: { openingTime: string; closingTime: string } | null;
-}) {
+/** One warning row of the Needs attention block: the words on the left, the way forward on the right (under them on a phone). */
+export const attentionRow =
+  "flex min-h-11 flex-col gap-1.5 rounded-button border border-brand-warning/50 bg-warning-bg px-3 py-2.5 text-small text-brand-warning sm:flex-row sm:items-center sm:justify-between sm:gap-3";
+export const textButton = "shrink-0 self-start text-small font-bold text-brand-accent hover:underline sm:self-auto";
+
+export function HoursNoticeRow({ hoursNotice, onSeen }: { hoursNotice: { openingTime: string; closingTime: string }; onSeen: () => void }) {
   const router = useRouter();
-  const [dismissed, setDismissed] = useState(false);
 
   async function seen() {
     try {
@@ -32,31 +26,30 @@ export function AvailabilityBanners({
     } catch {
       // the notice just shows again next time
     }
-    setDismissed(true);
+    onSeen();
     router.push("/contractor/availability");
   }
 
   return (
-    <>
-      {hoursNotice !== null && !dismissed ? (
-        <Banner kind="warning">
-          <p className="mb-2" data-testid="hours-notice">
-            Opening hours are now {timeLabelFor(minutesOfClock(hoursNotice.openingTime))} to {timeLabelFor(minutesOfClock(hoursNotice.closingTime))}. The new
-            times start as Not available until you switch them on.
-          </p>
-          <button type="button" className={outlined} onClick={() => void seen()}>
-            Check availability
-          </button>
-        </Banner>
-      ) : null}
-      {setAvailability ? (
-        <Banner kind="warning">
-          <p className="mb-2">Set your availability so the office knows when you can work. Until you do, every time inside opening hours counts as available.</p>
-          <Link href="/contractor/availability" className={outlined}>
-            Set your availability
-          </Link>
-        </Banner>
-      ) : null}
-    </>
+    <li className={attentionRow}>
+      <span data-testid="hours-notice">
+        Opening hours are now {timeLabelFor(minutesOfClock(hoursNotice.openingTime))} to {timeLabelFor(minutesOfClock(hoursNotice.closingTime))}. The new
+        times start as Not available until you switch them on.
+      </span>
+      <button type="button" className={textButton} onClick={() => void seen()}>
+        Check availability
+      </button>
+    </li>
+  );
+}
+
+export function SetAvailabilityRow() {
+  return (
+    <li className={attentionRow}>
+      <span>Set your availability so the office knows when you can work. Until you do, every time inside opening hours counts as available.</span>
+      <Link href="/contractor/availability" className={textButton}>
+        Set your availability
+      </Link>
+    </li>
   );
 }

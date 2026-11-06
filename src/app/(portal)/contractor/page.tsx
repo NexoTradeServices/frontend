@@ -2,8 +2,7 @@
 // Architecture & Routing / Page inventory: "Dashboard (assigned jobs -- the
 // day's work, no money; the readiness panel above them)".
 import { cookies } from "next/headers";
-import { AvailabilityBanners } from "@/components/contractor-dashboard/availability-banners";
-import { ReadinessPanel } from "@/components/contractor-dashboard/readiness-panel";
+import { NeedsAttention } from "@/components/contractor-dashboard/readiness-panel";
 import { JobCard } from "@/components/contractor-dashboard/job-card";
 import { EmptyDashboard } from "@/components/contractor-dashboard/empty-state";
 import type { DashboardDto } from "@/components/contractor-dashboard/types";
@@ -28,8 +27,7 @@ export default async function ContractorDashboardPage() {
         title="Dashboard"
         subtitle="Your work, soonest first."
       />
-      <AvailabilityBanners setAvailability={dashboard.setAvailability} hoursNotice={dashboard.hoursNotice} />
-      <ReadinessPanel ready={dashboard.ready} missing={dashboard.missing} />
+      <NeedsAttention ready={dashboard.ready} missing={dashboard.missing} setAvailability={dashboard.setAvailability} hoursNotice={dashboard.hoursNotice} />
       {dashboard.jobs.length === 0 ? (
         <EmptyDashboard />
       ) : (

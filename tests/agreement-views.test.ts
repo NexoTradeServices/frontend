@@ -13,14 +13,16 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
-import { ReadinessPanel } from "../src/components/contractor-dashboard/readiness-panel";
+import { NeedsAttention } from "../src/components/contractor-dashboard/readiness-panel";
 import { ContractorAgreementCard } from "../src/components/contractors/agreement-card";
 
 describe("AC7 -- the readiness row links to the agreement page", () => {
-  test("the agreement item reads as his own, with a Fix now link to /contractor/agreement, under the Not ready tag", () => {
+  test("the agreement item reads as his own, with a Fix now link to /contractor/agreement, in the Needs attention block, under the Not ready tag", () => {
     const html = renderToStaticMarkup(
-      createElement(ReadinessPanel, {
+      createElement(NeedsAttention, {
         ready: false,
+        setAvailability: false,
+        hoursNotice: null,
         missing: [
           {
             key: "agreement",
@@ -32,6 +34,7 @@ describe("AC7 -- the readiness row links to the agreement page", () => {
         ],
       }),
     );
+    expect(html).toContain("Needs attention");
     expect(html).toContain("Not ready to dispatch");
     expect(html).toContain("contractor agreement (not accepted)");
     expect(html).toContain('href="/contractor/agreement"');
