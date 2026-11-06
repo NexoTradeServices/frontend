@@ -23,7 +23,7 @@
 // Phone width: Bob's screen is designed Mobile first. Every test dispatches a throwaway job
 // of its own (helpers/accepted-job.ts), labelled `e2e` and swept by the suite.
 import { test, expect, type Page } from "@playwright/test";
-import { acceptedJobForBob, completeJobAsBob, giveInvoiceItsPayLink, openJobScreen } from "./helpers/accepted-job";
+import { acceptedJobForBob, completeJobAsBob, giveInvoiceItsPayLink, openJobScreen, openJobScreenArrived, visitToday } from "./helpers/accepted-job";
 import { decodeQr } from "./helpers/qr";
 import { login } from "./helpers/login";
 import { installMockCloudinary } from "./helpers/mock-cloudinary";
@@ -58,7 +58,7 @@ test.describe("Bob's job screen, on a phone", () => {
   }) => {
     await installMockCloudinary(page);
     const job = await acceptedJobForBob(browser, request, "ac4", { siteContact: { name: "Lena Park", phone: "0400 002 050" } });
-    await openJobScreen(page, job);
+    await openJobScreenArrived(page, request, job);
 
     // The job's facts: the ask-for NAME, never her number.
     await expect(page.getByText("Lena Park")).toBeVisible();
@@ -120,7 +120,7 @@ test.describe("Bob's job screen, on a phone", () => {
     request,
   }) => {
     const job = await acceptedJobForBob(browser, request, "ac7");
-    await openJobScreen(page, job);
+    await openJobScreenArrived(page, request, job);
 
     // Nothing entered: the refusal is on the fields, not a banner, and no dialog opens.
     await page.getByRole("button", { name: "Complete job" }).click();
@@ -180,7 +180,7 @@ test.describe("Bob's job screen, on a phone", () => {
     request,
   }) => {
     const job = await acceptedJobForBob(browser, request, "pay-qr");
-    await openJobScreen(page, job);
+    await openJobScreenArrived(page, request, job);
     await completeOnScreen(page);
 
     const payment = page.locator("section").filter({ has: page.getByRole("heading", { name: "Payment" }) });
@@ -259,7 +259,7 @@ test.describe("Bob's job screen, on a phone", () => {
     request,
   }) => {
     const job = await acceptedJobForBob(browser, request, "pay-wait");
-    await openJobScreen(page, job);
+    await openJobScreenArrived(page, request, job);
     // Stripe may or may not have answered by the time Complete returns; this test is about the
     // waiting wording, so every read of the completed job is handed the waiting state.
     await page.route(/\/api\/contractor\/jobs\/[^/]+(\/complete)?$/, async (route) => {
@@ -313,6 +313,7 @@ test.describe("Bob's job screen, on a phone", () => {
   }) => {
     await installMockCloudinary(page, { signatureStatus: 503 });
     const job = await acceptedJobForBob(browser, request, "onsite");
+    await visitToday(request, job);
     await openJobScreen(page, job);
 
     await expect(page.getByText("Scheduled", { exact: true })).toBeVisible();
@@ -338,20 +339,20 @@ test.describe("Bob's job screen, on a phone", () => {
 // AC2  Book a return visit saves nothing: no time for today -> "Enter today's time on site first."; otherwise the card opens
 // AC3  the Primary stays greyed until the Reason and the return choice are in
 // AC4  Pick a time then Confirm return visit books it and shows the banner
-// AC5  Not yet then Put on hold: the On hold banner, Save only
+// AC5  Not yet then Put on hold: the On hold banner, no buttons left
 // AC6  Back closes the card with nothing booked and what was typed kept
 const todayPerth = (): string => new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Perth" }).format(new Date());
 
 test.describe("Bob's return visit, on a phone", () => {
   test.use(MOBILE_VIEWPORT);
 
-  test("5002 AC1, AC2, AC3, AC6: the bar has three buttons; no time today is refused; the card opens, greys its Primary, and Back keeps what was typed", async ({
+  test("5002 AC1, AC2, AC3, AC6: Book a return visit sits under Time on site and the bar has Save and Complete job; no time today is refused; the card opens, greys its Primary, and Back keeps what was typed", async ({
     page,
     browser,
     request,
   }) => {
     const job = await acceptedJobForBob(browser, request, "rv1");
-    await openJobScreen(page, job);
+    await openJobScreenArrived(page, request, job);
 
     for (const name of ["Save", "Book a return visit", "Complete job"]) await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
 
@@ -385,7 +386,7 @@ test.describe("Bob's return visit, on a phone", () => {
 
   test("5002 AC4: Pick a time then Confirm return visit books it, saves the visit and shows the banner", async ({ page, browser, request }) => {
     const job = await acceptedJobForBob(browser, request, "rv2");
-    await openJobScreen(page, job);
+    await openJobScreenArrived(page, request, job);
     await page.locator("#entry-0-date").fill(todayPerth());
     await pickTime(page, "#entry-0-start", "9:00am");
     await pickTime(page, "#entry-0-end", "10:00am");
@@ -396,14 +397,19 @@ test.describe("Bob's return visit, on a phone", () => {
     await page.getByRole("button", { name: "Confirm return visit" }).click();
     await expect(page.getByTestId("return-booked")).toContainText(/Return visit booked for .* 1:00pm\. .* has been told by email and text\./);
     await expect(page.getByTestId("return-visit-card")).toHaveCount(0);
-    // the visit he typed was saved with the booking
+    // the visit he typed was saved with the booking, and the screen now waits for the next visit: no arrival, no boxes, no buttons
     await page.reload();
-    await expect(page.locator("#entry-0-date")).toHaveValue(todayPerth());
+    await expect(page.getByTestId("next-visit")).toContainText("I've arrived appears on the day.");
+    await expect(page.getByRole("button", { name: "I've arrived" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Time on site" })).toBeVisible();
+    await expect(page.locator("#entry-0-date")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Book a return visit" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Complete job" })).toHaveCount(0);
   });
 
-  test("5002 AC5: Not yet then Put on hold shows the On hold banner and leaves Save only", async ({ page, browser, request }) => {
+  test("5002 AC5: Not yet then Put on hold shows the On hold banner and leaves no buttons", async ({ page, browser, request }) => {
     const job = await acceptedJobForBob(browser, request, "rv3");
-    await openJobScreen(page, job);
+    await openJobScreenArrived(page, request, job);
     await page.locator("#entry-0-date").fill(todayPerth());
     await pickTime(page, "#entry-0-start", "9:00am");
     await pickTime(page, "#entry-0-end", "10:00am");
@@ -414,7 +420,7 @@ test.describe("Bob's return visit, on a phone", () => {
     await page.getByLabel("Note for the office").fill("Owner says Friday.");
     await page.getByRole("button", { name: "Put on hold" }).click();
     await expect(page.getByTestId("on-hold-banner")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Book a return visit" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Complete job" })).toHaveCount(0);
   });

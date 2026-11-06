@@ -8,7 +8,7 @@
 // The rest is proven in the backend (tests/callbacks.test.ts, contractor-job.test.ts,
 // invoice-completion.test.ts). Every test makes throwaway jobs of its own, labelled `e2e`.
 import { test, expect } from "@playwright/test";
-import { acceptedJobForBob, completeJobAsBob, openJobScreen } from "./helpers/accepted-job";
+import { acceptedJobForBob, completeJobAsBob, openJobScreen, openJobScreenArrived } from "./helpers/accepted-job";
 import { acceptedCallbackForBob } from "./helpers/callback-job";
 import { login } from "./helpers/login";
 import { pickTime } from "./helpers/time-box";
@@ -94,7 +94,7 @@ test.describe("Bob's callback, on a phone", () => {
     request,
   }) => {
     const callback = await acceptedCallbackForBob(browser, request, "cbk3");
-    await openJobScreen(page, callback);
+    await openJobScreenArrived(page, request, callback);
 
     const pick = page.getByLabel("This callback is");
     await expect(pick).toBeVisible();

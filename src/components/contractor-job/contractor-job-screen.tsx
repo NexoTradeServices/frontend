@@ -25,6 +25,7 @@ import {
   TimeEntryRows,
   freshKey,
   isBlankRow,
+  newEntryRow,
   rowsFromEntries,
   type TimeEntryRow,
 } from "@/components/ui/time-entry-rows";
@@ -259,6 +260,14 @@ function pickOf(value: boolean | null): CallbackPick {
 }
 
 /** What would be saved, as one string -- Save stays Quiet until it differs from what is stored. */
+/** Feature 5002: arriving for a return visit opens that visit's own row -- there is no "+ Add a visit" for Bob. */
+function withVisitRow(rows: TimeEntryRow[], view: ContractorJobDto): TimeEntryRow[] {
+  if (view.assignmentStatus !== "in_progress" || view.frozen) return rows;
+  const last = rows[rows.length - 1];
+  if (rows.length >= view.visitsAllowed || (last !== undefined && isBlankRow(last))) return rows;
+  return [...rows, newEntryRow(view.timezone)];
+}
+
 function snapshotOf(rows: TimeEntryRow[], notes: string, parts: PartRow[], pick: CallbackPick): string {
   return JSON.stringify({
     pick,
@@ -324,7 +333,7 @@ async function uploadReceipt(
 export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) {
   const router = useRouter();
   const [job, setJob] = useState(initial);
-  const [rows, setRows] = useState<TimeEntryRow[]>(() => rowsFromEntries(initial.timeEntries, initial.timezone));
+  const [rows, setRows] = useState<TimeEntryRow[]>(() => withVisitRow(rowsFromEntries(initial.timeEntries, initial.timezone), initial));
   const [notes, setNotes] = useState(initial.completionNotes);
   const [parts, setParts] = useState<PartRow[]>(() => partRowsOf(initial));
   const [pick, setPick] = useState<CallbackPick>(() => pickOf(initial.callbackChargeable));
@@ -353,6 +362,10 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
   const returnRef = useRef<HTMLDivElement>(null);
 
   const frozen = job.frozen;
+  // Feature 5002: the work (time, parts, notes, the buttons) opens when Bob has arrived; between visits the screen only says when the next one is.
+  const arrived = job.assignmentStatus === "in_progress";
+  const working = arrived && !frozen;
+  const idle = !arrived && !frozen;
   const onHold = job.jobStatus === "on_hold";
   const isCallback = job.callbackOn !== null;
   const changed = snapshotOf(rows, notes, parts, pick) !== saved;
@@ -449,7 +462,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
 
   function adopt(next: ContractorJobDto) {
     setJob(next);
-    const nextRows = rowsFromEntries(next.timeEntries, next.timezone);
+    const nextRows = withVisitRow(rowsFromEntries(next.timeEntries, next.timezone), next);
     const nextParts = partRowsOf(next);
     setRows(nextRows);
     setNotes(next.completionNotes);
@@ -586,6 +599,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
       const next = (await res.json()) as ContractorJobDto;
       // Only the status moved: what he is typing stays as it is.
       setJob((current) => ({ ...current, jobStatus: next.jobStatus, assignmentStatus: next.assignmentStatus, canOnSite: next.canOnSite, onMyWay: next.onMyWay }));
+      setRows((current) => withVisitRow(current, next));
       router.refresh();
     } catch {
       setBanner("Couldn't mark you on site - try again.");
@@ -758,7 +772,14 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
         </div>
 
         <div className="order-2 flex min-w-0 flex-col gap-4 xl:col-start-1 xl:row-start-1">
-          {(job.canOnSite || job.onMyWay !== null) && !frozen ? (
+          {idle && !job.canOnSite && job.onMyWay === null && job.jobStatus === "scheduled" && job.slotLabel !== null ? (
+            <Card title="Next visit">
+              <p className="text-small text-secondary-text" data-testid="next-visit">
+                {job.slotLabel}. I&apos;ve arrived appears on the day.
+              </p>
+            </Card>
+          ) : null}
+          {(job.canOnSite || job.onMyWay !== null) && idle ? (
             <Card title="Arrival">
               <p className="mb-3 text-small text-secondary-text">
                 {job.onMyWay !== null && job.canOnSite
@@ -786,20 +807,21 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               </div>
             </Card>
           ) : null}
+          {frozen || arrived || rows.some((row) => !isBlankRow(row)) ? (
           <Card title="Time on site" aside={`Billed ${formatHours(billed)}h`}>
             <TimeEntryRows
-              rows={rows}
-              mode={frozen ? "frozen" : "edit"}
+              rows={frozen || arrived ? rows : rows.filter((row) => !isBlankRow(row))}
+              mode={frozen ? "frozen" : arrived ? "edit" : "facts"}
               zone={job.timezone}
               idPrefix="entry"
               errors={errors}
-              canAdd={rows.length < job.visitsAllowed}
+              canAdd={false}
               onChange={(next) => {
                 setRows(next);
                 setErrors({});
               }}
             />
-            {job.canBookReturn && !returning ? (
+            {job.canBookReturn && working && !returning ? (
               <button
                 type="button"
                 onClick={openReturn}
@@ -810,6 +832,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               </button>
             ) : null}
           </Card>
+          ) : null}
         </div>
 
         <div className="order-3 flex min-w-0 flex-col gap-4 xl:col-start-1 xl:row-start-2">
@@ -838,6 +861,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               )}
             </Card>
           ) : null}
+{frozen || working ? (
           <Card title="Work notes">
             {frozen ? (
               <LockedValue label="Work notes" hideLabel value={notes === "" ? "-" : notes} message />
@@ -865,9 +889,11 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               </div>
             )}
           </Card>
+          ) : null}
         </div>
 
         <div className="order-4 min-w-0 xl:col-start-1 xl:row-start-3">
+{frozen || working ? (
           <Card title="Parts used" aside={`Up to ${capLabel} in total`}>
             {parts.length === 0 && frozen ? <p className="text-small text-muted-text">No parts.</p> : null}
             {parts.map((part, index) => {
@@ -965,6 +991,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               </button>
             ) : null}
           </Card>
+          ) : null}
           {returning ? (
             <div ref={returnRef} className="scroll-mt-4">
               <ReturnVisitCard
@@ -983,7 +1010,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
         </div>
       </div>
 
-      {!frozen ? (
+      {working ? (
         <div className="fixed inset-x-0 bottom-0 z-10 border-t border-hairline bg-surface px-4 pt-3 pb-5 md:static md:mt-3.5 md:border-0 md:bg-transparent md:p-0">
           <div className="flex flex-wrap items-center gap-2.5 md:flex-nowrap md:justify-end">
             {changed ? (
