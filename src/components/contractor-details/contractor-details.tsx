@@ -1,9 +1,10 @@
 // The contractor's My details page -- Feature 2005. Portal, Medium, Form page.
 //
-// Three form cards the contractor looks after (Your details: name, phone, business name; Address; Emergency contact)
-// with ONE Save row, and a card "Set by the office" whose values are frozen (Molecules / Field, Frozen state): the
-// login email, ABN, GST, Operating state, trades, insurance, status and the BANK DETAILS, which only the office changes.
-// The address is for the file only, so it carries no state check here (unlike Mike's form). Saved shows a Toast "Saved".
+// ONE form in one card, its fields in the order they make sense, with Save at the end. The fields the contractor looks
+// after (name, phone, business name, address, emergency contact) are boxes; the ones only the office changes (the code,
+// login email, ABN, GST, Operating state, trades, insurance, the bank details, status) sit among them frozen with a
+// padlock (Molecules / Field, Frozen state), and the hint under the heading says to call the office. The address is for
+// the file only, so it carries no state check here (unlike Mike's form). Saved shows a Toast "Saved".
 "use client";
 
 import { useState } from "react";
@@ -17,7 +18,6 @@ import type { DetailsDto } from "./types";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 const card = "mb-3 rounded-card border border-hairline bg-surface p-4 sm:p-5";
-const cardTitle = "mb-3.5 font-heading text-base font-extrabold text-ink";
 
 interface Fields {
   name: string;
@@ -105,60 +105,35 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
           e.preventDefault();
           void save();
         }}
+        className={card}
+        data-testid="my-details-form"
       >
-        <div className={card}>
-          <h3 className={cardTitle}>Your details</h3>
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            <Field label="Name" id="d-name" required value={fields.name} onChange={(e) => set("name", e.target.value)} error={errors["name"]} />
-            <Field label="Phone" id="d-phone" required value={fields.phone} onChange={(e) => set("phone", e.target.value)} error={errors["phone"]} helper="Job texts come here." />
-          </div>
-          <Field label="Business name" id="d-businessName" placeholder="Reilly Plumbing" value={fields.businessName} onChange={(e) => set("businessName", e.target.value)} />
-        </div>
-
-        <div className={card}>
-          <h3 className={cardTitle}>Address</h3>
-          <PlacesField
-            id="d-address"
-            label="Address"
-            value={fields.address}
-            onChange={(v) => set("address", v)}
-            error={errors["address"] ?? addressError}
-            onErrorChange={setAddressError}
-            onPickingChange={setAddressPicking}
-          />
-        </div>
-
-        <div className={card}>
-          <h3 className={cardTitle}>Emergency contact</h3>
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            <Field label="Contact name" id="d-ecName" placeholder="Jen Reilly" value={fields.emergencyContactName} onChange={(e) => set("emergencyContactName", e.target.value)} />
-            <Field label="Contact phone" id="d-ecPhone" placeholder="0400 000 000" value={fields.emergencyContactPhone} onChange={(e) => set("emergencyContactPhone", e.target.value)} />
-          </div>
-        </div>
-
-        <div className="mb-3 flex justify-end">
-          <button
-            type="submit"
-            disabled={saving || addressPicking}
-            className={`min-h-11 min-w-[140px] rounded-button px-5 py-2.5 text-sm font-bold disabled:cursor-not-allowed ${
-              saving || addressPicking ? "bg-brand-accent-loading text-on-accent" : "bg-brand-accent text-on-accent"
-            }`}
-          >
-            {saving ? "Saving..." : addressPicking ? "Picking address..." : "Save"}
-          </button>
-        </div>
-      </form>
-
-      <div className={card} data-testid="office-card">
-        <h3 className={cardTitle}>
-          Set by the office <small className="text-xs font-normal text-muted-text">Ring the office to change any of these.</small>
-        </h3>
+        <h3 className="font-heading text-base font-extrabold text-ink">Your details</h3>
+        <p className="mt-1 mb-4 text-small text-secondary-text">
+          Fields with a padlock are set by the office. Please call the office to change them.
+        </p>
         <div className="grid grid-cols-1 gap-x-3.5 sm:grid-cols-2">
+          <Field label="Name" id="d-name" required value={fields.name} onChange={(e) => set("name", e.target.value)} error={errors["name"]} />
           <LockedField label="Contractor code" value={office.code} />
           <LockedField label="Email" value={office.email} helper="This is your login." />
+          <Field label="Phone" id="d-phone" required value={fields.phone} onChange={(e) => set("phone", e.target.value)} error={errors["phone"]} helper="Job texts come here." />
+          <Field label="Business name" id="d-businessName" placeholder="Reilly Plumbing" value={fields.businessName} onChange={(e) => set("businessName", e.target.value)} />
           <LockedField label="ABN" value={office.abn ?? "Not set"} />
           <LockedField label="GST registered" value={gst} />
           <LockedField label="Operating state" value={office.operatingState} />
+          <div className="sm:col-span-2">
+            <PlacesField
+              id="d-address"
+              label="Address"
+              value={fields.address}
+              onChange={(v) => set("address", v)}
+              error={errors["address"] ?? addressError}
+              onErrorChange={setAddressError}
+              onPickingChange={setAddressPicking}
+            />
+          </div>
+          <Field label="Emergency contact name" id="d-ecName" placeholder="Jen Reilly" value={fields.emergencyContactName} onChange={(e) => set("emergencyContactName", e.target.value)} />
+          <Field label="Emergency contact phone" id="d-ecPhone" placeholder="0400 000 000" value={fields.emergencyContactPhone} onChange={(e) => set("emergencyContactPhone", e.target.value)} />
           {office.specialties.map((s) => (
             <LockedField key={s.trade} label={s.trade} value={`Licence ${s.licenceNumber}, expires ${fmtDate(s.licenceExpiry)}`} />
           ))}
@@ -175,7 +150,18 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
           <LockedField label="Account name" value={office.payoutAccountName ?? "Not set"} />
           <LockedField label="Status" value={office.status === "active" ? "Active" : "Deactivated"} />
         </div>
-      </div>
+        <div className="flex justify-end border-t border-hairline pt-4">
+          <button
+            type="submit"
+            disabled={saving || addressPicking}
+            className={`min-h-11 min-w-[140px] rounded-button px-5 py-2.5 text-sm font-bold disabled:cursor-not-allowed ${
+              saving || addressPicking ? "bg-brand-accent-loading text-on-accent" : "bg-brand-accent text-on-accent"
+            }`}
+          >
+            {saving ? "Saving..." : addressPicking ? "Picking address..." : "Save"}
+          </button>
+        </div>
+      </form>
 
       <Toast message={toastMessage} />
     </div>
