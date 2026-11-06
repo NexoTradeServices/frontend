@@ -3,7 +3,7 @@
 // AC1  My details is on Bob's menu and opens /contractor/details
 // AC2  Bob edits his name, phone, business name, address and emergency contact and they hold after a reload
 // AC3  everything else sits in the same form frozen with a padlock -- the bank details too -- and cannot be changed, on the screen or by sending it
-// AC4  the address has no state check; Operating state does not change
+// AC4  a new address must be in the Operating state (WA); Operating state does not change
 //
 // Everything Bob changes is put back afterwards. The bank details are never touched (they are the office's).
 import { test, expect, type Page } from "@playwright/test";
@@ -90,11 +90,15 @@ test("AC3: the rest sits among the fields frozen with a padlock, bank details in
   expect(body.office).toMatchObject({ email: "bob@idelta.com.au", operatingState: "WA", status: "active", payoutBsb: "066-000", payoutAccountNo: "12345678" });
 });
 
-test("AC4: an address in a state we do not operate in is saved, and the Operating state stays", async ({ page }) => {
-  const address = { street: "1 Collins Street", suburb: "Melbourne", state: "VIC", country: "AU", postcode: "3000", lat: -37.81, lng: 144.96, placeId: "e2e-melbourne" };
-  const res = await page.request.put(`${apiUrl}/api/contractor/details`, { data: { ...original, address } });
-  expect(res.status()).toBe(200);
-  const body = (await res.json()) as { own: { address: { state: string } }; office: { operatingState: string } };
-  expect(body.own.address.state).toBe("VIC");
+test("AC4: an address in another state is refused (a new one must be in WA), and the Operating state stays", async ({ page }) => {
+  const vic = { street: "1 Collins Street", suburb: "Melbourne", state: "VIC", country: "AU", postcode: "3000", lat: -37.81, lng: 144.96, placeId: "e2e-melbourne" };
+  const refused = await page.request.put(`${apiUrl}/api/contractor/details`, { data: { ...original, address: vic } });
+  expect(refused.status()).toBe(400);
+  expect(((await refused.json()) as { error: string }).error).toBe("The address must be in WA. Ring the office if you have moved.");
+  const wa = { street: "1 Rokeby Road", suburb: "Subiaco", state: "WA", country: "AU", postcode: "6008", lat: -31.95, lng: 115.82, placeId: "e2e-subiaco" };
+  const ok = await page.request.put(`${apiUrl}/api/contractor/details`, { data: { ...original, address: wa } });
+  expect(ok.status()).toBe(200);
+  const body = (await ok.json()) as { own: { address: { state: string } }; office: { operatingState: string } };
+  expect(body.own.address.state).toBe("WA");
   expect(body.office.operatingState).toBe("WA");
 });

@@ -4,7 +4,7 @@
 // after (name, phone, business name, address, emergency contact) are boxes; the ones only the office changes (the code,
 // login email, ABN, GST, Operating state, trades, insurance, the bank details, status) sit among them frozen with a
 // padlock (Molecules / Field, Frozen state), and the hint under the heading says to call the office. The address is for
-// the file only, so it carries no state check here (unlike Mike's form). Saved shows a Toast "Saved".
+// the file but a NEW one must sit in the Operating state, as on Mike's form (1021). Saved shows a Toast "Saved".
 "use client";
 
 import { useState } from "react";
@@ -50,6 +50,14 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
   const [addressPicking, setAddressPicking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toastMessage, showToast] = useToast();
+
+  // 1021's rule, as on Mike's form: a newly picked address sits in the Operating state.
+  const onFile = initial.own.address;
+  const addressIsNew = fields.address !== null && (onFile === null || onFile.placeId !== fields.address.placeId || onFile.street !== fields.address.street);
+  const addressStateMessage =
+    addressIsNew && fields.address !== null && fields.address.state !== office.operatingState
+      ? `The address must be in ${office.operatingState}. Ring the office if you have moved.`
+      : undefined;
 
   const set = <K extends keyof Fields>(key: K, value: Fields[K]) => setFields((prev) => ({ ...prev, [key]: value }));
 
@@ -127,7 +135,7 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
               label="Address"
               value={fields.address}
               onChange={(v) => set("address", v)}
-              error={errors["address"] ?? addressError}
+              error={addressStateMessage ?? errors["address"] ?? addressError}
               onErrorChange={setAddressError}
               onPickingChange={setAddressPicking}
             />
@@ -156,9 +164,9 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
         <div className="flex justify-end">
           <button
             type="submit"
-            disabled={saving || addressPicking}
+            disabled={saving || addressPicking || addressStateMessage !== undefined}
             className={`min-h-11 min-w-[140px] rounded-button px-5 py-2.5 text-sm font-bold disabled:cursor-not-allowed ${
-              saving || addressPicking ? "bg-brand-accent-loading text-on-accent" : "bg-brand-accent text-on-accent"
+              addressStateMessage !== undefined ? "bg-hairline text-muted-text" : saving || addressPicking ? "bg-brand-accent-loading text-on-accent" : "bg-brand-accent text-on-accent"
             }`}
           >
             {saving ? "Saving..." : addressPicking ? "Picking address..." : "Save"}
