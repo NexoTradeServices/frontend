@@ -1,8 +1,9 @@
 // The contractor's My details page -- Feature 2005. Portal, Medium, Form page.
 //
-// Three form cards the contractor looks after (Address, Emergency contact, Bank details) with ONE Save row, and a
-// card "Set by the office" whose values are frozen (Molecules / Field, Frozen state). The address is for the file
-// only, so it carries no state check here (unlike Mike's form). Saved shows a Toast "Saved".
+// Three form cards the contractor looks after (Your details: name, phone, business name; Address; Emergency contact)
+// with ONE Save row, and a card "Set by the office" whose values are frozen (Molecules / Field, Frozen state): the
+// login email, ABN, GST, Operating state, trades, insurance, status and the BANK DETAILS, which only the office changes.
+// The address is for the file only, so it carries no state check here (unlike Mike's form). Saved shows a Toast "Saved".
 "use client";
 
 import { useState } from "react";
@@ -19,22 +20,22 @@ const card = "mb-3 rounded-card border border-hairline bg-surface p-4 sm:p-5";
 const cardTitle = "mb-3.5 font-heading text-base font-extrabold text-ink";
 
 interface Fields {
+  name: string;
+  phone: string;
+  businessName: string;
   address: PickedAddress | null;
   emergencyContactName: string;
   emergencyContactPhone: string;
-  payoutBsb: string;
-  payoutAccountNo: string;
-  payoutAccountName: string;
 }
 
 function fieldsOf(dto: DetailsDto): Fields {
   return {
+    name: dto.own.name,
+    phone: dto.own.phone,
+    businessName: dto.own.businessName ?? "",
     address: dto.own.address,
     emergencyContactName: dto.own.emergencyContactName ?? "",
     emergencyContactPhone: dto.own.emergencyContactPhone ?? "",
-    payoutBsb: dto.own.payoutBsb ?? "",
-    payoutAccountNo: dto.own.payoutAccountNo ?? "",
-    payoutAccountName: dto.own.payoutAccountName ?? "",
   };
 }
 
@@ -54,7 +55,8 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
 
   async function save() {
     const next: Record<string, string> = {};
-    if (fields.payoutBsb.trim() !== "" && !/^\d{6}$/.test(fields.payoutBsb.replace(/[\s-]/g, ""))) next["payoutBsb"] = "A BSB is six digits.";
+    if (fields.name.trim() === "") next["name"] = "Required.";
+    if (fields.phone.trim() === "") next["phone"] = "Required.";
     if (addressError) next["address"] = addressError;
     setErrors(next);
     if (Object.keys(next).length > 0) {
@@ -69,12 +71,12 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          name: fields.name.trim(),
+          phone: fields.phone.trim(),
+          businessName: orNull(fields.businessName),
           address: fields.address,
           emergencyContactName: orNull(fields.emergencyContactName),
           emergencyContactPhone: orNull(fields.emergencyContactPhone),
-          payoutBsb: orNull(fields.payoutBsb),
-          payoutAccountNo: orNull(fields.payoutAccountNo),
-          payoutAccountName: orNull(fields.payoutAccountName),
         }),
       });
       const body = (await res.json()) as DetailsDto & { error?: string; field?: string };
@@ -105,6 +107,15 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
         }}
       >
         <div className={card}>
+          <h3 className={cardTitle}>Your details</h3>
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <Field label="Name" id="d-name" required value={fields.name} onChange={(e) => set("name", e.target.value)} error={errors["name"]} />
+            <Field label="Phone" id="d-phone" required value={fields.phone} onChange={(e) => set("phone", e.target.value)} error={errors["phone"]} helper="Job texts come here." />
+          </div>
+          <Field label="Business name" id="d-businessName" placeholder="Reilly Plumbing" value={fields.businessName} onChange={(e) => set("businessName", e.target.value)} />
+        </div>
+
+        <div className={card}>
           <h3 className={cardTitle}>Address</h3>
           <PlacesField
             id="d-address"
@@ -120,19 +131,8 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
         <div className={card}>
           <h3 className={cardTitle}>Emergency contact</h3>
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            <Field label="Name" id="d-ecName" placeholder="Jen Reilly" value={fields.emergencyContactName} onChange={(e) => set("emergencyContactName", e.target.value)} />
-            <Field label="Phone" id="d-ecPhone" placeholder="0400 000 000" value={fields.emergencyContactPhone} onChange={(e) => set("emergencyContactPhone", e.target.value)} />
-          </div>
-        </div>
-
-        <div className={card}>
-          <h3 className={cardTitle}>
-            Bank details <small className="text-xs font-normal text-muted-text">where your weekly payout goes</small>
-          </h3>
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-            <Field label="BSB" id="d-bsb" placeholder="066-000" value={fields.payoutBsb} onChange={(e) => set("payoutBsb", e.target.value)} error={errors["payoutBsb"]} />
-            <Field label="Account number" id="d-accountNo" placeholder="12345678" value={fields.payoutAccountNo} onChange={(e) => set("payoutAccountNo", e.target.value)} />
-            <Field label="Account name" id="d-accountName" placeholder="B Reilly" value={fields.payoutAccountName} onChange={(e) => set("payoutAccountName", e.target.value)} />
+            <Field label="Contact name" id="d-ecName" placeholder="Jen Reilly" value={fields.emergencyContactName} onChange={(e) => set("emergencyContactName", e.target.value)} />
+            <Field label="Contact phone" id="d-ecPhone" placeholder="0400 000 000" value={fields.emergencyContactPhone} onChange={(e) => set("emergencyContactPhone", e.target.value)} />
           </div>
         </div>
 
@@ -154,11 +154,8 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
           Set by the office <small className="text-xs font-normal text-muted-text">Ring the office to change any of these.</small>
         </h3>
         <div className="grid grid-cols-1 gap-x-3.5 sm:grid-cols-2">
-          <LockedField label="Name" value={office.name} />
           <LockedField label="Contractor code" value={office.code} />
-          <LockedField label="Email" value={office.email} />
-          <LockedField label="Phone" value={office.phone} />
-          <LockedField label="Business name" value={office.businessName ?? "Not set"} />
+          <LockedField label="Email" value={office.email} helper="This is your login." />
           <LockedField label="ABN" value={office.abn ?? "Not set"} />
           <LockedField label="GST registered" value={gst} />
           <LockedField label="Operating state" value={office.operatingState} />
@@ -173,6 +170,9 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
                 : "Not set"
             }
           />
+          <LockedField label="BSB" value={office.payoutBsb ?? "Not set"} />
+          <LockedField label="Account number" value={office.payoutAccountNo ?? "Not set"} />
+          <LockedField label="Account name" value={office.payoutAccountName ?? "Not set"} />
           <LockedField label="Status" value={office.status === "active" ? "Active" : "Deactivated"} />
         </div>
       </div>

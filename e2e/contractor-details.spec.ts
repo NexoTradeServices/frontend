@@ -1,12 +1,11 @@
 // Feature 2005 -- contractor My details, at the contractor portal's primary (phone) viewport.
 //
 // AC1  My details is on Bob's menu and opens /contractor/details
-// AC2  Bob edits address, emergency contact and bank details and they hold after a reload; a bad BSB is refused
-// AC3  everything else shows under "Set by the office" and cannot be changed, on the screen or by sending it
+// AC2  Bob edits his name, phone, business name, address and emergency contact and they hold after a reload
+// AC3  everything else shows under "Set by the office" -- the bank details too -- and cannot be changed, on the screen or by sending it
 // AC4  the address has no state check; Operating state does not change
 //
-// Bob's bank details are never CHANGED here (a replacement queues the Bank details changed email); the bank
-// fields are saved as loaded. The replace / first-entry emails are proved in the backend tests.
+// Everything Bob changes is put back afterwards. The bank details are never touched (they are the office's).
 import { test, expect, type Page } from "@playwright/test";
 import { login } from "./helpers/login";
 import { MOBILE_VIEWPORT } from "../playwright.config";
@@ -16,12 +15,12 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.idelta.com.au";
 test.use(MOBILE_VIEWPORT);
 
 interface Own {
+  name: string;
+  phone: string;
+  businessName: string | null;
   address: unknown;
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
-  payoutBsb: string | null;
-  payoutAccountNo: string | null;
-  payoutAccountName: string | null;
 }
 
 let original: Own | null = null;
@@ -47,38 +46,43 @@ test("AC1: My details is on the menu and opens the page", async ({ page }) => {
   await page.getByRole("navigation", { name: "Menu" }).getByRole("link", { name: "My details" }).click();
   await expect(page).toHaveURL(/\/contractor\/details$/);
   await expect(page.getByRole("heading", { name: "My details", level: 1 })).toBeVisible();
-  for (const card of ["Address", "Emergency contact", "Bank details"]) await expect(page.getByRole("heading", { name: new RegExp(`^${card}`) })).toBeVisible();
+  for (const card of ["Your details", "Address", "Emergency contact"]) await expect(page.getByRole("heading", { name: new RegExp(`^${card}`) })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Bank details/ })).toHaveCount(0); // they are the office's
 });
 
-test("AC2: an emergency contact saves, shows Saved and holds after a reload; a bad BSB is refused and nothing is sent", async ({ page }) => {
-  await page.getByLabel("Name", { exact: true }).fill("Ann Reilly");
-  await page.getByLabel("Phone", { exact: true }).fill("0400 000 321");
+test("AC2: name, phone, business name and emergency contact save, show Saved and hold after a reload; a blank name is refused", async ({ page }) => {
+  await page.getByLabel("Name", { exact: true }).fill("");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Required.").first()).toBeVisible();
+
+  await page.getByLabel("Name", { exact: true }).fill("Robert Reilly");
+  await page.getByLabel("Phone", { exact: true }).fill("0400 111 222");
+  await page.getByLabel("Business name").fill("Reilly and Son Plumbing");
+  await page.getByLabel("Contact name").fill("Ann Reilly");
+  await page.getByLabel("Contact phone").fill("0400 000 321");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Ann Reilly");
-  await expect(page.getByLabel("Phone", { exact: true })).toHaveValue("0400 000 321");
-
-  const bsb = page.getByLabel("BSB");
-  const before = await bsb.inputValue();
-  await bsb.fill("12345");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByText("A BSB is six digits.")).toBeVisible();
-  await page.reload();
-  await expect(page.getByLabel("BSB")).toHaveValue(before);
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Robert Reilly");
+  await expect(page.getByLabel("Phone", { exact: true })).toHaveValue("0400 111 222");
+  await expect(page.getByLabel("Business name")).toHaveValue("Reilly and Son Plumbing");
+  await expect(page.getByLabel("Contact name")).toHaveValue("Ann Reilly");
 });
 
-test("AC3: the rest sits under Set by the office, frozen, and sending it changes nothing", async ({ page }) => {
+test("AC3: the rest sits under Set by the office, bank details included, frozen, and sending it changes nothing", async ({ page }) => {
   const office = page.getByTestId("office-card");
   await expect(office.getByRole("heading", { name: /Set by the office/ })).toBeVisible();
   await expect(office.getByText("Ring the office to change any of these.")).toBeVisible();
-  for (const text of ["Bob Reilly", "CON-014", "bob@idelta.com.au", "WA"]) await expect(office.getByText(text, { exact: true }).first()).toBeVisible();
+  for (const text of ["CON-014", "bob@idelta.com.au", "WA", "066-000", "12345678", "B Reilly"]) await expect(office.getByText(text, { exact: true }).first()).toBeVisible();
+  for (const label of ["BSB", "Account number", "Account name"]) await expect(office.getByText(label, { exact: true })).toBeVisible();
   await expect(office.locator("input, textarea, select")).toHaveCount(0);
 
-  const res = await page.request.put(`${apiUrl}/api/contractor/details`, { data: { ...original, name: "Not Bob", operatingState: "NSW", status: "suspended" } });
+  const res = await page.request.put(`${apiUrl}/api/contractor/details`, {
+    data: { ...original, email: "not-bob@idelta.com.au", operatingState: "NSW", status: "suspended", payoutBsb: "062-000", payoutAccountNo: "99887766", payoutAccountName: "Not Bob" },
+  });
   expect(res.status()).toBe(200);
-  const body = (await res.json()) as { office: { name: string; operatingState: string; status: string } };
-  expect(body.office).toMatchObject({ name: "Bob Reilly", operatingState: "WA", status: "active" });
+  const body = (await res.json()) as { office: { email: string; operatingState: string; status: string; payoutBsb: string; payoutAccountNo: string } };
+  expect(body.office).toMatchObject({ email: "bob@idelta.com.au", operatingState: "WA", status: "active", payoutBsb: "066-000", payoutAccountNo: "12345678" });
 });
 
 test("AC4: an address in a state we do not operate in is saved, and the Operating state stays", async ({ page }) => {

@@ -91,18 +91,17 @@ test.describe(() => {
     await expect(page.getByText("Nothing on your list right now.").locator("xpath=..")).toHaveCSS("border-top-left-radius", "10px");
   });
 
-  test("AC7: Priya's panel -- her own two items, Mike's one, no address/EC nudge", async ({ page }) => {
+  test("AC7: Priya's panel -- her one own item, the office's two, no address/EC nudge", async ({ page }) => {
     await page.goto("/contractor");
     await login(page, "priya@idelta.com.au");
     await expect(page.getByText("Not ready to dispatch")).toBeVisible();
 
     const panel = page.locator("ul").filter({ hasText: "service area" });
     await expect(panel.getByText("service area (not set up yet)")).toBeVisible();
-    await expect(panel.getByRole("link", { name: "Fix now" })).toHaveCount(2); // her two built destinations: service area and (2005) My details
-    await expect(panel.locator("li").filter({ hasText: "payout details" }).getByRole("link", { name: "Fix now" })).toHaveAttribute("href", "/contractor/details");
+    await expect(panel.getByRole("link", { name: "Fix now" })).toHaveCount(1); // her one built destination (the bank details are the office's: 2005)
     await expect(panel.getByText("payout details")).toBeVisible();
     await expect(panel.getByText("insurance renewal (expired)")).toBeVisible();
-    await expect(panel.getByText("Call the office")).toBeVisible();
+    await expect(panel.getByText("Call the office")).toHaveCount(2); // payout details and insurance
     await expect(panel.getByText("own address")).toHaveCount(0);
     await expect(panel.getByText("emergency contact")).toHaveCount(0);
   });

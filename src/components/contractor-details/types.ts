@@ -3,19 +3,19 @@ import type { PickedAddress } from "@/components/ui/places-field";
 
 export interface DetailsDto {
   own: {
+    name: string;
+    phone: string;
+    businessName: string | null;
     address: PickedAddress | null;
     emergencyContactName: string | null;
     emergencyContactPhone: string | null;
+  };
+  office: {
+    code: string;
+    email: string;
     payoutBsb: string | null;
     payoutAccountNo: string | null;
     payoutAccountName: string | null;
-  };
-  office: {
-    name: string;
-    code: string;
-    email: string;
-    phone: string;
-    businessName: string | null;
     abn: string | null;
     gstRegistered: boolean | null;
     operatingState: string;
