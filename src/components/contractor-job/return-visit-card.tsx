@@ -7,6 +7,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Dialog } from "radix-ui";
 import { Banner } from "@/components/auth/banner";
 import { Field } from "@/components/auth/field";
 import { SelectField } from "@/components/ui/select-field";
@@ -77,7 +78,6 @@ export function ReturnVisitCard({
   onChange,
   error,
   onDay,
-  onOverlap,
 }: {
   reference: string;
   zone: string;
@@ -87,8 +87,6 @@ export function ReturnVisitCard({
   error?: string;
   /** Tells the screen what the day says (a holiday), so it can grey the Primary. */
   onDay?: (day: { closed: string | null } | null) => void;
-  /** Tells the screen when the picked time sits over time he switched off, so it can ask before booking it. */
-  onOverlap?: (over: boolean) => void;
 }) {
   const [day, setDay] = useState<DayData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -97,6 +95,8 @@ export function ReturnVisitCard({
   // time he switched off -- and never in the past today (the same smart pick as dispatch). A tap of his own is left alone.
   const wantedStart = useRef(draft.startMinutes);
   const tapped = useRef(false);
+  // A tap that would book over time he switched off is asked about right there, before the picture changes.
+  const [ask, setAsk] = useState<number | null>(null);
 
   useEffect(() => {
     if (draft.choice !== "pick" || draft.date === "") return;
@@ -146,13 +146,12 @@ export function ReturnVisitCard({
   const close = day === null ? 1140 : minutesOfClock(day.closingTime);
   const end = draft.startMinutes + draft.holdMinutes;
   const overlapsOff = day !== null && day.notAvailable.some((run) => run.startMinutes < end && run.endMinutes > draft.startMinutes && run.startMinutes < close && run.endMinutes > open);
-  const overlapReported = useRef(false);
-  const overlapNow = overlapsOff && draft.choice === "pick" && draft.startPicked && !day?.closed;
-  useEffect(() => {
-    if (overlapReported.current === overlapNow) return;
-    overlapReported.current = overlapNow;
-    onOverlap?.(overlapNow);
-  });
+
+  function takeSlot(minutes: number) {
+    tapped.current = true;
+    wantedStart.current = minutes;
+    set({ startMinutes: minutes, startPicked: true });
+  }
 
   function stepDay(delta: -1 | 1) {
     tapped.current = false;
@@ -225,9 +224,12 @@ export function ReturnVisitCard({
             proposedStart={draft.startMinutes}
             proposedEnd={end}
             onPickHalfHour={(minutes) => {
-              tapped.current = true;
-              wantedStart.current = minutes;
-              set({ startMinutes: minutes, startPicked: true });
+              const over = (day?.notAvailable ?? []).some((run) => run.startMinutes < minutes + draft.holdMinutes && run.endMinutes > minutes);
+              if (over && (minutes !== draft.startMinutes || !overlapsOff)) {
+                setAsk(minutes);
+                return;
+              }
+              takeSlot(minutes);
             }}
             onStepDay={stepDay}
             openMinutes={open}
@@ -245,6 +247,33 @@ export function ReturnVisitCard({
       ) : error ? (
         <Banner kind="error">{error}</Banner>
       ) : null}
+      <Dialog.Root open={ask !== null} onOpenChange={(next) => (next ? undefined : setAsk(null))}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-[60] bg-ink/40" />
+          <Dialog.Content
+            aria-describedby={undefined}
+            className="fixed top-1/2 left-1/2 z-[60] w-[calc(100%-2rem)] max-w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-card border border-hairline bg-surface p-5 outline-none"
+          >
+            <Dialog.Title className="font-heading text-base font-extrabold text-ink">Book over your Not available time?</Dialog.Title>
+            <p className="mt-2 text-small text-secondary-text">You marked this time Not available. Booking it will make it Available.</p>
+            <div className="mt-4 flex justify-end gap-2.5">
+              <button type="button" onClick={() => setAsk(null)} className="min-h-11 rounded-button border border-hairline bg-surface px-4 text-sm font-bold text-ink">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (ask !== null) takeSlot(ask);
+                  setAsk(null);
+                }}
+                className="min-h-11 rounded-button bg-brand-accent px-4 text-sm font-bold text-on-accent"
+              >
+                Use this time
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }
