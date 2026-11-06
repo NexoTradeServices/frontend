@@ -566,8 +566,9 @@ test.describe("1021 -- operating states", () => {
       await expect(page).toHaveURL(/\/ops\/settings\/holidays\?holidayState=VIC$/);
       await expect(page.getByLabel("State", { exact: true })).toHaveValue("VIC");
 
-      // AC1: untick NSW (and take VIC off again), save, reload - it holds and says who and when.
-      await page.getByLabel("Victoria (VIC)").uncheck();
+      // AC1: back on Settings (the unsaved VIC tick is gone), untick NSW, save, reload - it holds and says who and when.
+      await page.goto("/ops/settings");
+      await expect(page.getByLabel("Victoria (VIC)")).not.toBeChecked();
       await page.getByLabel("New South Wales (NSW)").uncheck();
       await page.getByRole("button", { name: "Save settings" }).click();
       await expect(page.getByText("Saved.")).toBeVisible();

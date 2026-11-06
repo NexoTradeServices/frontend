@@ -36,7 +36,6 @@ export default async function OpsContractorAvailabilityPage({
         key={initial.week}
         base={`/api/contractors/${code}`}
         initial={initial}
-        calendarHref={`/ops/contractors/${code}/calendar`}
       />
     </Container>
   );

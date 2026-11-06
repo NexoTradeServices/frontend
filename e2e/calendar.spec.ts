@@ -2,7 +2,7 @@
 //
 // AC1  Bob's menu has Calendar and Availability; Mike has the same two tabs on Bob's record
 // AC2  Calendar draws day and month on a phone, week and month from a tablet up; a job shows ON its block with its status
-//      look; a public holiday is a Closed day; "Change availability" goes to Availability on that week
+//      look; a public holiday is a closed day (rose, with its name); the Calendar is look-only (no Change availability link)
 //
 // Runs against the seeded dev database: Bob's JOB-1042 (waiting on his answer) and JOB-1051 (booked today) are the blocks.
 import { test, expect } from "@playwright/test";
@@ -40,6 +40,7 @@ test.describe("desktop and tablet: the week and the month", () => {
     await expect(page.getByTestId("week-view")).toBeVisible({ timeout: 15_000 });
     // JOB-1042 waits on Bob (To answer, dashed); find it in this week or the next.
     const toAnswer = page.locator('[data-status="to_answer"]');
+    await page.waitForLoadState("networkidle"); // the week's data has arrived before we count
     if ((await toAnswer.count()) === 0) await page.getByRole("button", { name: "Next" }).click();
     await expect(toAnswer.first()).toBeVisible({ timeout: 15_000 });
     await expect(toAnswer.first()).toContainText(/JOB-\d+ \w+/);
@@ -66,16 +67,15 @@ test.describe("desktop and tablet: the week and the month", () => {
     const cell = page.getByRole("button", { name: new RegExp(`closed - ${holiday.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i") }).first();
     await expect(cell).toBeVisible({ timeout: 15_000 });
     await cell.click(); // a tap opens that day
-    await expect(page.getByTestId("closed-day").filter({ hasText: `Closed - ${holiday.name}` }).first()).toBeVisible();
+    await expect(page.getByTestId("closed-day").filter({ hasText: holiday.name }).first()).toBeVisible();
   });
 
-  test("AC2: Change availability opens Availability on the week in view", async ({ page }) => {
+  test("AC2: the Calendar is look-only - one swatch legend, and no Change availability link", async ({ page }) => {
     await page.goto("/contractor/calendar");
     await login(page, "bob@idelta.com.au");
     await expect(page.getByTestId("week-view")).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("link", { name: "Change availability" }).click();
-    await expect(page).toHaveURL(/\/contractor\/availability\?week=\d{4}-\d{2}-\d{2}$/);
-    await expect(page.getByTestId("availability-grid")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("calendar-legend")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Change availability" })).toHaveCount(0);
   });
 });
 

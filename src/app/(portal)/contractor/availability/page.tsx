@@ -23,8 +23,8 @@ export default async function ContractorAvailabilityPage({
   const initial = (await res.json()) as WeekDto;
   return (
     <Container width="wide">
-      <PageHeader title="Availability" subtitle="The times you can work. Booked jobs stay as they are." />
-      <AvailabilityGrid key={initial.week} base="/api/contractor" initial={initial} calendarHref="/contractor/calendar" />
+      <PageHeader title="Availability" />
+      <AvailabilityGrid key={initial.week} base="/api/contractor" initial={initial} />
     </Container>
   );
 }

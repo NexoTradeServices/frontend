@@ -183,7 +183,7 @@ test("1020 AC7: a public holiday of the suburb's state shows as the date's error
   await expect(suburb).toHaveValue(/Fremantle WA/, { timeout: 20_000 });
   await fillCustomerAndJob(page, "1020");
   await page.getByLabel("Date").fill("2099-12-25");
-  await expect(page.getByText("We're closed on Sat 25 Dec 2099 for Christmas Day. Please pick another date.")).toBeVisible();
+  await expect(page.getByText("We're closed on Fri 25 Dec 2099 for Christmas Day. Please pick another date.")).toBeVisible();
   // The message takes the place of the time-of-day choices, and Create job is greyed.
   await expect(page.getByText("Time of day")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Create job" })).toBeDisabled();

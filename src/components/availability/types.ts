@@ -1,5 +1,5 @@
 // Shapes for the Availability grid and the Calendar -- Feature 2004. Mirrors backend/src/availability/.
-export type SlotState = "available" | "not_available" | "booked" | "to_answer" | "closed" | "past";
+export type SlotState = "available" | "not_available" | "booked" | "in_progress" | "to_answer" | "closed" | "past";
 
 export interface WeekDto {
   /** the Monday, YYYY-MM-DD, in the contractor's zone */
@@ -9,7 +9,7 @@ export interface WeekDto {
   openingTime: string;
   closingTime: string;
   availabilitySet: boolean;
-  days: { date: string; closed: string | null; slots: { time: string; state: SlotState }[] }[];
+  days: { date: string; closed: string | null; slots: { time: string; state: SlotState; job?: string | null }[] }[];
 }
 
 export type CalendarStatus = "booked" | "to_answer" | "in_progress" | "finished";

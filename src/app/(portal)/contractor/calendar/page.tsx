@@ -17,8 +17,8 @@ export default async function ContractorCalendarPage() {
   const initial = (await res.json()) as CalendarDto;
   return (
     <Container width="wide">
-      <PageHeader title="Calendar" subtitle="The work ahead, and the days we are closed." />
-      <ContractorCalendar base="/api/contractor" initial={initial} availabilityHref="/contractor/availability" />
+      <PageHeader title="Calendar" />
+      <ContractorCalendar base="/api/contractor" initial={initial} />
     </Container>
   );
 }

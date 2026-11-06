@@ -10,7 +10,7 @@
 // counted -- and Send new time swaps the bookings.
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fullAddress } from "@/components/ui/places-field";
 import { ChangeAvailabilityDialog } from "./change-availability-dialog";
@@ -103,11 +103,6 @@ function CandidateRowButton({
     >
       <div className="mb-1 flex flex-wrap items-center gap-2">
         <span className="font-heading text-small font-extrabold text-ink">{row.code}</span>
-        {row.notAvailable ? (
-          <span className="inline-block rounded bg-not-available px-2 py-0.5 text-field-label font-bold tracking-[0.04em] text-secondary-text uppercase">
-            Not available
-          </span>
-        ) : null}
         <span
           className={`inline-block rounded px-2 py-0.5 text-field-label font-bold tracking-[0.04em] uppercase ${
             row.ready ? "bg-success-bg text-brand-success" : "bg-warning-bg text-brand-warning"
@@ -124,7 +119,7 @@ function CandidateRowButton({
           {distanceText} - {payText}
           {ratingText}
         </div>
-        {row.why ? <div className="font-semibold text-brand-warning">{row.why}</div> : null}
+        {row.why && !row.notAvailable ? <div className="font-semibold text-brand-warning">{row.why}</div> : null}
         {row.availabilityNotSet ? <div className="text-field-label text-muted-text">Availability not set</div> : null}
       </div>
     </button>
@@ -151,6 +146,9 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
   const [candidates, setCandidates] = useState<CandidatesResponse | null>(null);
   const [candidatesLoading, setCandidatesLoading] = useState(true);
   const [dayBlocks, setDayBlocks] = useState<DayBlock[]>([]);
+  const [dayOff, setDayOff] = useState<{ startMinutes: number; endMinutes: number }[]>([]);
+  /** which pick + day + refresh the loaded blocks belong to, so a stale day from another contractor is never used */
+  const [dayFor, setDayFor] = useState("");
   const [dayLoading, setDayLoading] = useState(false);
   const [dispatching, setDispatching] = useState(false);
   const [dispatchError, setDispatchError] = useState<string | undefined>();
@@ -212,17 +210,24 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
     const timer = window.setTimeout(() => {
       if (!pickedCode) {
         setDayBlocks([]);
+        setDayOff([]);
         return;
       }
       setDayLoading(true);
       const ignore = reschedule ? `&ignoreJob=${encodeURIComponent(initial.reference)}` : "";
       fetch(`${apiUrl}/api/contractors/${encodeURIComponent(pickedCode)}/day?date=${date}&job=${encodeURIComponent(initial.reference)}${ignore}`, { credentials: "include" })
-        .then((res) => (res.ok ? (res.json() as Promise<{ blocks: DayBlock[] }>) : null))
+        .then((res) => (res.ok ? (res.json() as Promise<{ blocks: DayBlock[]; notAvailable?: { startMinutes: number; endMinutes: number }[] }>) : null))
         .then((body) => {
-          if (!cancelled) setDayBlocks(body?.blocks ?? []);
+          if (cancelled) return;
+          setDayBlocks(body?.blocks ?? []);
+          setDayOff(body?.notAvailable ?? []);
+          setDayFor(`${pickedCode}|${date}|${String(refreshTick)}`);
         })
         .catch(() => {
-          if (!cancelled) setDayBlocks([]);
+          if (cancelled) return;
+          setDayBlocks([]);
+          setDayOff([]);
+          setDayFor("");
         })
         .finally(() => {
           if (!cancelled) setDayLoading(false);
@@ -232,17 +237,39 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [pickedCode, date, reschedule, initial.reference]);
+  }, [pickedCode, date, reschedule, initial.reference, refreshTick]);
 
   const allRows = candidates ? [...candidates.serves, ...candidates.outside] : [];
   const pickedRow = allRows.find((row) => row.code === pickedCode) ?? null;
   const canGo = pickedRow !== null && pickedRow.pickable && holidayName === undefined;
+
+  // Feature 2004: the moment a contractor is picked, the proposed start is the first half hour at or after the time asked for
+  // that this contractor can take - never over a booked, in-progress, to-answer or switched-off time. Mike's own choice of
+  // start (the Start list or a tap on the grid) is what it looks forward from.
+  const wantedStart = useRef(startMinutes);
+  useEffect(() => {
+    if (reschedule || pickedRow === null || holidayName !== undefined || dayFor !== `${pickedCode ?? ""}|${date}|${String(refreshTick)}`) return;
+    const free = (from: number) =>
+      !dayOff.some((run) => run.startMinutes < from + holdMinutes && run.endMinutes > from) &&
+      !dayBlocks.some((block) => block.startMinutes < from + holdMinutes && block.endMinutes > from);
+    let target = wantedStart.current;
+    for (let from = wantedStart.current; from + holdMinutes <= closeMinutes; from += 30) {
+      if (free(from)) {
+        target = from;
+        break;
+      }
+    }
+    if (target !== startMinutes) {
+      setStartMinutes(target);
+    }
+  }, [reschedule, pickedRow, pickedCode, holidayName, dayFor, date, refreshTick, dayOff, dayBlocks, holdMinutes, closeMinutes, startMinutes]);
 
   function stepDay(delta: -1 | 1) {
     setDate((current) => addDays(current, delta));
   }
 
   function pickHalfHour(minutes: number) {
+    wantedStart.current = minutes;
     setStartMinutes(minutes);
   }
 
@@ -263,7 +290,12 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
       });
       const payload = (await res.json()) as { toast?: string; error?: string };
       if (!res.ok) {
-        setDispatchError(payload.error ?? (reschedule ? "Reschedule failed." : "Dispatch failed."));
+        // Mike's list was out of date: say plainly what happened and what to do (the grey hours on the day are now up to date).
+        setDispatchError(
+          res.status === 409 && payload.error?.startsWith("Not available at that time")
+            ? `${pickedRow.name.split(" ")[0] ?? pickedRow.name} has just switched that time off. Nothing was sent. Pick a free time (the grey hours are off) or another contractor.`
+            : (payload.error ?? (reschedule ? "Reschedule failed." : "Dispatch failed.")),
+        );
         setRefreshTick((tick) => tick + 1); // the list may have changed under Mike (a time switched off, a clash)
         return;
       }
@@ -306,7 +338,10 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
               <select
                 id="dispatch-start"
                 value={startMinutes}
-                onChange={(event) => setStartMinutes(Number(event.target.value))}
+                onChange={(event) => {
+                  wantedStart.current = Number(event.target.value);
+                  setStartMinutes(Number(event.target.value));
+                }}
                 disabled={holidayName !== undefined}
                 className="min-h-11 w-full rounded-button border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
               >
@@ -350,6 +385,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
             <CalendarDayView
               dayLabel={`${fixedFirstName}'s ${shortDateOf(date)}`}
               blocks={dayBlocks}
+              notAvailable={dayOff}
               proposedStart={startMinutes}
               proposedEnd={startMinutes + holdMinutes}
               onPickHalfHour={pickHalfHour}
@@ -392,6 +428,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                       <CalendarDayView
                         dayLabel={`${row.name.split(" ")[0] ?? row.name}'s ${shortDateOf(date)}`}
                         blocks={dayBlocks}
+                        notAvailable={dayOff}
                         proposedStart={startMinutes}
                         proposedEnd={startMinutes + holdMinutes}
                         onPickHalfHour={pickHalfHour}
@@ -432,6 +469,7 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
                       <CalendarDayView
                         dayLabel={`${row.name.split(" ")[0] ?? row.name}'s ${shortDateOf(date)}`}
                         blocks={dayBlocks}
+                        notAvailable={dayOff}
                         proposedStart={startMinutes}
                         proposedEnd={startMinutes + holdMinutes}
                         onPickHalfHour={pickHalfHour}

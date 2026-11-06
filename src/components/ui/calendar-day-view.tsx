@@ -39,6 +39,7 @@ function topOf(minutes: number, dayStart: number): number {
 export function CalendarDayView({
   dayLabel,
   blocks,
+  notAvailable = [],
   proposedStart,
   proposedEnd,
   onPickHalfHour,
@@ -52,6 +53,8 @@ export function CalendarDayView({
   /** e.g. "Bob's Mon 14 Sep" -- the caller composes it, this component only draws the grid. */
   dayLabel: string;
   blocks: DayBlock[];
+  /** Feature 2004: runs the contractor has switched off (minutes from midnight); drawn grey behind the blocks. */
+  notAvailable?: { startMinutes: number; endMinutes: number }[];
   proposedStart: number;
   proposedEnd: number;
   onPickHalfHour: (minutes: number) => void;
@@ -77,6 +80,11 @@ export function CalendarDayView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dayLabel]);
 
+  // A start is closed when the hold from there would run into a job (booked, in progress, to answer, a hold) or a switched-off time.
+  const holdLength = proposedEnd - proposedStart;
+  const takenStart = (from: number) =>
+    blocks.some((block) => block.startMinutes < from + holdLength && block.endMinutes > from) ||
+    notAvailable.some((run) => run.startMinutes < from + holdLength && run.endMinutes > from);
   const clashes = blocks.some((block) => block.startMinutes < proposedEnd && block.endMinutes > proposedStart);
   const rows: number[] = [];
   for (let m = openMinutes; m < closeMinutes; m += 30) rows.push(m);
@@ -124,7 +132,7 @@ export function CalendarDayView({
                 <button
                   type="button"
                   onClick={() => onPickHalfHour(minutes)}
-                  disabled={lastStartMinutes !== undefined && minutes > lastStartMinutes}
+                  disabled={(lastStartMinutes !== undefined && minutes > lastStartMinutes) || (takenStart(minutes) && minutes !== proposedStart)}
                   aria-label={`Start at ${timeLabelFor(minutes)}`}
                   className={`h-11 border-t px-2 text-left enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:bg-ground ${
                     half ? "border-dashed border-hairline" : "border-hairline"
@@ -134,6 +142,21 @@ export function CalendarDayView({
             );
           })}
           <div className="pointer-events-none absolute inset-y-0 left-[58px] right-0">
+            {notAvailable.map((run, index) => {
+              const start = Math.max(run.startMinutes, openMinutes);
+              const end = Math.min(run.endMinutes, closeMinutes);
+              if (end <= start) return null;
+              return (
+                <div
+                  key={`off-${String(run.startMinutes)}-${String(index)}`}
+                  data-testid="not-available-run"
+                  style={{ top: `${String(topOf(start, openMinutes))}px`, height: `${String(topOf(end, openMinutes) - topOf(start, openMinutes))}px` }}
+                  className="absolute inset-x-0 bg-not-available/80 px-2 pt-1 text-field-label font-semibold text-secondary-text"
+                >
+                  Not available
+                </div>
+              );
+            })}
             {blocks.map((block, index) => (
               <div
                 key={`${String(block.startMinutes)}-${String(index)}`}

@@ -303,24 +303,30 @@ test("1020 AC3, AC6: start times and the day view stay inside the opening hours;
 
 // Feature 2004 -- Availability on the dispatch page
 //
-// AC12 a switched-off hour greys the contractor's row with a "Not available" tag; the server refuses it too
+// AC12 a day with nothing free greys the contractor's row (no tag); the server refuses it too
 // AC13 "Change availability" shows when that is the only problem; it opens a one-day pop-up; saved, the slot can be dispatched
+//      (when Bob has a free half hour that day the job box simply starts there)
 // AC14 time switched off just before dispatch is refused and the list refreshes
-test("2004 AC12, AC13: a Not available row says so, Change availability opens one day and Save frees the slot", async ({ page, request }) => {
+test("2004 AC12, AC13: a day with nothing free greys the row, Change availability opens one day and Save frees the slot", async ({ page, request }) => {
   await page.goto("/ops/jobs");
   await login(page, "mike@idelta.com.au");
   const day = await pickFreeWeekday(page);
   const reference = await postEnquiry(request, "av13", "Plumbing", FREMANTLE, day);
   await putBillingAddress(page, reference);
   const off = await page.request.put(`${apiUrl}/api/contractors/CON-014/availability`, {
-    data: { changes: [{ date: day, time: "07:00", available: false }, { date: day, time: "07:30", available: false }] },
+    data: {
+      changes: Array.from({ length: 24 }, (_, i) => ({
+        date: day,
+        time: `${String(7 + Math.floor(i / 2)).padStart(2, "0")}:${i % 2 === 0 ? "00" : "30"}`,
+        available: false,
+      })),
+    },
   });
   expect(off.status()).toBe(200);
 
   await page.goto(`/ops/jobs/${reference}/dispatch`);
   const bobRow = page.getByRole("button", { name: /Bob Reilly/ });
   await expect(bobRow).toBeVisible();
-  await expect(bobRow.getByText("Not available", { exact: true }).first()).toBeVisible();
   await bobRow.click();
   await expect(page.getByRole("button", { name: "Dispatch", exact: true })).toBeDisabled();
 
@@ -332,7 +338,6 @@ test("2004 AC12, AC13: a Not available row says so, Change availability opens on
   await dialog.getByRole("button", { name: /7:30am not available$/ }).click();
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /Bob Reilly/ }).getByText("Not available", { exact: true })).toHaveCount(0);
   // Bob stays picked; with the list refreshed he can be dispatched.
   const go = page.getByRole("button", { name: /Dispatch to Bob/ });
   await expect(go).toBeEnabled({ timeout: 10_000 });
@@ -356,6 +361,7 @@ test("2004 AC14: time switched off just before dispatch is refused, and the list
   });
   expect(off.status()).toBe(200);
   await go.click();
-  await expect(page.getByText("Not available at that time - pick another slot or another contractor.")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Bob Reilly/ }).getByText("Not available", { exact: true }).first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/Bob has just switched that time off\. Nothing was sent\./)).toBeVisible();
+  // the day is read again and the job box moves to Bob's next free half hour (7:30am)
+  await expect(page.getByLabel("Start (WA time)")).toHaveValue("450", { timeout: 10_000 });
 });

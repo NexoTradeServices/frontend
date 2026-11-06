@@ -23,7 +23,7 @@ export default async function OpsContractorCalendarPage({ params }: { params: Pr
   return (
     <Container width="wide">
       <ContractorRecordHeader contractor={contractor} activeTab="calendar" />
-      <ContractorCalendar base={`/api/contractors/${code}`} initial={initial} availabilityHref={`/ops/contractors/${code}/availability`} />
+      <ContractorCalendar base={`/api/contractors/${code}`} initial={initial} />
     </Container>
   );
 }

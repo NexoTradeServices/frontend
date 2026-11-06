@@ -1,7 +1,7 @@
 // Feature 2004 -- Availability, frontend e2e (ADR 0001).
 //
 // AC3  Bob switches half hours off, Saves, and they hold after a reload
-// AC4  Day off / Day on, Copy to next day, Copy to next week (and "Replace it?" when that week is set)
+// AC4  Day off / Day on, Copy to next day, Copy to next week (and "Replace next week?" when that week is set)
 // AC5  click and drag paints a run on desktop; a tablet is tap only
 // AC6  tapping a half hour a job holds says to ring the office
 // AC7  past half hours and holidays are locked
@@ -69,12 +69,12 @@ test("AC4: Day off switches a whole day off and the button reads Day on; Copy to
   await expect(slot(page, WEEK_DAYOFF, 0, "7:00am", "available")).toBeVisible();
 });
 
-test("AC4, AC8: Copy to next week saves the unsaved taps with it, moves to that week, and asks 'Replace it?' when that week is already set", async ({ page }) => {
+test("AC4, AC8: Copy to next week saves the unsaved taps with it, moves to that week, and asks 'Replace next week?' when that week is already set", async ({ page }) => {
   const next = "2027-05-10";
   await openBob(page, WEEK_COPY);
   await slot(page, WEEK_COPY, 2, "9:00am", "available").click(); // an unsaved tap
   await page.getByRole("button", { name: "Copy to next week", exact: true }).click();
-  await expect(page.getByText("Copied to next week.")).toBeVisible();
+  await expect(page.getByText(/This week is copied to next week \(week of 10 May\)\./)).toBeVisible();
   await expect(page.getByRole("heading", { name: /Week of 10 May/ })).toBeVisible();
   await expect(slot(page, next, 2, "9:00am", "not available")).toBeVisible();
   // the tap was saved with the copy: back on the first week it holds
@@ -83,7 +83,7 @@ test("AC4, AC8: Copy to next week saves the unsaved taps with it, moves to that 
   await expect(slot(page, WEEK_COPY, 2, "9:00am", "not available")).toBeVisible();
   // the next week is now set - copying again asks
   await page.getByRole("button", { name: "Copy to next week", exact: true }).click();
-  await expect(page.getByRole("alertdialog").getByRole("heading", { name: "Replace it?" })).toBeVisible();
+  await expect(page.getByRole("alertdialog").getByRole("heading", { name: "Replace next week?" })).toBeVisible();
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("heading", { name: /Week of 3 May/ })).toBeVisible();
   await page.getByRole("button", { name: "Copy to next week", exact: true }).click();
@@ -151,7 +151,7 @@ test("AC6: tapping a half hour a job holds says to ring the office, and changes 
   void request;
 });
 
-test("AC7: a past half hour is locked, and so is a public holiday ('Closed - <name>')", async ({ page, request }) => {
+test("AC7: a past half hour is locked, and so is a public holiday (rose, with its name)", async ({ page, request }) => {
   await openBob(page, new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10));
   const past = page.locator('[data-state="past"]').first();
   await expect(past).toBeVisible();
@@ -169,7 +169,7 @@ test("AC7: a past half hour is locked, and so is a public holiday ('Closed - <na
   await expect(closed).toBeVisible();
   await closed.click();
   await expect(page.locator(".ring-brand-accent")).toHaveCount(0);
-  await expect(page.getByText(`Closed - ${holiday.name}`).first()).toBeVisible();
+  await expect(page.getByText(holiday.name).first()).toBeVisible();
 });
 
 test("Mike sets Bob's half hours through the Availability tab on his record, and Bob sees them", async ({ page, browser }) => {
