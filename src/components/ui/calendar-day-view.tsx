@@ -89,6 +89,16 @@ export function CalendarDayView({
     blocks.some((block) => block.startMinutes < from + holdLength && block.endMinutes > from) ||
     (!allowNotAvailable && notAvailable.some((run) => run.startMinutes < from + holdLength && run.endMinutes > from));
   const clashes = blocks.some((block) => block.startMinutes < proposedEnd && block.endMinutes > proposedStart);
+  // Feature 5002: on the contractor's own picker, time he picks over turns Available in the picture (booking makes it so);
+  // everywhere else the grey stays under the proposal.
+  const shownOff = allowNotAvailable
+    ? notAvailable.flatMap((run) => {
+        const pieces: { startMinutes: number; endMinutes: number }[] = [];
+        if (run.startMinutes < proposedStart) pieces.push({ startMinutes: run.startMinutes, endMinutes: Math.min(run.endMinutes, proposedStart) });
+        if (run.endMinutes > proposedEnd) pieces.push({ startMinutes: Math.max(run.startMinutes, proposedEnd), endMinutes: run.endMinutes });
+        return run.endMinutes <= proposedStart || run.startMinutes >= proposedEnd ? [run] : pieces;
+      })
+    : notAvailable;
   const rows: number[] = [];
   for (let m = openMinutes; m < closeMinutes; m += 30) rows.push(m);
 
@@ -145,7 +155,7 @@ export function CalendarDayView({
             );
           })}
           <div className="pointer-events-none absolute inset-y-0 left-[58px] right-0">
-            {notAvailable.map((run, index) => {
+            {shownOff.map((run, index) => {
               const start = Math.max(run.startMinutes, openMinutes);
               const end = Math.min(run.endMinutes, closeMinutes);
               if (end <= start) return null;
