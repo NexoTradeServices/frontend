@@ -368,6 +368,8 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
   const idle = !arrived && !frozen;
   // between visits (and after Complete) what is saved shows, locked; the Locked-at-completion words are only for a completed job
   const readOnly = !working;
+  // a visit has been worked and saved: the notes and parts show, empty or not, until the next arrival
+  const visited = rows.some((row) => !isBlankRow(row));
   const onHold = job.jobStatus === "on_hold";
   const isCallback = job.callbackOn !== null;
   const changed = snapshotOf(rows, notes, parts, pick) !== saved;
@@ -883,7 +885,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               )}
             </Card>
           ) : null}
-{frozen || working || notes.trim() !== "" ? (
+{frozen || working || visited ? (
           <Card title="Work notes">
             {readOnly ? (
               <LockedValue label="Work notes" hideLabel value={notes === "" ? "-" : notes} message={frozen} />
@@ -915,7 +917,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
         </div>
 
         <div className="order-4 min-w-0 xl:col-start-1 xl:row-start-3">
-{frozen || working || parts.some((part) => !isBlankPart(part)) ? (
+{frozen || working || visited ? (
           <Card title="Parts used" aside={`Up to ${capLabel} in total`}>
             {parts.length === 0 && readOnly ? <p className="text-small text-muted-text">No parts.</p> : null}
             {parts.map((part, index) => {
