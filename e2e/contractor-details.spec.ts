@@ -52,6 +52,7 @@ test("AC1: My details is on the menu and opens the page", async ({ page }) => {
   for (const group of ["Emergency contact", "Trades and licences", "Insurance", "Bank details"]) await expect(form.getByRole("heading", { name: group })).toBeVisible();
   await expect(form.getByText("Fields with a padlock are set by the office. Please call the office to change them.")).toBeVisible();
   await expect(form.getByRole("button", { name: "Save", exact: true })).toBeVisible();
+  await expect(form).toHaveAttribute("autocomplete", "off"); // a refresh shows what is saved, not what the browser remembers
   await expect(page.getByRole("heading", { name: /^(Address|Set by the office)/ })).toHaveCount(0);
 });
 

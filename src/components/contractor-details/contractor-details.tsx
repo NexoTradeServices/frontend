@@ -109,6 +109,8 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
       {formError ? <Banner kind="error">{formError}</Banner> : null}
       <form
         noValidate
+        // a browser refresh must show what is SAVED, not the values the browser remembers for the boxes
+        autoComplete="off"
         onSubmit={(e) => {
           e.preventDefault();
           void save();
