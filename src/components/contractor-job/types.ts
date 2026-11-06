@@ -72,6 +72,8 @@ export interface ContractorJobDto {
   canOnSite: boolean;
   /** Feature 5002: Book a return visit is offered. */
   canBookReturn: boolean;
+  /** Feature 5002: how many visit rows Bob may hold -- one per booked block. */
+  visitsAllowed: number;
   /** Feature 5004: null (no visit booked today), or whether On my way has gone for today's visit. */
   onMyWay: OnMyWayDto;
   timezone: string;

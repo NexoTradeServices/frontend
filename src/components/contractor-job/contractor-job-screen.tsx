@@ -793,6 +793,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               zone={job.timezone}
               idPrefix="entry"
               errors={errors}
+              canAdd={rows.length < job.visitsAllowed}
               onChange={(next) => {
                 setRows(next);
                 setErrors({});

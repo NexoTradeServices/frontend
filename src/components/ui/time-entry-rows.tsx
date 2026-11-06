@@ -112,6 +112,7 @@ export function TimeEntryRows({
   errors = {},
   noteLabel = "Visit note",
   showNow = true,
+  canAdd = true,
   onChange,
 }: {
   rows: TimeEntryRow[];
@@ -124,6 +125,8 @@ export function TimeEntryRows({
   noteLabel?: string;
   /** Feature 6007: false after the fact (Correct & reissue) -- Finish has no "Now" button. */
   showNow?: boolean;
+  /** Feature 5002: false on Bob's screen until a return visit is booked -- no "+ Add a visit" link. */
+  canAdd?: boolean;
   onChange?: (next: TimeEntryRow[]) => void;
 }) {
   if (mode !== "edit") {
@@ -229,6 +232,7 @@ export function TimeEntryRows({
         );
       })}
       {errors["rows"] ? <p className="mt-[5px] text-xs text-brand-destructive">{errors["rows"]}</p> : null}
+      {canAdd ? (
       <button
         type="button"
         onClick={() => onChange?.([...rows, newEntryRow(zone)])}
@@ -236,6 +240,7 @@ export function TimeEntryRows({
       >
         + Add a visit
       </button>
+      ) : null}
     </div>
   );
 }

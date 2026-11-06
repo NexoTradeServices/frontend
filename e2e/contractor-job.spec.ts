@@ -83,12 +83,9 @@ test.describe("Bob's job screen, on a phone", () => {
     await expect(page.locator("#entry-0-end-minute")).not.toHaveValue("");
     await pickTime(page, "#entry-0-start", "8:07am");
     await pickTime(page, "#entry-0-end", "11:05am");
-    await page.getByRole("button", { name: "+ Add a visit" }).click();
-    await page.locator("#entry-1-date").fill("2026-10-09");
-    await pickTime(page, "#entry-1-start", "9:00am");
-    await pickTime(page, "#entry-1-end", "9:20am");
-    await page.locator("#entry-1-note").fill("Back for the washer");
-    await expect(page.getByText("Billed 3.5h")).toBeVisible();
+    // A second visit row only comes from a booked return: no add link on a job with one visit (the two-row save is proven in the back end).
+    await expect(page.getByRole("button", { name: "+ Add a visit" })).toHaveCount(0);
+    await expect(page.getByText(/Billed 3(\.0)?h/)).toBeVisible();
 
     await page.locator("#completion-notes").fill("Replaced the cartridge.");
 
@@ -110,13 +107,11 @@ test.describe("Bob's job screen, on a phone", () => {
     await page.reload();
     await expectTime(page, "#entry-0-start", "8:07am");
     await expectTime(page, "#entry-0-end", "11:05am");
-    await expect(page.locator("#entry-1-date")).toHaveValue("2026-10-09");
-    await expect(page.locator("#entry-1-note")).toHaveValue("Back for the washer");
     await expect(page.locator("#completion-notes")).toHaveValue("Replaced the cartridge.");
     await expect(page.locator("#part-0-name")).toHaveValue("Tap cartridge");
     await expect(page.locator("#part-0-price")).toHaveValue("45.00");
     await expect(page.getByText("bunnings-re...")).toBeVisible();
-    await expect(page.getByText("Billed 3.5h")).toBeVisible();
+    await expect(page.getByText(/Billed 3(\.0)?h/)).toBeVisible();
   });
 
   test("AC7: Complete with nothing entered is refused on those fields; then the dialog asks once and the screen locks", async ({
