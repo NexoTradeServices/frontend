@@ -547,10 +547,13 @@ export function DispatchView({ initial }: { initial: DispatchFacts }) {
           </label>
           {candidates ? (
             <div className="mt-3 rounded-small-box border border-hairline bg-ground p-3.5">
-              <span className={labelClass}>Price to quote the customer</span>
+              <span className={labelClass}>{returning ? "Price of the return visit" : "Price to quote the customer"}</span>
               <div className="font-heading text-lg font-extrabold tabular-nums text-ink">
-                First hour (includes call-out) {candidates.price.calloutRate}, then {candidates.price.standardRate}/h
+                {returning
+                  ? `${candidates.price.standardRate}/h - no call-out`
+                  : `First hour (includes call-out) ${candidates.price.calloutRate}, then ${candidates.price.standardRate}/h`}
               </div>
+              {returning ? <p className="mt-1 text-xs text-muted-text">The call-out was charged on the first visit.</p> : null}
             </div>
           ) : null}
         </Card>
