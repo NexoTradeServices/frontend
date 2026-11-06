@@ -366,6 +366,8 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
   const arrived = job.assignmentStatus === "in_progress";
   const working = arrived && !frozen;
   const idle = !arrived && !frozen;
+  // between visits (and after Complete) what is saved shows, locked; the Locked-at-completion words are only for a completed job
+  const readOnly = !working;
   const onHold = job.jobStatus === "on_hold";
   const isCallback = job.callbackOn !== null;
   const changed = snapshotOf(rows, notes, parts, pick) !== saved;
@@ -771,7 +773,28 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
         </div>
 
         <div className="order-2 flex min-w-0 flex-col gap-4 xl:col-start-1 xl:row-start-1">
-          {idle && !job.canOnSite && job.onMyWay === null && job.jobStatus === "scheduled" && job.slotLabel !== null ? (
+          {job.returnVisit !== null ? (
+            <Card title="Return visit">
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2" data-testid="return-visit-summary">
+                <Fact label="Reason">
+                  {job.returnVisit.reason === "part_on_order"
+                    ? "Part on order"
+                    : job.returnVisit.reason === "more_time_needed"
+                      ? "More time needed"
+                      : job.returnVisit.otherText === ""
+                        ? "Other"
+                        : `Other - ${job.returnVisit.otherText}`}
+                </Fact>
+                <Fact label="When">{onHold ? "Not booked yet - the office will book it" : (job.slotLabel ?? "No date yet")}</Fact>
+              </div>
+              {onHold && job.returnVisit.officeNote !== "" ? (
+                <div className="mt-3.5">
+                  <Fact label="Note for the office">{job.returnVisit.officeNote}</Fact>
+                </div>
+              ) : null}
+              {idle && !job.canOnSite && !onHold ? <p className="mt-3.5 text-small text-secondary-text">I&apos;ve arrived appears on the day.</p> : null}
+            </Card>
+          ) : idle && !job.canOnSite && job.onMyWay === null && job.jobStatus === "scheduled" && job.slotLabel !== null ? (
             <Card title="Next visit">
               <p className="text-small text-secondary-text" data-testid="next-visit">
                 {job.slotLabel}. I&apos;ve arrived appears on the day.
@@ -860,10 +883,10 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
               )}
             </Card>
           ) : null}
-{frozen || working ? (
+{frozen || working || notes.trim() !== "" ? (
           <Card title="Work notes">
-            {frozen ? (
-              <LockedValue label="Work notes" hideLabel value={notes === "" ? "-" : notes} message />
+            {readOnly ? (
+              <LockedValue label="Work notes" hideLabel value={notes === "" ? "-" : notes} message={frozen} />
             ) : (
               <div className="mb-3.5">
                 <label htmlFor="completion-notes" className="sr-only">
@@ -892,15 +915,15 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
         </div>
 
         <div className="order-4 min-w-0 xl:col-start-1 xl:row-start-3">
-{frozen || working ? (
+{frozen || working || parts.some((part) => !isBlankPart(part)) ? (
           <Card title="Parts used" aside={`Up to ${capLabel} in total`}>
-            {parts.length === 0 && frozen ? <p className="text-small text-muted-text">No parts.</p> : null}
+            {parts.length === 0 && readOnly ? <p className="text-small text-muted-text">No parts.</p> : null}
             {parts.map((part, index) => {
               const at = (field: string): string | undefined => errors[`part.${String(index)}.${field}`] || undefined;
               const id = `part-${String(index)}`;
               return (
                 <div key={part.key} className={index > 0 ? "mt-3.5 border-t border-hairline pt-3.5" : undefined} data-testid="part-row">
-                  {frozen ? (
+                  {readOnly ? (
                     <>
                       <LockedValue label="Part" value={part.name} />
                       <div className="grid grid-cols-[5.5rem_1fr] gap-x-3.5">
@@ -980,7 +1003,7 @@ export function ContractorJobScreen({ initial }: { initial: ContractorJobDto }) 
                 </div>
               );
             })}
-            {!frozen ? (
+            {working ? (
               <button
                 type="button"
                 onClick={() => setParts((current) => [...current, newPart()])}
