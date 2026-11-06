@@ -14,5 +14,5 @@ export const CONTRACTOR_NAV_ITEMS: readonly PortalNavItem[] = [
   { key: "settlements", label: "Payouts", href: "/contractor/payouts", built: true },
   { key: "rates", label: "Rates", href: "/contractor/rates", built: true },
   { key: "service-area", label: "Service area", href: "/contractor/service-area", built: true },
-  { key: "my-details", label: "My details", href: "/contractor/details", built: false },
+  { key: "my-details", label: "My details", href: "/contractor/details", built: true },
 ] as const;

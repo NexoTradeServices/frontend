@@ -98,7 +98,8 @@ test.describe(() => {
 
     const panel = page.locator("ul").filter({ hasText: "service area" });
     await expect(panel.getByText("service area (not set up yet)")).toBeVisible();
-    await expect(panel.getByRole("link", { name: "Fix now" })).toHaveCount(1); // her one built destination
+    await expect(panel.getByRole("link", { name: "Fix now" })).toHaveCount(2); // her two built destinations: service area and (2005) My details
+    await expect(panel.locator("li").filter({ hasText: "payout details" }).getByRole("link", { name: "Fix now" })).toHaveAttribute("href", "/contractor/details");
     await expect(panel.getByText("payout details")).toBeVisible();
     await expect(panel.getByText("insurance renewal (expired)")).toBeVisible();
     await expect(panel.getByText("Call the office")).toBeVisible();
@@ -133,7 +134,7 @@ test.describe(() => {
     await expect(page.getByText("$215.00")).toBeVisible(); // Air conditioning call-out
   });
 
-  test("AC13: the contractor menu shows Dashboard, Calendar, Availability, Rates, Service area and Settlements; the rest still dark", async ({ page }) => {
+  test("AC13: the contractor menu shows Dashboard, Calendar, Availability, Payouts, Rates, Service area and My details", async ({ page }) => {
     await page.goto("/contractor");
     await login(page, "bob@idelta.com.au");
     await page.getByRole("button", { name: "Open menu" }).click();
@@ -144,10 +145,11 @@ test.describe(() => {
     // Feature 2004 built Calendar and Availability (Availability after Calendar, the Portal menus order).
     await expect(menu.getByRole("link", { name: "Calendar" })).toBeVisible();
     await expect(menu.getByRole("link", { name: "Availability" })).toBeVisible();
-    await expect(menu.getByRole("link")).toHaveText(["Dashboard", "Calendar", "Availability", "Payouts", "Rates", "Service area"]);
+    await expect(menu.getByRole("link")).toHaveText(["Dashboard", "Calendar", "Availability", "Payouts", "Rates", "Service area", "My details"]);
     // Feature 6003 built it.
     await expect(menu.getByRole("link", { name: "Payouts" })).toBeVisible();
-    await expect(menu.getByRole("link", { name: "My details" })).toHaveCount(0);
+    // Feature 2005 built My details.
+    await expect(menu.getByRole("link", { name: "My details" })).toBeVisible();
   });
 
   test("5004 AC1, AC4: On my way sits under today's card only; the tap turns it into the sent line, and a failed tap says so", async ({ page, browser, request }) => {
