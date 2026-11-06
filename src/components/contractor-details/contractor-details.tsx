@@ -135,12 +135,13 @@ export function ContractorDetails({ initial }: { initial: DetailsDto }) {
           <h4 className="mt-5 mb-3 font-heading text-sm font-extrabold text-ink sm:col-span-2">Emergency contact</h4>
           <Field label="Emergency contact name" id="d-ecName" placeholder="Jen Reilly" value={fields.emergencyContactName} onChange={(e) => set("emergencyContactName", e.target.value)} />
           <Field label="Emergency contact phone" id="d-ecPhone" placeholder="0400 000 000" value={fields.emergencyContactPhone} onChange={(e) => set("emergencyContactPhone", e.target.value)} />
-          <h4 className="mt-5 mb-3 font-heading text-sm font-extrabold text-ink sm:col-span-2">Trade and insurance</h4>
+          <h4 className="mt-5 mb-3 font-heading text-sm font-extrabold text-ink sm:col-span-2">Trades and licences</h4>
           {office.specialties.map((s) => (
             <LockedField key={s.trade} label={s.trade} value={`Licence ${s.licenceNumber}, expires ${fmtDate(s.licenceExpiry)}`} />
           ))}
+          <h4 className="mt-5 mb-3 font-heading text-sm font-extrabold text-ink sm:col-span-2">Insurance</h4>
           <LockedField
-            label="Insurance"
+            label="Insurance details"
             value={
               office.insurer
                 ? `${office.insurer}${office.insurancePolicyNo ? `, policy ${office.insurancePolicyNo}` : ""}${office.insuranceExpiry ? `, expires ${fmtDate(office.insuranceExpiry)}` : ""}`

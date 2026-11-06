@@ -49,7 +49,7 @@ test("AC1: My details is on the menu and opens the page", async ({ page }) => {
   // one form in one card, the hint at its top, Save at the end
   const form = page.getByTestId("my-details-form");
   await expect(form.getByRole("heading", { name: "Your details" })).toHaveCount(0); // no second title: the page title is My details
-  for (const group of ["Emergency contact", "Trade and insurance", "Bank details"]) await expect(form.getByRole("heading", { name: group })).toBeVisible();
+  for (const group of ["Emergency contact", "Trades and licences", "Insurance", "Bank details"]) await expect(form.getByRole("heading", { name: group })).toBeVisible();
   await expect(form.getByText("Fields with a padlock are set by the office. Please call the office to change them.")).toBeVisible();
   await expect(form.getByRole("button", { name: "Save", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: /^(Address|Set by the office)/ })).toHaveCount(0);
